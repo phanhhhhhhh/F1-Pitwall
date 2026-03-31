@@ -1,0 +1,17 @@
+# Môi trường IDE (IntelliJ, VS Code)
+.idea/
+*.iml
+.vscode/
+
+# Thư mục build của Java
+target/
+*.class
+
+# Thư mục build của Node.js (sau này làm Frontend)
+node_modules/
+dist/
+build/
+
+# File cấu hình hệ điều hành
+.DS_Store
+Thumbs.db
