@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { authFetch, clearTokens } from "./lib/pitwall-auth";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 interface Driver {
   id?: number;
@@ -13,35 +14,22 @@ interface Driver {
 export default function Home() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isLoggedIn] = useState(() =>
-    typeof window !== "undefined" && Boolean(window.sessionStorage.getItem("pitwall_access"))
-  );
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const [newName, setNewName] = useState("");
   const [newTeam, setNewTeam] = useState("");
   const [newNumber, setNewNumber] = useState("");
 
-  const handleLogout = () => {
-    clearTokens();
-    window.location.href = "/login";
-  };
-
   const fetchDrivers = async () => {
     try {
-      const res = await authFetch("http://localhost:8080/api/drivers");
-
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          window.location.href = "/login";
-          return;
-        }
-        throw new Error("Server error");
-      }
-
+      const res = await fetch(`${API_URL}/api/drivers`);
+      if (!res.ok) throw new Error("Không thể kết nối tới server");
       const data = await res.json();
       setDrivers(data);
-    } catch (err) {
-      console.error("Connection error:", err);
+      setError("");
+    } catch (err: any) {
+      setError(err.message || "Lỗi kết nối");
     } finally {
       setLoading(false);
     }
@@ -53,6 +41,7 @@ export default function Home() {
 
   const handleAddDriver = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
 
     const newDriver = {
       name: newName,
@@ -61,75 +50,62 @@ export default function Home() {
     };
 
     try {
-      const response = await authFetch("http://localhost:8080/api/drivers", {
+      const response = await fetch(`${API_URL}/api/drivers`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newDriver),
       });
 
-      if (response.ok) {
-        setNewName("");
-        setNewTeam("");
-        setNewNumber("");
-        fetchDrivers();
-      } else {
-        alert("You do not have permission to add a driver. Please sign in.");
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Thêm tay đua thất bại");
       }
-    } catch (error) {
-      console.error("Error while adding driver:", error);
+
+      setNewName("");
+      setNewTeam("");
+      setNewNumber("");
+      fetchDrivers();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id?: number) => {
     if (!id) return;
 
-    const confirmDelete = window.confirm("Are you sure you want to delete this driver?");
-    if (!confirmDelete) return;
-
     try {
-      const response = await authFetch(`http://localhost:8080/api/drivers/${id}`, {
+      const response = await fetch(`${API_URL}/api/drivers/${id}`, {
         method: "DELETE",
       });
 
-      if (response.ok) {
-        fetchDrivers();
-      } else {
-        alert("You do not have permission to delete a driver. Please sign in.");
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Xóa thất bại");
       }
-    } catch (error) {
-      console.error("Error while deleting driver:", error);
+
+      fetchDrivers();
+    } catch (err: any) {
+      setError(err.message);
     }
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-red-500/30">
-      <div className="bg-zinc-900 border-b border-zinc-800 px-10 py-3 flex justify-between items-center text-sm">
-        <div className="text-zinc-400 font-mono">
-          SYSTEM STATUS: <span className="text-green-500">ONLINE</span>
-        </div>
-        <div>
-          {isLoggedIn ? (
-            <div className="flex items-center space-x-4">
-              <span className="text-zinc-300">
-                Logged in
-              </span>
-              <button onClick={handleLogout} className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1 rounded transition-colors">
-                LOGOUT
-              </button>
-            </div>
-          ) : (
-            <a href="/login" className="text-red-500 hover:text-red-400 font-bold tracking-wider transition-colors">
-              [ LOGIN TO COMMAND CENTER ]
-            </a>
-          )}
-        </div>
-      </div>
+    <main className="min-h-screen bg-zinc-950 p-10 text-white font-sans selection:bg-red-500/30">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
 
-      <div className="p-10 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-1">
           <div className="sticky top-10 bg-zinc-900/50 border border-zinc-800 p-8 rounded-2xl backdrop-blur-md">
             <h2 className="text-2xl font-bold mb-6 text-red-500 border-b border-zinc-800 pb-4">
               [ ADD DRIVER ]
             </h2>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                ⚠️ {error}
+              </div>
+            )}
 
             <form onSubmit={handleAddDriver} className="space-y-4">
               <div>
@@ -161,6 +137,8 @@ export default function Home() {
                 <input
                   type="number"
                   required
+                  min={1}
+                  max={99}
                   value={newNumber}
                   onChange={(e) => setNewNumber(e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 transition-colors"
@@ -170,9 +148,10 @@ export default function Home() {
 
               <button
                 type="submit"
-                className="w-full mt-6 bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-center items-center space-x-2"
+                disabled={submitting}
+                className="w-full mt-6 bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-center items-center space-x-2"
               >
-                <span>🚀 PUSH TO DATABASE</span>
+                <span>{submitting ? "⏳ ĐANG GỬI..." : "🚀 PUSH TO DATABASE"}</span>
               </button>
             </form>
           </div>
@@ -201,16 +180,15 @@ export default function Home() {
                   className="group relative bg-zinc-900 border border-zinc-800 p-6 rounded-2xl overflow-hidden hover:border-red-500/50 transition-all duration-300 hover:shadow-[0_0_30px_-5px_rgba(239,68,68,0.2)] hover:-translate-y-1"
                 >
                   <div className="absolute top-0 right-0 w-16 h-16 bg-linear-to-bl from-red-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-                  {/* Delete button uses authFetch */}
                   <button
                     onClick={() => handleDelete(driver.id)}
                     className="absolute top-4 right-4 z-20 w-8 h-8 flex items-center justify-center bg-zinc-950 border border-zinc-800 rounded-full text-zinc-500 hover:text-red-500 hover:border-red-500 transition-colors opacity-0 group-hover:opacity-100"
                     title="Delete this driver"
+                    aria-label="Delete this driver"
+                    type="button"
                   >
                     ×
                   </button>
-
                   <div className="absolute -bottom-4 -right-2 text-8xl font-black text-zinc-800/50 group-hover:text-red-500/10 transition-colors pointer-events-none">
                     {driver.carNumber}
                   </div>

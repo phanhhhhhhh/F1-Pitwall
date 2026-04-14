@@ -1,0 +1,13 @@
+# 1. Đăng nhập
+curl -X POST http://localhost:8080/api/auth/login \
+-H "Content-Type: application/json" \
+-d '{"username":"admin","password":"pitwall2024"}'
+
+# 2. Dùng token trả về để gọi API
+curl http://localhost:8080/api/drivers \
+  -H "Authorization: Bearer <paste_token_here>"
+
+# 3. Refresh token
+curl -X POST http://localhost:8080/api/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"<paste_refresh_token>"}'
