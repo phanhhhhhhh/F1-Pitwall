@@ -1,4 +1,3 @@
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export interface AuthResponse {
@@ -16,7 +15,6 @@ export interface User {
     role: string;
     createdAt: string;
 }
-
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
