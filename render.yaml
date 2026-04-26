@@ -3,7 +3,7 @@ services:
   - type: web
     name: f1-pitwall-backend
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
+    rootDir: backend
     plan: free
     envVars:
       - key: SPRING_PROFILES_ACTIVE
