@@ -11,7 +11,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        value: https://f1-pitwall.vercel.app  # đổi thành URL Vercel của bạn
+        value: https://f1-pitwall.vercel.app
       - key: DATABASE_URL
         fromDatabase:
           name: f1-pitwall-db
@@ -32,11 +32,14 @@ services:
         fromDatabase:
           name: f1-pitwall-db
           property: port
+      - key: PGDATABASE
+        fromDatabase:
+          name: f1-pitwall-db
+          property: database
     healthCheckPath: /actuator/health
 
-  # ─── PostgreSQL Database ─────────────────────────────────────────────────
+# ─── PostgreSQL Database ─────────────────────────────────────────────────
 databases:
   - name: f1-pitwall-db
     plan: free
     databaseName: f1_pitwall_db
-    user: postgres
