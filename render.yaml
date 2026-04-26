@@ -36,7 +36,6 @@ services:
         fromDatabase:
           name: f1-pitwall-db
           property: database
-    healthCheckPath: /actuator/health
 
 # ─── PostgreSQL Database ─────────────────────────────────────────────────
 databases:
