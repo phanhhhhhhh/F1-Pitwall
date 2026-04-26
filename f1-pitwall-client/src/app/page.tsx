@@ -24,7 +24,6 @@ const statusStyle: Record<string, string> = {
   ONGOING: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
 };
 
-// 2026 race winners (3 completed races)
 const RACE_WINNERS: Record<string, { driver: string; team: string }> = {
   "Australian Grand Prix": { driver: "G. Russell", team: "Mercedes" },
   "Chinese Grand Prix": { driver: "K. Antonelli", team: "Mercedes" },
@@ -44,7 +43,6 @@ export default function Home() {
     fetchData();
   }, []);
 
-  // Countdown to Miami GP — May 3, 2026
   useEffect(() => {
     const target = new Date("2026-05-03T20:00:00Z");
     const update = () => {
@@ -59,6 +57,19 @@ export default function Home() {
     const id = setInterval(update, 60000);
     return () => clearInterval(id);
   }, []);
+
+  const fetchWithRetry = async (url: string, retries = 3): Promise<Response> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await authFetch(url);
+        if (res.ok) return res;
+      } catch (e) {
+        if (i === retries - 1) throw e;
+        await new Promise(r => setTimeout(r, 2000)); // chờ 2s rồi retry
+      }
+    }
+    throw new Error("Failed after retries");
+  };
 
   const fetchData = async () => {
     try {
