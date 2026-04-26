@@ -9,6 +9,7 @@ const navItems = [
   { href: "/drivers", label: "DRIVERS" },
   { href: "/teams", label: "TEAMS" },
   { href: "/races", label: "RACES" },
+  { href: "/standings", label: "STANDINGS" },
   { href: "/circuits", label: "CIRCUITS" },
   { href: "/telemetry", label: "TELEMETRY", live: true },
 ];
@@ -33,18 +34,13 @@ export default function Navbar() {
 
       <div className="flex items-center">
         {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`px-5 py-4 text-xs font-bold tracking-widest border-b-2 transition-all duration-200 flex items-center gap-1.5 ${
-              pathname === item.href
+          <Link key={item.href} href={item.href}
+            className={`px-4 py-4 text-xs font-bold tracking-widest border-b-2 transition-all duration-200 flex items-center gap-1.5 ${
+              pathname === item.href || pathname.startsWith(item.href + "/")
                 ? "border-red-500 text-white"
                 : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
-            }`}
-          >
-            {item.live && (
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-            )}
+            }`}>
+            {item.live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
             {item.label}
           </Link>
         ))}

@@ -7,9 +7,35 @@ import Navbar from "../components/Navbar";
 
 declare global {
   interface Window {
-    SockJS: any;
-    Stomp: any;
+    SockJS: new (url: string) => unknown;
+    Stomp?: StompFactory;
+    StompJs?: {
+      Stomp: StompFactory;
+    };
   }
+}
+
+interface TelemetryFrame {
+  body: string;
+}
+
+interface StompSubscription {
+  unsubscribe: () => void;
+}
+
+interface StompClient {
+  debug: ((message: string) => void) | null;
+  connect: (
+    headers: Record<string, string>,
+    onConnect: () => void,
+    onError?: (error: unknown) => void,
+  ) => void;
+  subscribe: (destination: string, callback: (message: TelemetryFrame) => void) => StompSubscription;
+  disconnect: (callback?: () => void) => void;
+}
+
+interface StompFactory {
+  over: (webSocketFactory: () => unknown) => StompClient;
 }
 
 interface TelemetryData {
@@ -70,7 +96,11 @@ function SpeedChart({ data, color }: { data: number[]; color: string }) {
     data.forEach((v, i) => {
       const x = (i / (MAX_HISTORY - 1)) * w;
       const y = h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
     });
     ctx.stroke();
 
@@ -108,62 +138,65 @@ export default function TelemetryPage() {
   const [drivers, setDrivers] = useState<TelemetryData[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [speedHistory, setSpeedHistory] = useState<Record<string, number[]>>({});
-  const stompRef = useRef<any>(null);
+  const stompRef = useRef<StompClient | null>(null);
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
+    if (!getAccessToken()) {
+      router.push("/login");
+      return;
+    }
+
+    const connect = () => {
+      const stompFactory = window.Stomp ?? window.StompJs?.Stomp;
+
+      if (!stompFactory) {
+        setTimeout(connect, 500);
+        return;
+      }
+
+      const stompClient = stompFactory.over(() => new window.SockJS("http://localhost:8080/ws"));
+      stompClient.debug = () => {};
+
+      stompClient.connect({}, () => {
+        setConnected(true);
+        stompClient.subscribe("/topic/telemetry", (message: TelemetryFrame) => {
+          const data: TelemetryData[] = JSON.parse(message.body);
+          setDrivers(data);
+          setSpeedHistory((prev) => {
+            const next = { ...prev };
+            data.forEach((driver) => {
+              const hist = next[driver.driverName] || [];
+              next[driver.driverName] = [...hist.slice(-(MAX_HISTORY - 1)), driver.speed];
+            });
+            return next;
+          });
+        });
+      }, () => setConnected(false));
+
+      stompRef.current = stompClient;
+    };
+
+    const loadScriptsAndConnect = () => {
+      const sockScript = document.createElement("script");
+      sockScript.src = "https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js";
+      document.head.appendChild(sockScript);
+
+      sockScript.onload = () => {
+        const stompScript = document.createElement("script");
+        stompScript.src = "https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js";
+        document.head.appendChild(stompScript);
+
+        stompScript.onload = () => {
+          setTimeout(connect, 100);
+        };
+      };
+    };
+
     loadScriptsAndConnect();
     return () => {
       stompRef.current?.disconnect();
     };
-  }, []);
-
-  const loadScriptsAndConnect = () => {
-  const sockScript = document.createElement("script");
-  sockScript.src = "https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js";
-  document.head.appendChild(sockScript);
-
-  sockScript.onload = () => {
-    const stompScript = document.createElement("script");
-    stompScript.src = "https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js";
-    document.head.appendChild(stompScript);
-
-    stompScript.onload = () => {
-      setTimeout(connect, 100);
-    };
-  };
-};
-
- const connect = () => {
-  const StompClient = window.Stomp || window.StompJs?.Stomp;
-  
-  if (!StompClient) {
-    setTimeout(connect, 500);
-    return;
-  }
-
-  // Đổi const stomp → const stompClient để tránh trùng tên
-  const stompClient = StompClient.over(() => new window.SockJS("http://localhost:8080/ws"));
-  stompClient.debug = () => {};
-
-  stompClient.connect({}, () => {
-    setConnected(true);
-    stompClient.subscribe("/topic/telemetry", (msg: any) => {
-      const data: TelemetryData[] = JSON.parse(msg.body);
-      setDrivers(data);
-      setSpeedHistory(prev => {
-        const next = { ...prev };
-        data.forEach(d => {
-          const hist = next[d.driverName] || [];
-          next[d.driverName] = [...hist.slice(-(MAX_HISTORY - 1)), d.speed];
-        });
-        return next;
-      });
-    });
-  }, () => setConnected(false));
-
-  stompRef.current = stompClient;
-};
+  }, [router]);
 
   const selectedDriver = drivers.find(d => d.driverName === selected) || drivers[0];
 
@@ -296,7 +329,11 @@ export default function TelemetryPage() {
                         data.forEach((v, i) => {
                           const x = (i / (MAX_HISTORY - 1)) * w;
                           const y = h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-                          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                          if (i === 0) {
+                            ctx.moveTo(x, y);
+                          } else {
+                            ctx.lineTo(x, y);
+                          }
                         });
                         ctx.stroke();
                         ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
