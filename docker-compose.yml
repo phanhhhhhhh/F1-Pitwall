@@ -1,22 +1,74 @@
-version: '3.8'
+version: "3.9"
+
 services:
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: f1_postgres
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: rootpassword
       POSTGRES_DB: f1_pitwall_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ─── Redis ───────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: f1_redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend (Spring Boot) ───────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: f1_backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/f1_pitwall_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      JWT_SECRET: f1pitwall2026supersecretkey_changethisinproduction
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Frontend (Next.js) ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./f1-pitwall-client
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    container_name: f1_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
-  pgdata:
+  postgres_data:
