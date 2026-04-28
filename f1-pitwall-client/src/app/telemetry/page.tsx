@@ -87,7 +87,7 @@ function SpeedChart({ data, color }: { data: number[]; color: string }) {
       ctx.stroke();
     }
 
-   
+
     ctx.beginPath();
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
@@ -104,7 +104,7 @@ function SpeedChart({ data, color }: { data: number[]; color: string }) {
     });
     ctx.stroke();
 
-    
+
     ctx.lineTo(w, h);
     ctx.lineTo(0, h);
     ctx.closePath();
@@ -154,8 +154,9 @@ export default function TelemetryPage() {
         return;
       }
 
-      const stompClient = stompFactory.over(() => new window.SockJS("http://localhost:8080/ws"));
-      stompClient.debug = () => {};
+      const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/ws";
+      const stompClient = stompFactory.over(() => new window.SockJS(wsUrl));
+      stompClient.debug = () => { };
 
       stompClient.connect({}, () => {
         setConnected(true);
@@ -234,18 +235,17 @@ export default function TelemetryPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            {}
+            { }
             <div className="lg:col-span-1 space-y-2">
               <p className="text-xs font-mono text-zinc-500 tracking-widest mb-3">RACE ORDER</p>
               {drivers.map((d) => (
                 <div
                   key={d.driverName}
                   onClick={() => setSelected(d.driverName)}
-                  className={`bg-zinc-900 rounded-xl p-4 cursor-pointer transition-all border ${
-                    selected === d.driverName || (!selected && d.position === 1)
-                      ? "border-2"
-                      : "border-zinc-800 hover:border-zinc-600"
-                  }`}
+                  className={`bg-zinc-900 rounded-xl p-4 cursor-pointer transition-all border ${selected === d.driverName || (!selected && d.position === 1)
+                    ? "border-2"
+                    : "border-zinc-800 hover:border-zinc-600"
+                    }`}
                   style={selected === d.driverName || (!selected && d.position === 1)
                     ? { borderColor: d.teamColor }
                     : {}}
@@ -277,10 +277,10 @@ export default function TelemetryPage() {
               ))}
             </div>
 
-            {}
+            { }
             {selectedDriver && (
               <div className="lg:col-span-2 space-y-4">
-                {}
+                { }
                 <div
                   className="bg-zinc-900 rounded-xl p-6 border-l-4"
                   style={{ borderColor: selectedDriver.teamColor }}
@@ -301,7 +301,7 @@ export default function TelemetryPage() {
                     </div>
                   </div>
 
-                  {}
+                  { }
                   <div className="bg-zinc-800/50 rounded-lg p-3 mb-4">
                     <p className="text-xs text-zinc-500 font-mono mb-2">SPEED · LAST {MAX_HISTORY}s</p>
                     <canvas
@@ -346,7 +346,7 @@ export default function TelemetryPage() {
                     />
                   </div>
 
-                  {}
+                  { }
                   <div className="grid grid-cols-4 gap-3 mb-6">
                     {[
                       { label: "GEAR", value: `G${selectedDriver.gear}`, big: true },
@@ -361,20 +361,19 @@ export default function TelemetryPage() {
                     ))}
                   </div>
 
-                  {}
+                  { }
                   <div className="space-y-3">
                     <GaugeBar value={selectedDriver.throttle} max={100} color="#22c55e" label="THROTTLE" />
                     <GaugeBar value={selectedDriver.brake} max={100} color="#ef4444" label="BRAKE" />
                     <GaugeBar value={selectedDriver.tyreTemp} max={120} color="#f97316" label={`TYRE TEMP (${selectedDriver.tyreType})`} />
                   </div>
 
-                  {}
+                  { }
                   <div className="flex items-center gap-3 mt-4">
-                    <div className={`px-4 py-2 rounded-lg border font-mono text-sm font-bold transition-all ${
-                      selectedDriver.drsActive
-                        ? "bg-green-500/20 border-green-500 text-green-400"
-                        : "bg-zinc-800 border-zinc-700 text-zinc-600"
-                    }`}>
+                    <div className={`px-4 py-2 rounded-lg border font-mono text-sm font-bold transition-all ${selectedDriver.drsActive
+                      ? "bg-green-500/20 border-green-500 text-green-400"
+                      : "bg-zinc-800 border-zinc-700 text-zinc-600"
+                      }`}>
                       DRS {selectedDriver.drsActive ? "ACTIVE" : "INACTIVE"}
                     </div>
                     <div className="text-xs text-zinc-500">
