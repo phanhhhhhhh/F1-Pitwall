@@ -75,7 +75,6 @@ export default function RaceResultsPage() {
       if (resultsData.length > 0) {
         setMode("view");
       } else {
-        // Init rows with all drivers, sorted by carNumber
         initRows(driversData);
         setMode("edit");
       }
