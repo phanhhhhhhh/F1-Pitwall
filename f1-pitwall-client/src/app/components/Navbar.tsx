@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clearTokens } from "../lib/pitwall-auth";
+import NotificationBell from "./NotificationBell";
 
 const navItems = [
   { href: "/", label: "OVERVIEW" },
@@ -47,12 +48,14 @@ export default function Navbar() {
         ))}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-zinc-500 text-xs font-mono">LIVE</span>
         </div>
-        <button onClick={handleLogout} className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono tracking-wider">
+        <NotificationBell />
+        <button onClick={handleLogout}
+          className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono tracking-wider">
           LOGOUT
         </button>
       </div>
