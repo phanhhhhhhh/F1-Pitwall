@@ -10,6 +10,7 @@ const navItems = [
   { href: "/teams", label: "TEAMS" },
   { href: "/races", label: "RACES" },
   { href: "/standings", label: "STANDINGS" },
+  { href: "/strategy", label: "STRATEGY" },
   { href: "/circuits", label: "CIRCUITS" },
   { href: "/telemetry", label: "TELEMETRY", live: true },
 ];
