@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAccessToken } from "../lib/pitwall-auth";
 import Navbar from "../components/Navbar";
+import { authFetch } from "../lib/pitwall-auth";
 
 declare global {
   interface Window {
@@ -46,14 +47,29 @@ interface TelemetryData {
   timestamp: number;
 }
 
+interface LiveTyreData {
+  driverNumber: number;
+  driverName: string;
+  teamName: string;
+  teamColor: string;
+  tyreCompound: string;
+  tyreAge: number;
+  lapStart: number;
+  stintNumber: number;
+  position: number;
+  isLive: boolean;
+}
+
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 const MAX_HISTORY = 40;
 
 const TYRE_CONFIG: Record<string, { maxLaps: number; color: string; optimalTemp: [number, number] }> = {
-  SOFT:         { maxLaps: 20, color: "#ef4444", optimalTemp: [80, 110] },
-  MEDIUM:       { maxLaps: 30, color: "#eab308", optimalTemp: [90, 120] },
-  HARD:         { maxLaps: 40, color: "#e2e8f0", optimalTemp: [100, 130] },
+  SOFT: { maxLaps: 20, color: "#ef4444", optimalTemp: [80, 110] },
+  MEDIUM: { maxLaps: 30, color: "#eab308", optimalTemp: [90, 120] },
+  HARD: { maxLaps: 40, color: "#e2e8f0", optimalTemp: [100, 130] },
   INTERMEDIATE: { maxLaps: 25, color: "#22c55e", optimalTemp: [50, 80] },
-  WET:          { maxLaps: 30, color: "#3b82f6", optimalTemp: [30, 60] },
+  WET: { maxLaps: 30, color: "#3b82f6", optimalTemp: [30, 60] },
 };
 
 function DualSpeedChart({ data1, data2, color1, color2, label }: {
@@ -222,6 +238,63 @@ function TyreCard({ driver }: { driver: TelemetryData }) {
   );
 }
 
+function LiveTyreCard({ data }: { data: LiveTyreData }) {
+  const config = TYRE_CONFIG[data.tyreCompound] || TYRE_CONFIG.HARD;
+  const tyreLife = Math.max(0, 100 - (data.tyreAge / config.maxLaps) * 100);
+  const pitIn = Math.max(0, config.maxLaps - data.tyreAge);
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-all">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-black text-zinc-600">P{data.position}</span>
+          <div>
+            <p className="text-xs font-bold text-white">{data.driverName.split(" ").pop()}</p>
+            <p className="text-xs font-mono" style={{ color: data.teamColor }}>#{data.driverNumber}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: config.color + "25", color: config.color }}>
+            {data.tyreCompound}
+          </span>
+          <span className="text-xs font-mono text-zinc-500">+{data.tyreAge}L</span>
+        </div>
+      </div>
+
+      {/* Tyre life */}
+      <div className="mb-3">
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-zinc-600">TYRE LIFE</span>
+          <span style={{ color: tyreLife < 20 ? "#ef4444" : tyreLife < 50 ? "#eab308" : "#22c55e" }}>
+            {tyreLife.toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${tyreLife}%`, backgroundColor: tyreLife < 20 ? "#ef4444" : tyreLife < 50 ? "#eab308" : config.color }} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-zinc-800/50 rounded-lg p-2 text-center">
+          <p className="text-lg font-black text-white">{data.tyreAge}</p>
+          <p className="text-xs text-zinc-600">AGE</p>
+        </div>
+        <div className="bg-zinc-800/50 rounded-lg p-2 text-center">
+          <p className="text-xs font-bold text-white mt-1">STINT {data.stintNumber}</p>
+          <p className="text-xs text-zinc-600 mt-0.5">LIVE</p>
+        </div>
+        <div className="bg-zinc-800/50 rounded-lg p-2 text-center">
+          <p className="text-lg font-black" style={{ color: pitIn <= 5 ? "#ef4444" : pitIn <= 10 ? "#eab308" : "#fff" }}>
+            {pitIn}
+          </p>
+          <p className="text-xs text-zinc-600">PIT IN</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TelemetryPage() {
   const router = useRouter();
   const [connected, setConnected] = useState(false);
@@ -233,6 +306,9 @@ export default function TelemetryPage() {
   const [rpmHistory, setRpmHistory] = useState<Record<string, number[]>>({});
   const [throttleHistory, setThrottleHistory] = useState<Record<string, number[]>>({});
   const stompRef = useRef<StompClient | null>(null);
+  const [isRaceLive, setIsRaceLive] = useState(false);
+  const [liveTyreData, setLiveTyreData] = useState<LiveTyreData[]>([]);
+  const [tyreDataSource, setTyreDataSource] = useState<"live" | "simulator">("simulator");
 
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
@@ -241,7 +317,7 @@ export default function TelemetryPage() {
       if (!stompFactory) { setTimeout(connect, 500); return; }
       const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/ws";
       const stompClient = stompFactory.over(() => new window.SockJS(wsUrl));
-      stompClient.debug = () => {};
+      stompClient.debug = () => { };
       stompClient.connect({}, () => {
         setConnected(true);
         stompClient.subscribe("/topic/telemetry", (message: TelemetryFrame) => {
@@ -268,6 +344,31 @@ export default function TelemetryPage() {
     loadScriptsAndConnect();
     return () => { stompRef.current?.disconnect(); };
   }, [router]);
+
+  useEffect(() => {
+    const checkLiveStatus = async () => {
+      try {
+        const res = await authFetch(`${API}/api/openf1/status`);
+        const status = await res.json();
+        setIsRaceLive(status.isLive);
+
+        if (status.isLive) {
+          setTyreDataSource("live");
+          const tyreRes = await authFetch(`${API}/api/openf1/tyres`);
+          const tyreData = await tyreRes.json();
+          setLiveTyreData(tyreData);
+        } else {
+          setTyreDataSource("simulator");
+        }
+      } catch (e) {
+        console.error("Live status check failed:", e);
+      }
+    };
+
+    checkLiveStatus();
+    const interval = setInterval(checkLiveStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const selectedDriver = drivers.find(d => d.driverName === selected) || drivers[0];
   const compareDriver = drivers.find(d => d.driverName === compareWith);
@@ -314,24 +415,88 @@ export default function TelemetryPage() {
           </div>
         ) : mode === "tyres" ? (
           <div>
+            {/* Live / Simulator indicator */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                {isRaceLive ? (
+                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-red-400 text-xs font-mono font-bold">LIVE RACE DATA · OpenF1</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2">
+                    <div className="w-2 h-2 bg-zinc-500 rounded-full" />
+                    <span className="text-zinc-500 text-xs font-mono">SIMULATOR DATA · No race live</span>
+                  </div>
+                )}
+                {isRaceLive && (
+                  <span className="text-xs text-zinc-600 font-mono">Miami GP · Race</span>
+                )}
+              </div>
+
+              {/* Force refresh button */}
+              <button
+                onClick={async () => {
+                  try {
+                    await authFetch(`${API}/api/openf1/fetch`, { method: "POST" });
+                    const tyreRes = await authFetch(`${API}/api/openf1/tyres`);
+                    setLiveTyreData(await tyreRes.json());
+                  } catch (e) { console.error(e); }
+                }}
+                className="text-xs border border-zinc-700 hover:border-red-500 text-zinc-500 hover:text-red-400 px-3 py-1.5 rounded-lg transition-all font-mono"
+              >
+                ↻ REFRESH
+              </button>
+            </div>
+
+            {/* Summary stats */}
             <div className="grid grid-cols-4 gap-4 mb-6">
-              {[
-                { count: softCount, label: "SOFT", color: "text-red-400" },
-                { count: medCount, label: "MEDIUM", color: "text-yellow-400" },
-                { count: hardCount, label: "HARD", color: "text-white" },
-                { count: criticalCount, label: "PIT NOW ⚠️", color: "text-red-500" },
-              ].map(s => (
-                <div key={s.label} className={`bg-zinc-900 border ${s.label === "PIT NOW ⚠️" && criticalCount > 0 ? "border-red-900/50" : "border-zinc-800"} rounded-xl p-4 text-center`}>
-                  <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
-                  <p className="text-xs text-zinc-600 font-mono">{s.label}</p>
-                </div>
-              ))}
+              {isRaceLive ? (
+                // Live data stats
+                <>
+                  {["SOFT", "MEDIUM", "HARD", "INTER"].map(compound => (
+                    <div key={compound} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                      <p className="text-2xl font-black" style={{ color: TYRE_CONFIG[compound]?.color || "#fff" }}>
+                        {liveTyreData.filter(d => d.tyreCompound === compound).length}
+                      </p>
+                      <p className="text-xs text-zinc-600 font-mono">{compound}</p>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                // Simulator stats
+                <>
+                  {[
+                    { count: softCount, label: "SOFT", color: "text-red-400" },
+                    { count: medCount, label: "MEDIUM", color: "text-yellow-400" },
+                    { count: hardCount, label: "HARD", color: "text-white" },
+                    { count: criticalCount, label: "PIT NOW", color: "text-red-500" },
+                  ].map(s => (
+                    <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                      <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
+                      <p className="text-xs text-zinc-600 font-mono">{s.label}</p>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[...drivers].sort((a, b) => a.position - b.position).map(d => (
-                <TyreCard key={d.driverName} driver={d} />
-              ))}
-            </div>
+
+            {/* Tyre cards */}
+            {isRaceLive ? (
+              // Live tyre cards
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {liveTyreData.map(d => (
+                  <LiveTyreCard key={d.driverNumber} data={d} />
+                ))}
+              </div>
+            ) : (
+              // Simulator tyre cards
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {[...drivers].sort((a, b) => a.position - b.position).map(d => (
+                  <TyreCard key={d.driverName} driver={d} />
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -395,17 +560,17 @@ export default function TelemetryPage() {
                       ctx.clearRect(0, 0, el.width, el.height);
                       const min = 150, max = 360, w = el.width, h = el.height, pad = 8;
                       ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
-                      [0,1,2,3,4].forEach(i => { const y = pad + (h-pad*2)*(i/4); ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); ctx.fillStyle="rgba(255,255,255,0.2)"; ctx.font="10px monospace"; ctx.fillText(`${Math.round(max-(max-min)*(i/4))}`,4,y-2); });
+                      [0, 1, 2, 3, 4].forEach(i => { const y = pad + (h - pad * 2) * (i / 4); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.font = "10px monospace"; ctx.fillText(`${Math.round(max - (max - min) * (i / 4))}`, 4, y - 2); });
                       ctx.beginPath(); ctx.strokeStyle = selectedDriver.teamColor; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
-                      data.forEach((v, i) => { const x=(i/(MAX_HISTORY-1))*w; const y=h-pad-((v-min)/(max-min))*(h-pad*2); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-                      ctx.stroke(); ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath(); ctx.fillStyle=selectedDriver.teamColor+"20"; ctx.fill();
+                      data.forEach((v, i) => { const x = (i / (MAX_HISTORY - 1)) * w; const y = h - pad - ((v - min) / (max - min)) * (h - pad * 2); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+                      ctx.stroke(); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fillStyle = selectedDriver.teamColor + "20"; ctx.fill();
                     }} width={600} height={100} className="w-full" />
                   </div>
                   <div className="grid grid-cols-4 gap-3 mb-6">
                     {[
                       { label: "GEAR", value: `G${selectedDriver.gear}`, big: true },
                       { label: "RPM", value: selectedDriver.rpm.toLocaleString(), big: false },
-                      { label: "LAP TIME", value: `${Math.floor(selectedDriver.lapTime/60)}:${(selectedDriver.lapTime%60).toFixed(3).padStart(6,"0")}`, big: false },
+                      { label: "LAP TIME", value: `${Math.floor(selectedDriver.lapTime / 60)}:${(selectedDriver.lapTime % 60).toFixed(3).padStart(6, "0")}`, big: false },
                       { label: "FUEL", value: `${selectedDriver.fuelLoad.toFixed(1)}kg`, big: false },
                     ].map(s => (
                       <div key={s.label} className="bg-zinc-800/50 rounded-lg p-3 text-center">
@@ -460,9 +625,9 @@ export default function TelemetryPage() {
                           </div>
                         </div>
                         <div className="space-y-4">
-                          <DualSpeedChart data1={speedHistory[selectedDriver?.driverName||""]||[]} data2={speedHistory[compareDriver.driverName]||[]} color1={selectedDriver?.teamColor||"#fff"} color2={compareDriver.teamColor} label="SPEED (km/h)" />
-                          <DualSpeedChart data1={throttleHistory[selectedDriver?.driverName||""]||[]} data2={throttleHistory[compareDriver.driverName]||[]} color1={selectedDriver?.teamColor||"#fff"} color2={compareDriver.teamColor} label="THROTTLE (%)" />
-                          <DualSpeedChart data1={rpmHistory[selectedDriver?.driverName||""]||[]} data2={rpmHistory[compareDriver.driverName]||[]} color1={selectedDriver?.teamColor||"#fff"} color2={compareDriver.teamColor} label="RPM" />
+                          <DualSpeedChart data1={speedHistory[selectedDriver?.driverName || ""] || []} data2={speedHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="SPEED (km/h)" />
+                          <DualSpeedChart data1={throttleHistory[selectedDriver?.driverName || ""] || []} data2={throttleHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="THROTTLE (%)" />
+                          <DualSpeedChart data1={rpmHistory[selectedDriver?.driverName || ""] || []} data2={rpmHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="RPM" />
                         </div>
                       </div>
                       <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
@@ -472,7 +637,7 @@ export default function TelemetryPage() {
                             <CompareRow label="SPEED" v1={selectedDriver.speed} v2={compareDriver.speed} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit=" km/h" />
                             <CompareRow label="THROTTLE" v1={selectedDriver.throttle} v2={compareDriver.throttle} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="%" />
                             <CompareRow label="BRAKE" v1={selectedDriver.brake} v2={compareDriver.brake} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="%" />
-                            <CompareRow label="RPM" v1={selectedDriver.rpm/100} v2={compareDriver.rpm/100} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="00" />
+                            <CompareRow label="RPM" v1={selectedDriver.rpm / 100} v2={compareDriver.rpm / 100} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="00" />
                             <CompareRow label="TYRE TEMP" v1={selectedDriver.tyreTemp} v2={compareDriver.tyreTemp} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="°C" />
                             <CompareRow label="FUEL" v1={selectedDriver.fuelLoad} v2={compareDriver.fuelLoad} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="kg" />
                           </>
