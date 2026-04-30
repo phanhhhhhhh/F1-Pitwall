@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/openf1/**").authenticated()
+                        .requestMatchers("/api/export/**").authenticated()
                         .requestMatchers("/ws/**", "/ws/info/**").permitAll()
                         .anyRequest().authenticated()
                 )

@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import {
+  downloadDriverStandingsCsv,
+  downloadConstructorStandingsCsv,
+  downloadStandingsPdf,
+} from "../lib/export";
 import Navbar from "../components/Navbar";
+import ExportButton from "../components/ExportButton";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -80,9 +86,25 @@ export default function StandingsPage() {
               CHAMPIONSHIP <span className="text-red-500">STANDINGS</span>
             </h1>
           </div>
-          <Link href="/races" className="text-xs text-zinc-500 hover:text-red-400 font-mono border border-zinc-700 hover:border-red-500 px-4 py-2 rounded-lg transition-all">
-            ← RACE CALENDAR
-          </Link>
+          {/* Export buttons */}
+          <div className="flex items-center gap-2">
+            <ExportButton
+              label="CSV"
+              variant="csv"
+              onClick={() => tab === "drivers"
+                ? downloadDriverStandingsCsv(2026)
+                : downloadConstructorStandingsCsv(2026)
+              }
+            />
+            <ExportButton
+              label="PDF Report"
+              variant="pdf"
+              onClick={() => downloadStandingsPdf(2026)}
+            />
+            <Link href="/races" className="text-xs text-zinc-500 hover:text-red-400 font-mono border border-zinc-700 hover:border-red-500 px-4 py-2 rounded-lg transition-all">
+              ← RACES
+            </Link>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -102,7 +124,6 @@ export default function StandingsPage() {
             <div className="w-2 h-2 bg-red-500 rounded-full" /> LOADING STANDINGS...
           </div>
         ) : tab === "drivers" ? (
-          /* Driver Standings Table */
           drivers.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-zinc-500 text-lg mb-2">No results yet</p>
@@ -160,7 +181,6 @@ export default function StandingsPage() {
                       <td className="px-4 py-3 text-right">
                         <div>
                           <span className="text-sm font-black text-white">{d.totalPoints.toFixed(0)}</span>
-                          {/* Points bar */}
                           <div className="w-16 h-1 bg-zinc-800 rounded-full mt-1 ml-auto">
                             <div className="h-full rounded-full" style={{ width: `${(d.totalPoints / maxPoints) * 100}%`, backgroundColor: d.teamColor }} />
                           </div>
@@ -173,7 +193,6 @@ export default function StandingsPage() {
             </div>
           )
         ) : (
-          /* Constructor Standings */
           constructors.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-zinc-500 text-lg mb-2">No results yet</p>
@@ -198,14 +217,8 @@ export default function StandingsPage() {
                       </div>
                     </div>
                     <div className="flex gap-6 text-center hidden sm:flex">
-                      <div>
-                        <p className="text-lg font-black text-white">{c.wins}</p>
-                        <p className="text-xs text-zinc-600">WINS</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-black text-white">{c.podiums}</p>
-                        <p className="text-xs text-zinc-600">POD</p>
-                      </div>
+                      <div><p className="text-lg font-black text-white">{c.wins}</p><p className="text-xs text-zinc-600">WINS</p></div>
+                      <div><p className="text-lg font-black text-white">{c.podiums}</p><p className="text-xs text-zinc-600">POD</p></div>
                     </div>
                     <div className="text-right min-w-20">
                       {c.gapToLeader > 0 && <p className="text-xs text-zinc-600 font-mono">-{c.gapToLeader.toFixed(0)}</p>}
