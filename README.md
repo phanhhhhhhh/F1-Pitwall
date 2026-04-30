@@ -1,22 +1,47 @@
 # 🏎️ F1 Pitwall SaaS
 
-> **Live Roster Telemetry Platform** — A full-stack Formula 1 management system built with Spring Boot 4 & Next.js 16, featuring real-time WebSocket telemetry, JWT authentication, and a comprehensive 2026 season dataset.
+> **Live F1 Command Center** — A full-stack Formula 1 management platform built with Spring Boot 4 & Next.js 16, featuring real-time WebSocket telemetry, OpenF1 API integration, pit strategy simulation, championship standings, and a comprehensive 2026 season dataset.
 
----
-
-## 📸 Screenshots
-
-> Dashboard Overview · Driver Roster · Live Telemetry
+🌐 **Live Demo:** [f1-pitwall-tau.vercel.app](https://f1-pitwall-tau.vercel.app)
 
 ---
 
 ## ✨ Features
 
-- 🔐 **JWT Authentication** — Access token + Refresh token, BCrypt password hashing, role-based authorization (ADMIN / ENGINEER / VIEWER)
-- 📡 **Real-time WebSocket Telemetry** — Live speed, RPM, gear, throttle, brake, DRS data via STOMP over SockJS, updated every second
-- 🏁 **2026 Season Data** — Full grid of 22 drivers, 11 teams, 24 circuits, 22 active races (accurate lineup including Cadillac & Audi debut)
-- 🗄️ **18-Entity Data Model** — Comprehensive schema covering Drivers, Teams, Circuits, Races, RaceResults, LapTelemetry, PitStops, CarSetups, WeatherConditions, Penalties, Incidents, StrategyPlans, TyreCompounds, Championships, Sponsorships, DriverContracts, Engineers
-- 🎨 **Dark Dashboard UI** — 6-page Next.js app with team color accents, live race calendar, constructor standings, circuit database
+### 🔐 Authentication & Security
+- JWT Access token + Refresh token rotation
+- BCrypt password hashing
+- Role-based authorization: **ADMIN** / **ENGINEER** / **VIEWER**
+
+### 📡 Real-time WebSocket Telemetry
+- Live speed, RPM, gear, throttle, brake, DRS via STOMP over SockJS — updated every second
+- **Single mode** — full telemetry detail for selected driver
+- **Compare mode** — overlay 2 drivers' speed/throttle/RPM charts side by side with head-to-head stats
+- **Tyres mode** — tyre life %, temperature status, pit window countdown per driver
+
+### 🔴 OpenF1 Live Race Integration
+- Auto-detects live race sessions via OpenF1 API (checks every 30s)
+- During race weekends: Tyres tab switches to **real live data** automatically
+- Shows actual compound, tyre age, stint number per driver
+- Falls back to simulator when no race is active
+
+### 🏆 Race Management & Championship
+- Submit race results (P1–P22) with automatic F1 points calculation (25-18-15-12-10-8-6-4-2-1 + fastest lap)
+- **Driver Championship Standings** — live table with wins, podiums, fastest laps, gap to leader
+- **Constructor Championship Standings** — team points with per-driver breakdown
+- 3 completed 2026 races pre-seeded (Australia → Russell, China → Antonelli, Japan → Antonelli)
+
+### 🛞 Pit Strategy Simulator
+- Compare up to 5 strategies simultaneously
+- Choose tyre compound (S/M/H/I/W) and laps per stint
+- Auto-calculates race time: base lap + tyre pace delta + degradation + pit stop loss (22s)
+- Visual timeline bars + delta table
+- Highlights optimal strategy with ★ FASTEST badge
+
+### 🏁 2026 Season Data
+- 22 drivers, 11 teams, 24 circuits, 24 races
+- Accurate 2026 lineup: Cadillac & Audi debut, Kimi Antonelli at Mercedes, Lando Norris champion
+- 2 cancelled races (Bahrain, Saudi Arabia)
 
 ---
 
@@ -32,10 +57,9 @@
 | Spring Data JPA | 4.0.4 | ORM & repository layer |
 | Hibernate | 7.2.7 | Database ORM |
 | PostgreSQL | 15 | Primary database |
-| Redis | 7 | Cache layer (infrastructure ready) |
 | JJWT | 0.12.6 | JWT token generation & validation |
+| SpringDoc OpenAPI | 2.8.6 | Swagger API docs |
 | Lombok | 1.18.44 | Boilerplate reduction |
-| Docker | — | Containerized PostgreSQL & Redis |
 
 ### Frontend
 | Technology | Version | Purpose |
@@ -44,162 +68,39 @@
 | React | 19.2.4 | UI library |
 | TypeScript | 5 | Type safety |
 | Tailwind CSS | 4 | Styling |
-| SockJS | 1 | WebSocket transport |
-| STOMP.js | 6 | WebSocket messaging protocol |
+| SockJS + STOMP.js | 1 / 6 | WebSocket transport |
+
+### Infrastructure
+| Service | Purpose |
+|---|---|
+| Render | Backend (Docker) + PostgreSQL |
+| Vercel | Frontend hosting |
+| UptimeRobot | Backend uptime monitoring |
+| OpenF1 API | Live race data |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Next.js Frontend                      │
-│   Overview · Drivers · Teams · Races · Circuits · Live  │
-└──────────────────────┬──────────────────────────────────┘
-                       │ HTTP REST + WebSocket (STOMP)
-┌──────────────────────▼──────────────────────────────────┐
-│                  Spring Boot Backend                     │
-│                                                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │  REST API   │  │  WebSocket   │  │  JWT Security  │  │
-│  │ Controllers │  │  STOMP       │  │  Filter Chain  │  │
-│  └──────┬──────┘  └──────┬───────┘  └────────────────┘  │
-│         │                │                               │
-│  ┌──────▼──────┐  ┌──────▼───────┐                      │
-│  │  Services   │  │  Telemetry   │                      │
-│  │  (Domain)   │  │  Simulator   │                      │
-│  └──────┬──────┘  └──────────────┘                      │
-│         │                                                │
-│  ┌──────▼──────┐  ┌──────────────┐                      │
-│  │ Repositories│  │    Redis     │                      │
-│  │   (JPA)     │  │    Cache     │                      │
-│  └──────┬──────┘  └──────────────┘                      │
-└─────────┼───────────────────────────────────────────────┘
-          │
-┌─────────▼───────┐
-│   PostgreSQL 15  │
-│  (Docker)        │
-└─────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                 Next.js Frontend (Vercel)                     │
+│  Overview · Drivers · Teams · Races · Standings · Strategy   │
+│  Circuits · Telemetry (Single / Compare / Tyres)             │
+└───────────────────────┬──────────────────────────────────────┘
+                        │ HTTP REST + WebSocket (STOMP/SockJS)
+┌───────────────────────▼──────────────────────────────────────┐
+│              Spring Boot Backend (Render)                     │
+│                                                               │
+│  REST Controllers · WebSocket STOMP · JWT Security           │
+│  Services · TelemetrySimulator · OpenF1LiveSync              │
+│  Repositories (JPA) · Schedulers                             │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+             ┌──────────▼──────────┐
+             │  PostgreSQL (Render) │
+             └─────────────────────┘
 ```
-
----
-
-## 🗃️ Database Schema (18 Entities)
-
-```
-Users ──────────────────────────────────────── Auth
-Teams ──────┬── Drivers ──── RaceResults ────── LapTelemetry
-            │       │              │
-            │       └── Contracts  └── PitStops
-            │
-            ├── Engineers ── StrategyPlans
-            └── Sponsorships
-
-Circuits ── Races ──┬── RaceResults
-                    ├── WeatherConditions
-                    ├── Incidents
-                    └── CarSetups
-
-TyreCompounds ──── LapTelemetry
-               └── PitStops
-
-Championships ──── RaceResults
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Java 21+
-- Node.js 18+
-- Docker Desktop
-
-### 1. Clone the repository
-```bash
-git clone https://github.com/<your-username>/F1-Pitwall.git
-cd F1-Pitwall
-```
-
-### 2. Start the database
-```bash
-docker compose up -d
-```
-
-### 3. Run the backend
-```bash
-cd backend
-mvn clean install
-mvn spring-boot:run
-```
-
-The backend will start on `http://localhost:8080` and automatically seed the database with 2026 F1 season data.
-
-### 4. Run the frontend
-```bash
-cd f1-pitwall-client
-npm install
-npm run dev
-```
-
-The frontend will start on `http://localhost:3000`.
-
-### 5. Login
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `pitwall2024` | ADMIN — full CRUD access |
-| `engineer` | `telemetry2024` | ENGINEER — view + strategy |
-
----
-
-## 📡 API Endpoints
-
-### Authentication
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/auth/login` | Login, returns JWT tokens |
-| POST | `/api/auth/register` | Register new account |
-| POST | `/api/auth/refresh` | Refresh access token |
-| GET | `/api/auth/me` | Get current user info |
-
-### Drivers
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| GET | `/api/drivers` | Any | Get all drivers |
-| GET | `/api/drivers/{id}` | Any | Get driver by ID |
-| GET | `/api/drivers/leaderboard` | Any | Get drivers by career points |
-| POST | `/api/drivers` | ADMIN | Add new driver |
-| PUT | `/api/drivers/{id}` | ADMIN | Update driver |
-| DELETE | `/api/drivers/{id}` | ADMIN | Delete driver |
-
-### Teams
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| GET | `/api/teams` | Any | Get all teams |
-| POST | `/api/teams` | ADMIN | Create team |
-| PUT | `/api/teams/{id}` | ADMIN | Update team |
-| DELETE | `/api/teams/{id}` | ADMIN | Delete team |
-
-### Races
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| GET | `/api/races` | Any | Get all races |
-| GET | `/api/races/season/{year}` | Any | Get races by season |
-| POST | `/api/races` | ADMIN | Create race |
-| PATCH | `/api/races/{id}/status` | ADMIN/ENGINEER | Update race status |
-
-### Telemetry
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| GET | `/api/telemetry/race-result/{id}` | Any | Get lap telemetry |
-| POST | `/api/telemetry/race-result/{id}` | ADMIN/ENGINEER | Add lap data |
-
-### WebSocket
-| Topic | Description |
-|---|---|
-| `ws://localhost:8080/ws` | STOMP endpoint (SockJS) |
-| `/topic/telemetry` | Live telemetry for all 10 drivers |
-| `/topic/telemetry/{carNumber}` | Live telemetry for specific driver |
 
 ---
 
@@ -207,63 +108,107 @@ The frontend will start on `http://localhost:3000`.
 
 ```
 F1-Pitwall/
-├── backend/
-│   └── src/main/java/backend/
-│       ├── config/           # Security, DataSeeder, ExceptionHandler
-│       ├── controller/       # REST Controllers (8 controllers)
-│       ├── dto/              # Data Transfer Objects
-│       ├── model/            # JPA Entities (18 models)
-│       │   └── enums/        # RaceStatus, TyreType, PenaltyType...
-│       ├── repository/       # Spring Data JPA Repositories
-│       ├── scheduler/        # TelemetrySimulator (WebSocket)
-│       ├── security/         # JWT Filter & Service
-│       ├── service/          # Business Logic Layer
-│       └── websocket/        # WebSocket Config & Payload
+├── backend/src/main/java/backend/
+│   ├── config/           # SecurityConfig, DataSeeder
+│   ├── controller/       # 10 REST Controllers
+│   ├── dto/              # Request/Response DTOs
+│   ├── model/            # 18 JPA Entities + enums
+│   ├── repository/       # 18 Repositories
+│   ├── scheduler/        # TelemetrySimulator
+│   ├── security/         # JWT Filter & Service
+│   ├── service/          # Business logic + OpenF1SyncService
+│   └── websocket/        # WebSocketConfig, TelemetryPayload
 │
-├── f1-pitwall-client/
-│   └── src/app/
-│       ├── components/       # Shared Navbar
-│       ├── context/          # AuthContext (React)
-│       ├── lib/              # pitwall-auth.ts (token management)
-│       ├── drivers/          # Driver Roster page
-│       ├── teams/            # Constructor Standings page
-│       ├── races/            # Race Calendar page
-│       ├── circuits/         # Circuit Database page
-│       ├── telemetry/        # Live Telemetry page
-│       └── login/            # Login page
+├── f1-pitwall-client/src/app/
+│   ├── components/       # Navbar
+│   ├── drivers/          # Driver Roster
+│   ├── teams/            # Constructor Standings
+│   ├── races/            # Race Calendar
+│   │   └── [raceId]/results/  # Race result submission
+│   ├── standings/        # Championship Standings
+│   ├── strategy/         # Pit Strategy Simulator
+│   ├── circuits/         # Circuit Database
+│   ├── telemetry/        # Live Telemetry
+│   └── login/
 │
-└── docker-compose.yml        # PostgreSQL + Redis
+├── render.yaml           # Render deployment
+└── docker-compose.yml    # Local dev (PostgreSQL + Redis)
 ```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Java 21+, Node.js 18+, Docker Desktop
+
+```bash
+git clone https://github.com/phanhhhhhhh/F1-Pitwall.git
+cd F1-Pitwall
+
+# Start database
+docker compose up -d
+
+# Run backend
+cd backend && mvn spring-boot:run
+
+# Run frontend
+cd f1-pitwall-client && npm install && npm run dev
+```
+
+### Login
+| Username | Password | Role |
+|---|---|---|
+| `admin` | `pitwall2024` | ADMIN |
+| `engineer` | `telemetry2024` | ENGINEER |
+
+### Swagger UI
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
+---
+
+## 📡 Key API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/login` | Login |
+| GET | `/api/drivers` | All 2026 drivers |
+| GET | `/api/races/season/2026` | Race calendar |
+| POST | `/api/race-results/race/{id}` | Submit results (ADMIN) |
+| GET | `/api/race-results/standings/drivers/2026` | Driver standings |
+| GET | `/api/race-results/standings/constructors/2026` | Constructor standings |
+| GET | `/api/openf1/status` | Live race status |
+| POST | `/api/sync/all` | Sync past races (ADMIN) |
+
+**WebSocket:** `wss://f1-pitwall-backend.onrender.com/ws` → `/topic/telemetry`
 
 ---
 
 ## 🔑 Key Technical Decisions
 
-**Why Spring Boot 4?** — Latest generation with modular architecture, Jakarta EE 11, and Spring Security 7. Demonstrates familiarity with cutting-edge Java ecosystem.
+**Spring Boot 4** — Jakarta EE 11, Spring Security 7, modular architecture — cutting-edge Java ecosystem.
 
-**Why JWT over Sessions?** — Stateless authentication scales horizontally and suits SaaS architecture. Refresh token pattern provides secure long-lived sessions.
+**JWT + Refresh tokens** — Stateless auth, horizontal scaling, secure long-lived sessions.
 
-**Why WebSocket + STOMP?** — STOMP provides pub/sub messaging over WebSocket, allowing selective driver subscriptions. SockJS ensures fallback compatibility.
+**WebSocket + STOMP** — Pub/sub messaging, SockJS HTTP fallback, selective driver subscriptions.
 
-**Why `ddl-auto=update`?** — Simplifies local development. Production would use Flyway/Liquibase migrations.
+**OpenF1 Integration** — Auto-detects live sessions, graceful fallback to simulator when no race active.
+
+**Render + Vercel** — Backend on Render (Docker, Java), frontend on Vercel (edge, Next.js optimized).
 
 ---
 
 ## 🎯 What I Learned
 
-- Full-stack data flow: Form → HTTP → Controller → JPA → PostgreSQL
-- Enterprise security patterns: JWT, BCrypt, role-based access control
-- Real-time architectures: WebSocket, STOMP pub/sub, scheduled broadcasting
-- Spring Boot 4 modular architecture and breaking changes from 3.x
-- Docker-based development workflow
-- React state management for real-time data streams
+- Full-stack architecture: REST API, JPA relationships, React state management
+- Enterprise security: JWT lifecycle, BCrypt, Spring Security filter chains, CORS in production
+- Real-time systems: WebSocket, STOMP pub/sub, scheduled broadcasting
+- External API integration: polling, caching, graceful fallback
+- Production deployment: Docker multi-stage builds, env config, health checks
+- Canvas API for real-time data visualization
 
 ---
 
-## 📄 License
-
-This project is for portfolio/educational purposes.
-
----
-
-*Built with ❤️ as a portfolio project — F1 Pitwall SaaS · 2026 Season*
+*F1 Pitwall SaaS · 2026 Season · Spring Boot 4 + Next.js 16*
