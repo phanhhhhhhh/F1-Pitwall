@@ -16,7 +16,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepo;
     private final SimpMessagingTemplate messagingTemplate;
 
-    // ─── Create & broadcast ──────────────────────────────────────────────
+
 
     public Notification create(String type, String title, String message, String icon) {
         Notification n = Notification.builder()
@@ -24,8 +24,8 @@ public class NotificationService {
                 .build();
         Notification saved = notificationRepo.save(n);
 
-        // Broadcast via WebSocket
-        messagingTemplate.convertAndSend("/topic/notifications", Map.of(
+
+        messagingTemplate.convertAndSend("/topic/notifications", (Object) Map.of(
                 "id", saved.getId(),
                 "type", saved.getType(),
                 "title", saved.getTitle(),
@@ -36,8 +36,6 @@ public class NotificationService {
 
         return saved;
     }
-
-    // ─── Convenience methods ─────────────────────────────────────────────
 
     public void notifyRaceResult(String raceName, String winnerName, String teamName) {
         create("RACE_RESULT",
@@ -66,8 +64,6 @@ public class NotificationService {
     public void notifySystem(String title, String message) {
         create("SYSTEM", title, message, "ℹ️");
     }
-
-    // ─── Queries ─────────────────────────────────────────────────────────
 
     public List<Notification> getAll() {
         return notificationRepo.findAllByOrderByCreatedAtDesc();
