@@ -30,12 +30,9 @@ public class OpenF1SyncService {
 
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
-    // Sprint points system
     private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
-    // Race points system
     private static final int[] RACE_POINTS = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};
 
-    // ─── Auto-sync completed races every hour ────────────────────────────
     @Scheduled(fixedRate = 3600000)
     public void autoSyncCompletedRaces() {
         log.info("🔄 [OpenF1] Auto-sync checking for completed races...");
@@ -46,7 +43,6 @@ public class OpenF1SyncService {
         }
     }
 
-    // ─── Manual sync trigger ─────────────────────────────────────────────
     @Transactional
     public Map<String, Object> syncRecentSessions() {
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -56,7 +52,6 @@ public class OpenF1SyncService {
 
         try {
             int year = LocalDate.now().getYear();
-            // Get all sessions from this year
             String url = OPENF1_BASE + "/sessions?year=" + year;
             List<Map<String, Object>> sessions = restTemplate.getForObject(url, List.class);
 
@@ -65,7 +60,6 @@ public class OpenF1SyncService {
                 return summary;
             }
 
-            // Only process Race and Sprint sessions that are completed
             for (Map<String, Object> session : sessions) {
                 String sessionName = String.valueOf(session.getOrDefault("session_name", ""));
                 String countryName = String.valueOf(session.getOrDefault("country_name", ""));
@@ -73,7 +67,6 @@ public class OpenF1SyncService {
 
                 if (!sessionName.equals("Race") && !sessionName.equals("Sprint")) continue;
 
-                // Only sync sessions that ended in the past
                 if (dateEnd.isEmpty() || dateEnd.equals("null")) continue;
                 LocalDate sessionDate = LocalDate.parse(dateEnd.substring(0, 10));
                 if (!sessionDate.isBefore(LocalDate.now())) continue;
@@ -85,6 +78,7 @@ public class OpenF1SyncService {
                 try {
                     boolean isSprint = sessionName.equals("Sprint");
                     boolean result = syncSession(sessionKey, countryName, isSprint);
+                    sleep(1000); 
                     if (result) synced.add(label);
                     else skipped.add(label + " (already synced or no data)");
                 } catch (Exception e) {
@@ -104,28 +98,25 @@ public class OpenF1SyncService {
         return summary;
     }
 
-    // ─── Sync a specific session ─────────────────────────────────────────
-    @SuppressWarnings("unchecked")
+
     @Transactional
     public boolean syncSession(int sessionKey, String countryName, boolean isSprint) {
-        // Get race positions
         String posUrl = OPENF1_BASE + "/position?session_key=" + sessionKey;
         List<Map<String, Object>> positions = restTemplate.getForObject(posUrl, List.class);
+        sleep(400); // 400ms delay
         if (positions == null || positions.isEmpty()) return false;
 
-        // Get driver info
         String driversUrl = OPENF1_BASE + "/drivers?session_key=" + sessionKey;
         List<Map<String, Object>> openf1Drivers = restTemplate.getForObject(driversUrl, List.class);
+        sleep(400);
         if (openf1Drivers == null || openf1Drivers.isEmpty()) return false;
 
-        // Get fastest lap info for race (not sprint)
         Map<Integer, Boolean> fastestLapByDriver = new HashMap<>();
         if (!isSprint) {
             try {
                 String lapUrl = OPENF1_BASE + "/laps?session_key=" + sessionKey + "&is_pit_out_lap=false";
                 List<Map<String, Object>> laps = restTemplate.getForObject(lapUrl, List.class);
                 if (laps != null && !laps.isEmpty()) {
-                    // Find fastest lap
                     Map<String, Object> fastestLap = laps.stream()
                         .filter(l -> l.get("lap_duration") != null)
                         .min(Comparator.comparingDouble(l -> ((Number) l.get("lap_duration")).doubleValue()))
@@ -133,14 +124,13 @@ public class OpenF1SyncService {
                     if (fastestLap != null) {
                         Integer driverNum = toInt(fastestLap.get("driver_number"));
                         if (driverNum != null) fastestLapByDriver.put(driverNum, true);
-                    }
+                      }
                 }
             } catch (Exception e) {
                 log.debug("[OpenF1] Could not fetch fastest lap: {}", e.getMessage());
             }
         }
 
-        // Build final position per driver (take last position entry)
         Map<Integer, Integer> finalPositions = new HashMap<>();
         for (Map<String, Object> pos : positions) {
             Integer driverNum = toInt(pos.get("driver_number"));
@@ -152,14 +142,12 @@ public class OpenF1SyncService {
 
         if (finalPositions.isEmpty()) return false;
 
-        // Build driver number -> OpenF1 driver map
         Map<Integer, Map<String, Object>> driverInfoMap = new HashMap<>();
         for (Map<String, Object> d : openf1Drivers) {
             Integer num = toInt(d.get("driver_number"));
             if (num != null) driverInfoMap.put(num, d);
         }
 
-        // Find matching race in DB
         String sessionType = isSprint ? "Sprint" : "Race";
         Optional<Race> raceOpt = findMatchingRace(countryName, isSprint);
         if (raceOpt.isEmpty()) {
@@ -169,13 +157,11 @@ public class OpenF1SyncService {
 
         Race race = raceOpt.get();
 
-        // Check if already synced
         if (raceResultRepo.existsByRaceId(race.getId())) {
             log.debug("[OpenF1] {} {} already has results, skipping", countryName, sessionType);
             return false;
         }
 
-        // Build and save results
         List<RaceResult> results = new ArrayList<>();
         int[] pointsSystem = isSprint ? SPRINT_POINTS : RACE_POINTS;
 
@@ -216,11 +202,9 @@ public class OpenF1SyncService {
 
         raceResultRepo.saveAll(results);
 
-        // Update race status
         race.setStatus(RaceStatus.COMPLETED);
         raceRepo.save(race);
 
-        // Find winner and notify
         results.stream()
             .filter(r -> r.getFinishPosition() == 1)
             .findFirst()
@@ -236,7 +220,6 @@ public class OpenF1SyncService {
         return true;
     }
 
-    // ─── Find matching race in DB ─────────────────────────────────────────
     private Optional<Race> findMatchingRace(String countryName, boolean isSprint) {
         List<Race> races = raceRepo.findBySeason(2026);
         return races.stream()
@@ -255,11 +238,9 @@ public class OpenF1SyncService {
             .findFirst();
     }
 
-    // ─── Find driver by name or car number ───────────────────────────────
     private Optional<Driver> findDriver(String fullName, Integer carNumber) {
         List<Driver> drivers = driverRepo.findAll();
 
-        // Try exact match first
         return drivers.stream()
             .filter(d -> {
                 String dName = d.getName().toLowerCase();
@@ -276,5 +257,9 @@ public class OpenF1SyncService {
         if (o == null) return null;
         if (o instanceof Number) return ((Number) o).intValue();
         try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
+    }
+
+    private void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 }
