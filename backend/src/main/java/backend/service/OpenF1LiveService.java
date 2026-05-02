@@ -234,4 +234,8 @@ public class OpenF1LiveService {
         result.put("data", cachedLiveData);
         return result;
     }
+
+    private void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
 }
