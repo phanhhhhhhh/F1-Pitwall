@@ -170,7 +170,7 @@ public class OpenF1SyncService {
         Race race = raceOpt.get();
 
         // Check if already synced
-        if (!raceResultRepo.findByRace(race).isEmpty()) {
+        if (raceResultRepo.existsByRaceId(race.getId())) {
             log.debug("[OpenF1] {} {} already has results, skipping", countryName, sessionType);
             return false;
         }
@@ -189,7 +189,7 @@ public class OpenF1SyncService {
             Optional<Driver> driverOpt = findDriver(fullName, driverNum);
             if (driverOpt.isEmpty()) continue;
 
-            double points = 0;
+            float points = 0;
             if (position != null && position >= 1 && position <= pointsSystem.length) {
                 points = pointsSystem[position - 1];
             }
@@ -205,7 +205,7 @@ public class OpenF1SyncService {
             RaceResult result = RaceResult.builder()
                 .race(race)
                 .driver(driverOpt.get())
-                .finishPosition(position)
+                .finishPosition(position != null ? position : 0)
                 .points(points)
                 .hasFastestLap(hasFastestLap)
                 .build();
@@ -222,7 +222,7 @@ public class OpenF1SyncService {
 
         // Find winner and notify
         results.stream()
-            .filter(r -> r.getFinishPosition() != null && r.getFinishPosition() == 1)
+            .filter(r -> r.getFinishPosition() == 1)
             .findFirst()
             .ifPresent(winner -> {
                 notificationService.notifyRaceResult(
@@ -267,7 +267,7 @@ public class OpenF1SyncService {
                 return dName.equals(fName) ||
                     fName.contains(dName.split(" ")[dName.split(" ").length - 1].toLowerCase()) ||
                     dName.contains(fName.split(" ")[fName.split(" ").length - 1].toLowerCase()) ||
-                    (d.getCarNumber() != null && d.getCarNumber().equals(carNumber));
+                    (carNumber != null && d.getCarNumber() == carNumber);
             })
             .findFirst();
     }
