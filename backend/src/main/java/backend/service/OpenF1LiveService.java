@@ -15,13 +15,11 @@ public class OpenF1LiveService {
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // Session types to monitor (in priority order)
     private static final List<String> MONITORED_SESSIONS = List.of(
         "Race", "Sprint", "Qualifying", "Sprint Qualifying",
         "Practice 3", "Practice 2", "Practice 1"
     );
 
-    // Session type emojis
     private static final Map<String, String> SESSION_EMOJI = Map.of(
         "Race", "🏁",
         "Sprint", "⚡",
@@ -32,7 +30,6 @@ public class OpenF1LiveService {
         "Practice 3", "🔧"
     );
 
-    // Cache
     private List<Map<String, Object>> cachedLiveData = new ArrayList<>();
     private Integer cachedSessionKey = null;
     private String cachedSessionName = null;
@@ -41,7 +38,6 @@ public class OpenF1LiveService {
     private String cachedCountryName = null;
     private boolean isSessionLive = false;
 
-    // ─── Check every 30 seconds ──────────────────────────────────────────
     @Scheduled(fixedRate = 30000)
     public void checkAndFetchLiveData() {
         try {
@@ -77,7 +73,6 @@ public class OpenF1LiveService {
         }
     }
 
-    // ─── Find any live session today ─────────────────────────────────────
     @SuppressWarnings("unchecked")
     private Map<String, Object> getLiveSession() {
         try {
@@ -89,7 +84,6 @@ public class OpenF1LiveService {
             String today = LocalDate.now().toString();
             String yesterday = LocalDate.now().minusDays(1).toString();
 
-            // Find sessions that are today or started yesterday (for night races)
             List<Map<String, Object>> todaySessions = new ArrayList<>();
             for (Map<String, Object> session : sessions) {
                 String dateStart = String.valueOf(session.getOrDefault("date_start", ""));
@@ -102,7 +96,6 @@ public class OpenF1LiveService {
 
             if (todaySessions.isEmpty()) return null;
 
-            // Return highest priority session (Race > Sprint > Qualifying > Practice)
             for (String sessionType : MONITORED_SESSIONS) {
                 for (Map<String, Object> session : todaySessions) {
                     String name = String.valueOf(session.getOrDefault("session_name", ""));
@@ -112,7 +105,6 @@ public class OpenF1LiveService {
                 }
             }
 
-            // Return first found if no priority match
             return todaySessions.get(0);
 
         } catch (Exception e) {
@@ -121,7 +113,6 @@ public class OpenF1LiveService {
         }
     }
 
-    // ─── Fetch tyre + position + driver data ─────────────────────────────
     @SuppressWarnings("unchecked")
     private void fetchTyreData(int sessionKey) {
         try {
@@ -135,7 +126,6 @@ public class OpenF1LiveService {
 
             if (stints == null || drivers == null) return;
 
-            // Latest stint per driver
             Map<Integer, Map<String, Object>> latestStint = new HashMap<>();
             if (stints != null) {
                 for (Map<String, Object> stint : stints) {
@@ -149,7 +139,6 @@ public class OpenF1LiveService {
                 }
             }
 
-            // Latest position per driver
             Map<Integer, Integer> latestPosition = new HashMap<>();
             if (positions != null) {
                 for (Map<String, Object> pos : positions) {
@@ -161,14 +150,12 @@ public class OpenF1LiveService {
                 }
             }
 
-            // Driver info map
             Map<Integer, Map<String, Object>> driverInfo = new HashMap<>();
             for (Map<String, Object> d : drivers) {
                 Integer driverNum = toInt(d.get("driver_number"));
                 if (driverNum != null) driverInfo.put(driverNum, d);
             }
 
-            // Combine all data
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map.Entry<Integer, Map<String, Object>> entry : latestStint.entrySet()) {
                 Integer driverNum = entry.getKey();
@@ -201,7 +188,11 @@ public class OpenF1LiveService {
             cachedLiveData = result;
 
         } catch (Exception e) {
-            log.error("[OpenF1Live] Error fetching tyre data: {}", e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("No results found")) {
+                log.debug("[OpenF1Live] No tyre data yet for session {} — session may not have started", sessionKey);
+            } else {
+                log.warn("[OpenF1Live] Error fetching tyre data: {}", e.getMessage());
+            }
         }
     }
 
@@ -211,7 +202,6 @@ public class OpenF1LiveService {
         try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
     }
 
-    // ─── Public API ──────────────────────────────────────────────────────
 
     public boolean isSessionLive() { return isSessionLive; }
 
