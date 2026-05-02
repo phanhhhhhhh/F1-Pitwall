@@ -15,17 +15,26 @@ public class SyncController {
 
     private final OpenF1SyncService syncService;
 
-    // Sync all past races without results
+    // Sync tất cả races đã hoàn thành
     @PostMapping("/all")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
     public ResponseEntity<Map<String, Object>> syncAll() {
-        return ResponseEntity.ok(syncService.manualSync());
+        Map<String, Object> result = syncService.syncRecentSessions();
+        return ResponseEntity.ok(result);
     }
 
-    // Sync a specific race
-    @PostMapping("/race/{raceId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> syncRace(@PathVariable Long raceId) {
-        return ResponseEntity.ok(syncService.syncRace(raceId));
+    // Sync một session cụ thể bằng session key
+    @PostMapping("/session/{sessionKey}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
+    public ResponseEntity<Map<String, Object>> syncSession(
+            @PathVariable int sessionKey,
+            @RequestParam(defaultValue = "false") boolean sprint,
+            @RequestParam(defaultValue = "") String countryName) {
+        boolean success = syncService.syncSession(sessionKey, countryName, sprint);
+        return ResponseEntity.ok(Map.of(
+            "success", success,
+            "sessionKey", sessionKey,
+            "type", sprint ? "Sprint" : "Race"
+        ));
     }
 }
