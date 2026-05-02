@@ -1,8 +1,8 @@
 package backend.service;
 
-import backend.dto.RaceResultRequest;
 import backend.model.Driver;
 import backend.model.Race;
+import backend.model.RaceResult;
 import backend.model.enums.RaceStatus;
 import backend.repository.DriverRepository;
 import backend.repository.RaceRepository;
@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
@@ -22,213 +23,258 @@ import java.util.*;
 public class OpenF1SyncService {
 
     private final RaceRepository raceRepo;
-    private final DriverRepository driverRepo;
     private final RaceResultRepository raceResultRepo;
-    private final RaceResultService raceResultService;
+    private final DriverRepository driverRepo;
+    private final NotificationService notificationService;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
-    private static final Map<Integer, String> DRIVER_NUMBER_MAP = new HashMap<>() {{
-        put(1, "Lando Norris");
-        put(81, "Oscar Piastri");
-        put(44, "Lewis Hamilton");
-        put(16, "Charles Leclerc");
-        put(3, "Max Verstappen");
-        put(6, "Isack Hadjar");
-        put(63, "George Russell");
-        put(12, "Kimi Antonelli");
-        put(14, "Fernando Alonso");
-        put(18, "Lance Stroll");
-        put(55, "Carlos Sainz");
-        put(23, "Alexander Albon");
-        put(31, "Esteban Ocon");
-        put(87, "Oliver Bearman");
-        put(30, "Liam Lawson");
-        put(41, "Arvid Lindblad");
-        put(10, "Pierre Gasly");
-        put(43, "Franco Colapinto");
-        put(27, "Nico Hulkenberg");
-        put(5, "Gabriel Bortoleto");
-        put(11, "Sergio Perez");
-        put(77, "Valtteri Bottas");
-    }};
+    // Sprint points system
+    private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
+    // Race points system
+    private static final int[] RACE_POINTS = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};
 
-
-    @Scheduled(cron = "0 0 * * * *")
+    // ─── Auto-sync completed races every hour ────────────────────────────
+    @Scheduled(fixedRate = 3600000)
     public void autoSyncCompletedRaces() {
         log.info("🔄 [OpenF1] Auto-sync checking for completed races...");
-        syncAllPendingRaces();
+        try {
+            syncRecentSessions();
+        } catch (Exception e) {
+            log.error("[OpenF1] Auto-sync failed: {}", e.getMessage());
+        }
     }
 
-    public Map<String, Object> manualSync() {
-        log.info("🔄 [OpenF1] Manual sync triggered");
-        return syncAllPendingRaces();
-    }
-
-    public Map<String, Object> syncRace(Long raceId) {
-        Race race = raceRepo.findById(raceId)
-                .orElseThrow(() -> new RuntimeException("Race not found: " + raceId));
-        return syncSingleRace(race);
-    }
-
-
-
-    private Map<String, Object> syncAllPendingRaces() {
-
-        List<Race> races = raceRepo.findAll();
+    // ─── Manual sync trigger ─────────────────────────────────────────────
+    @Transactional
+    public Map<String, Object> syncRecentSessions() {
+        Map<String, Object> summary = new LinkedHashMap<>();
         List<String> synced = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
-        List<String> failed = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
 
-        for (Race race : races) {
-            if (race.getSeason() != 2026) continue;
-            if (race.getStatus() == RaceStatus.CANCELLED) continue;
+        try {
+            int year = LocalDate.now().getYear();
+            // Get all sessions from this year
+            String url = OPENF1_BASE + "/sessions?year=" + year;
+            List<Map<String, Object>> sessions = restTemplate.getForObject(url, List.class);
 
-
-            if (raceResultRepo.existsByRaceId(race.getId())) {
-                skipped.add(race.getName());
-                continue;
+            if (sessions == null || sessions.isEmpty()) {
+                summary.put("message", "No sessions found");
+                return summary;
             }
 
+            // Only process Race and Sprint sessions that are completed
+            for (Map<String, Object> session : sessions) {
+                String sessionName = String.valueOf(session.getOrDefault("session_name", ""));
+                String countryName = String.valueOf(session.getOrDefault("country_name", ""));
+                String dateEnd = String.valueOf(session.getOrDefault("date_end", ""));
 
-            if (race.getDate().isAfter(LocalDate.now())) {
-                skipped.add(race.getName() + " (future)");
-                continue;
-            }
+                if (!sessionName.equals("Race") && !sessionName.equals("Sprint")) continue;
 
-            Map<String, Object> result = syncSingleRace(race);
-            if ((Boolean) result.getOrDefault("success", false)) {
-                synced.add(race.getName());
-            } else {
-                failed.add(race.getName() + ": " + result.get("error"));
+                // Only sync sessions that ended in the past
+                if (dateEnd.isEmpty() || dateEnd.equals("null")) continue;
+                LocalDate sessionDate = LocalDate.parse(dateEnd.substring(0, 10));
+                if (!sessionDate.isBefore(LocalDate.now())) continue;
+
+                Integer sessionKey = toInt(session.get("session_key"));
+                if (sessionKey == null) continue;
+
+                String label = countryName + " " + sessionName;
+                try {
+                    boolean isSprint = sessionName.equals("Sprint");
+                    boolean result = syncSession(sessionKey, countryName, isSprint);
+                    if (result) synced.add(label);
+                    else skipped.add(label + " (already synced or no data)");
+                } catch (Exception e) {
+                    errors.add(label + ": " + e.getMessage());
+                    log.warn("[OpenF1] Failed to sync {}: {}", label, e.getMessage());
+                }
             }
+        } catch (Exception e) {
+            log.error("[OpenF1] Sync error: {}", e.getMessage());
+            errors.add("Global error: " + e.getMessage());
         }
 
-        Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("synced", synced);
         summary.put("skipped", skipped);
-        summary.put("failed", failed);
-        summary.put("total_synced", synced.size());
+        summary.put("errors", errors);
+        summary.put("total", synced.size());
         return summary;
     }
 
+    // ─── Sync a specific session ─────────────────────────────────────────
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public boolean syncSession(int sessionKey, String countryName, boolean isSprint) {
+        // Get race positions
+        String posUrl = OPENF1_BASE + "/position?session_key=" + sessionKey;
+        List<Map<String, Object>> positions = restTemplate.getForObject(posUrl, List.class);
+        if (positions == null || positions.isEmpty()) return false;
 
-    private Map<String, Object> syncSingleRace(Race race) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        try {
-            log.info("🔄 [OpenF1] Syncing: {}", race.getName());
+        // Get driver info
+        String driversUrl = OPENF1_BASE + "/drivers?session_key=" + sessionKey;
+        List<Map<String, Object>> openf1Drivers = restTemplate.getForObject(driversUrl, List.class);
+        if (openf1Drivers == null || openf1Drivers.isEmpty()) return false;
 
-            RestTemplate restTemplate = new RestTemplate();
-
-            String sessionUrl = String.format(
-                "%s/sessions?year=%d&session_name=Race&country_name=%s",
-                OPENF1_BASE, race.getSeason(),
-                race.getCircuit() != null && race.getCircuit().getCountry() != null ?
-                        race.getCircuit().getCountry().replace(" ", "%20") : ""
-            );
-
-            Map[] sessions = restTemplate.getForObject(sessionUrl, Map[].class);
-
-            if (sessions == null || sessions.length == 0) {
-                result.put("success", false);
-                result.put("error", "No session found for " + race.getName());
-                return result;
-            }
-
-            Integer sessionKey = (Integer) sessions[0].get("session_key");
-            log.info("✅ [OpenF1] Found session key: {} for {}", sessionKey, race.getName());
-
-
-            String positionUrl = String.format("%s/position?session_key=%d", OPENF1_BASE, sessionKey);
-            Map[] positions = restTemplate.getForObject(positionUrl, Map[].class);
-
-            if (positions == null || positions.length == 0) {
-                result.put("success", false);
-                result.put("error", "No position data for session " + sessionKey);
-                return result;
-            }
-
-
-            Map<Integer, Integer> finalPositions = new LinkedHashMap<>();
-            for (Map pos : positions) {
-                Integer driverNum = (Integer) pos.get("driver_number");
-                Integer position = (Integer) pos.get("position");
-                if (driverNum != null && position != null) {
-                    finalPositions.put(driverNum, position);
-                }
-            }
-
-
-            String lapsUrl = String.format("%s/laps?session_key=%d&is_pit_out_lap=false", OPENF1_BASE, sessionKey);
-            Map[] laps = restTemplate.getForObject(lapsUrl, Map[].class);
-
-            Integer fastestLapDriver = null;
-            Float fastestLapTime = null;
-            if (laps != null) {
-                for (Map lap : laps) {
-                    Object duration = lap.get("lap_duration");
-                    if (duration == null) continue;
-                    float lapTime = ((Number) duration).floatValue();
-                    if (fastestLapTime == null || lapTime < fastestLapTime) {
-                        fastestLapTime = lapTime;
-                        fastestLapDriver = (Integer) lap.get("driver_number");
+        // Get fastest lap info for race (not sprint)
+        Map<Integer, Boolean> fastestLapByDriver = new HashMap<>();
+        if (!isSprint) {
+            try {
+                String lapUrl = OPENF1_BASE + "/laps?session_key=" + sessionKey + "&is_pit_out_lap=false";
+                List<Map<String, Object>> laps = restTemplate.getForObject(lapUrl, List.class);
+                if (laps != null && !laps.isEmpty()) {
+                    // Find fastest lap
+                    Map<String, Object> fastestLap = laps.stream()
+                        .filter(l -> l.get("lap_duration") != null)
+                        .min(Comparator.comparingDouble(l -> ((Number) l.get("lap_duration")).doubleValue()))
+                        .orElse(null);
+                    if (fastestLap != null) {
+                        Integer driverNum = toInt(fastestLap.get("driver_number"));
+                        if (driverNum != null) fastestLapByDriver.put(driverNum, true);
                     }
                 }
+            } catch (Exception e) {
+                log.debug("[OpenF1] Could not fetch fastest lap: {}", e.getMessage());
             }
-
-
-            List<RaceResultRequest> requests = new ArrayList<>();
-            List<Driver> ourDrivers = driverRepo.findAll();
-
-            for (Map.Entry<Integer, Integer> entry : finalPositions.entrySet()) {
-                int driverNumber = entry.getKey();
-                int position = entry.getValue();
-
-                String driverName = DRIVER_NUMBER_MAP.get(driverNumber);
-                if (driverName == null) continue;
-
-
-                Optional<Driver> driverOpt = ourDrivers.stream()
-                        .filter(d -> d.getCarNumber() == driverNumber)
-                        .findFirst();
-
-                if (driverOpt.isEmpty()) {
-                    log.warn("⚠️ Driver #{} not found in DB", driverNumber);
-                    continue;
-                }
-
-                RaceResultRequest req = new RaceResultRequest();
-                req.setDriverId(driverOpt.get().getId());
-                req.setStartPosition(position);
-                req.setFinishPosition(position);
-                req.setHasFastestLap(fastestLapDriver != null && fastestLapDriver.equals(driverNumber));
-                req.setFastestLapTime(fastestLapTime != null ? fastestLapTime : 0f);
-                req.setFastestLapNumber(0);
-                req.setDnfReason(null);
-                requests.add(req);
-            }
-
-            if (requests.isEmpty()) {
-                result.put("success", false);
-                result.put("error", "No matching drivers found");
-                return result;
-            }
-
-
-            raceResultService.submitResults(race.getId(), requests);
-            log.info("✅ [OpenF1] Successfully synced {} results for {}", requests.size(), race.getName());
-
-            result.put("success", true);
-            result.put("race", race.getName());
-            result.put("results_count", requests.size());
-            result.put("fastest_lap_driver", fastestLapDriver);
-
-        } catch (Exception e) {
-            log.error("❌ [OpenF1] Sync failed for {}: {}", race.getName(), e.getMessage());
-            result.put("success", false);
-            result.put("error", e.getMessage());
         }
 
-        return result;
+        // Build final position per driver (take last position entry)
+        Map<Integer, Integer> finalPositions = new HashMap<>();
+        for (Map<String, Object> pos : positions) {
+            Integer driverNum = toInt(pos.get("driver_number"));
+            Integer position = toInt(pos.get("position"));
+            if (driverNum != null && position != null) {
+                finalPositions.put(driverNum, position);
+            }
+        }
+
+        if (finalPositions.isEmpty()) return false;
+
+        // Build driver number -> OpenF1 driver map
+        Map<Integer, Map<String, Object>> driverInfoMap = new HashMap<>();
+        for (Map<String, Object> d : openf1Drivers) {
+            Integer num = toInt(d.get("driver_number"));
+            if (num != null) driverInfoMap.put(num, d);
+        }
+
+        // Find matching race in DB
+        String sessionType = isSprint ? "Sprint" : "Race";
+        Optional<Race> raceOpt = findMatchingRace(countryName, isSprint);
+        if (raceOpt.isEmpty()) {
+            log.warn("[OpenF1] No matching race found for {} {}", countryName, sessionType);
+            return false;
+        }
+
+        Race race = raceOpt.get();
+
+        // Check if already synced
+        if (!raceResultRepo.findByRace(race).isEmpty()) {
+            log.debug("[OpenF1] {} {} already has results, skipping", countryName, sessionType);
+            return false;
+        }
+
+        // Build and save results
+        List<RaceResult> results = new ArrayList<>();
+        int[] pointsSystem = isSprint ? SPRINT_POINTS : RACE_POINTS;
+
+        for (Map.Entry<Integer, Integer> entry : finalPositions.entrySet()) {
+            Integer driverNum = entry.getKey();
+            Integer position = entry.getValue();
+            Map<String, Object> driverInfo = driverInfoMap.get(driverNum);
+            if (driverInfo == null) continue;
+
+            String fullName = String.valueOf(driverInfo.getOrDefault("full_name", ""));
+            Optional<Driver> driverOpt = findDriver(fullName, driverNum);
+            if (driverOpt.isEmpty()) continue;
+
+            double points = 0;
+            if (position != null && position >= 1 && position <= pointsSystem.length) {
+                points = pointsSystem[position - 1];
+            }
+
+            boolean hasFastestLap = false;
+            if (!isSprint && fastestLapByDriver.getOrDefault(driverNum, false)) {
+                if (position != null && position <= 10) {
+                    points += 1;
+                    hasFastestLap = true;
+                }
+            }
+
+            RaceResult result = RaceResult.builder()
+                .race(race)
+                .driver(driverOpt.get())
+                .finishPosition(position)
+                .points(points)
+                .hasFastestLap(hasFastestLap)
+                .build();
+            results.add(result);
+        }
+
+        if (results.isEmpty()) return false;
+
+        raceResultRepo.saveAll(results);
+
+        // Update race status
+        race.setStatus(RaceStatus.COMPLETED);
+        raceRepo.save(race);
+
+        // Find winner and notify
+        results.stream()
+            .filter(r -> r.getFinishPosition() != null && r.getFinishPosition() == 1)
+            .findFirst()
+            .ifPresent(winner -> {
+                notificationService.notifyRaceResult(
+                    race.getName() + (isSprint ? " (Sprint)" : ""),
+                    winner.getDriver().getName(),
+                    winner.getDriver().getTeam() != null ? winner.getDriver().getTeam().getName() : ""
+                );
+            });
+
+        log.info("✅ [OpenF1] Synced {} {} — {} results", countryName, sessionType, results.size());
+        return true;
+    }
+
+    // ─── Find matching race in DB ─────────────────────────────────────────
+    private Optional<Race> findMatchingRace(String countryName, boolean isSprint) {
+        List<Race> races = raceRepo.findBySeason(2026);
+        return races.stream()
+            .filter(r -> {
+                String name = r.getName().toLowerCase();
+                String country = countryName.toLowerCase();
+                boolean nameMatch = name.contains(country) ||
+                    country.contains("united states") && name.contains("miami") ||
+                    country.contains("great britain") && name.contains("british") ||
+                    country.contains("united arab") && name.contains("abu dhabi");
+                boolean typeMatch = isSprint
+                    ? name.contains("sprint")
+                    : !name.contains("sprint");
+                return nameMatch && typeMatch;
+            })
+            .findFirst();
+    }
+
+    // ─── Find driver by name or car number ───────────────────────────────
+    private Optional<Driver> findDriver(String fullName, Integer carNumber) {
+        List<Driver> drivers = driverRepo.findAll();
+
+        // Try exact match first
+        return drivers.stream()
+            .filter(d -> {
+                String dName = d.getName().toLowerCase();
+                String fName = fullName.toLowerCase();
+                return dName.equals(fName) ||
+                    fName.contains(dName.split(" ")[dName.split(" ").length - 1].toLowerCase()) ||
+                    dName.contains(fName.split(" ")[fName.split(" ").length - 1].toLowerCase()) ||
+                    (d.getCarNumber() != null && d.getCarNumber().equals(carNumber));
+            })
+            .findFirst();
+    }
+
+    private Integer toInt(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number) return ((Number) o).intValue();
+        try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
     }
 }
