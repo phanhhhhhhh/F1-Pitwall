@@ -80,6 +80,8 @@ public class OpenF1SyncService {
                     boolean result = syncSession(sessionKey, countryName, isSprint);
                     if (result) synced.add(label);
                     else skipped.add(label + " (already synced or no data)");
+
+                    sleep(1500); // 1.5 giây giữa mỗi session
                 } catch (Exception e) {
                     errors.add(label + ": " + e.getMessage());
                     log.warn("[OpenF1] Failed to sync {}: {}", label, e.getMessage());
@@ -101,10 +103,12 @@ public class OpenF1SyncService {
     public boolean syncSession(int sessionKey, String countryName, boolean isSprint) {
         String posUrl = OPENF1_BASE + "/position?session_key=" + sessionKey;
         List<Map<String, Object>> positions = restTemplate.getForObject(posUrl, List.class);
+        sleep(800);
         if (positions == null || positions.isEmpty()) return false;
 
         String driversUrl = OPENF1_BASE + "/drivers?session_key=" + sessionKey;
         List<Map<String, Object>> openf1Drivers = restTemplate.getForObject(driversUrl, List.class);
+        sleep(800);
         if (openf1Drivers == null || openf1Drivers.isEmpty()) return false;
 
         Map<Integer, Boolean> fastestLapByDriver = new HashMap<>();
@@ -268,5 +272,9 @@ public class OpenF1SyncService {
         if (o == null) return null;
         if (o instanceof Number) return ((Number) o).intValue();
         try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
+    }
+
+    private void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 }
