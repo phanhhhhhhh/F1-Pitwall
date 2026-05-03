@@ -55,6 +55,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/openf1/**").authenticated()
                         .requestMatchers("/api/export/**").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/qualifying/**").authenticated()
                         .requestMatchers("/ws/**", "/ws/info/**").permitAll()
                         .anyRequest().authenticated()
                 )
