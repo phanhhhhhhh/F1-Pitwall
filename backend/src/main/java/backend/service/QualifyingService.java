@@ -25,8 +25,37 @@ public class QualifyingService {
     private final DriverRepository driverRepo;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    private static final String OPENF1_BASE = "https://api.openf1.org/v1";
+    private static final String JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
 
+    // Round number mapping for 2026 season
+    private static final Map<String, Integer> RACE_ROUND_MAP = Map.ofEntries(
+        Map.entry("australian grand prix", 1),
+        Map.entry("chinese grand prix", 2),
+        Map.entry("japanese grand prix", 3),
+        Map.entry("miami grand prix", 4),
+        Map.entry("saudi arabian grand prix", 5),
+        Map.entry("bahrain grand prix", 6),
+        Map.entry("canadian grand prix", 7),
+        Map.entry("monaco grand prix", 8),
+        Map.entry("barcelona-catalunya grand prix", 9),
+        Map.entry("austrian grand prix", 10),
+        Map.entry("british grand prix", 11),
+        Map.entry("belgian grand prix", 12),
+        Map.entry("hungarian grand prix", 13),
+        Map.entry("dutch grand prix", 14),
+        Map.entry("italian grand prix", 15),
+        Map.entry("spanish grand prix", 16),
+        Map.entry("azerbaijan grand prix", 17),
+        Map.entry("singapore grand prix", 18),
+        Map.entry("united states grand prix", 19),
+        Map.entry("mexico city grand prix", 20),
+        Map.entry("são paulo grand prix", 21),
+        Map.entry("las vegas grand prix", 22),
+        Map.entry("qatar grand prix", 23),
+        Map.entry("abu dhabi grand prix", 24)
+    );
+
+    // ─── Get qualifying results for a race ───────────────────────────────
     public List<Map<String, Object>> getQualifyingResults(Long raceId) {
         List<QualifyingResult> results = qualifyingRepo.findByRaceIdOrderByGridPosition(raceId);
         return results.stream().map(r -> {
@@ -52,26 +81,31 @@ public class QualifyingService {
         }).collect(Collectors.toList());
     }
 
+    // ─── Sync qualifying for a specific race ─────────────────────────────
     @Transactional
     public Map<String, Object> syncQualifying(Long raceId) {
         Race race = raceRepo.findById(raceId)
                 .orElseThrow(() -> new RuntimeException("Race not found: " + raceId));
 
-        String country = extractCountry(race.getName());
-        Integer sessionKey = findQualifyingSession(country, race.getSeason(), isSprintRace(race));
-        if (sessionKey == null) {
-            return Map.of("success", false, "message", "No qualifying session found for " + race.getName());
+        if (isSprintRace(race)) {
+            return Map.of("success", false, "message", "Sprint races not supported for qualifying sync");
         }
 
-        boolean success = syncFromSession(sessionKey, race);
+        Integer round = findRoundNumber(race);
+        if (round == null) {
+            return Map.of("success", false, "message", "No round number found for " + race.getName());
+        }
+
+        boolean success = syncFromJolpica(round, race);
         return Map.of(
             "success", success,
             "raceId", raceId,
             "raceName", race.getName(),
-            "sessionKey", sessionKey
+            "round", round
         );
     }
 
+    // ─── Sync all qualifying sessions ────────────────────────────────────
     @Transactional
     public Map<String, Object> syncAllQualifying() {
         List<String> synced = new ArrayList<>();
@@ -86,7 +120,7 @@ public class QualifyingService {
                 continue;
             }
             try {
-                sleep(800);
+                sleep(500);
                 Map<String, Object> result = syncQualifying(race.getId());
                 if (Boolean.TRUE.equals(result.get("success"))) {
                     synced.add(race.getName());
@@ -101,73 +135,51 @@ public class QualifyingService {
         return Map.of("synced", synced, "skipped", skipped, "errors", errors, "total", synced.size());
     }
 
-    @SuppressWarnings("unchecked")
-    private Integer findQualifyingSession(String country, int season, boolean isSprint) {
-        try {
-            String sessionType = isSprint ? "Sprint+Qualifying" : "Qualifying";
-            String url = OPENF1_BASE + "/sessions?year=" + season + "&session_name=" + sessionType;
-            List<Map<String, Object>> sessions = restTemplate.getForObject(url, List.class);
-            if (sessions == null || sessions.isEmpty()) return null;
-
-            return sessions.stream()
-                .filter(s -> matchCountry(String.valueOf(s.getOrDefault("country_name", "")), country))
-                .map(s -> toInt(s.get("session_key")))
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
-        } catch (Exception e) {
-            log.warn("[Qualifying] Error finding session: {}", e.getMessage());
-            return null;
-        }
-    }
-
+    // ─── Sync from Jolpica/Ergast API ────────────────────────────────────
     @SuppressWarnings("unchecked")
     @Transactional
-    public boolean syncFromSession(Integer sessionKey, Race race) {
+    public boolean syncFromJolpica(int round, Race race) {
         try {
             if (qualifyingRepo.existsByRaceId(race.getId())) {
                 qualifyingRepo.deleteByRaceId(race.getId());
             }
 
-            sleep(400);
-            String resultsUrl = OPENF1_BASE + "/results?session_key=" + sessionKey;
-            List<Map<String, Object>> openf1Results = restTemplate.getForObject(resultsUrl, List.class);
+            String url = JOLPICA_BASE + "/2026/" + round + "/qualifying.json";
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            if (response == null) return false;
 
-            if (openf1Results == null || openf1Results.isEmpty()) {
-                log.warn("[Qualifying] No results from /results endpoint for session {}, trying laps fallback", sessionKey);
-                return syncFromLaps(sessionKey, race);
-            }
+            Map<String, Object> mrData = (Map<String, Object>) response.get("MRData");
+            if (mrData == null) return false;
 
-            sleep(400);
-            String driversUrl = OPENF1_BASE + "/drivers?session_key=" + sessionKey;
-            List<Map<String, Object>> openf1Drivers = restTemplate.getForObject(driversUrl, List.class);
-            if (openf1Drivers == null || openf1Drivers.isEmpty()) return false;
+            Map<String, Object> raceTable = (Map<String, Object>) mrData.get("RaceTable");
+            if (raceTable == null) return false;
 
-            Map<Integer, Map<String, Object>> driverInfoMap = new HashMap<>();
-            for (Map<String, Object> d : openf1Drivers) {
-                Integer num = toInt(d.get("driver_number"));
-                if (num != null) driverInfoMap.put(num, d);
-            }
+            List<Map<String, Object>> races = (List<Map<String, Object>>) raceTable.get("Races");
+            if (races == null || races.isEmpty()) return false;
+
+            List<Map<String, Object>> qualResults = (List<Map<String, Object>>) races.get(0).get("QualifyingResults");
+            if (qualResults == null || qualResults.isEmpty()) return false;
 
             List<QualifyingResult> results = new ArrayList<>();
-            for (Map<String, Object> r : openf1Results) {
-                Integer driverNum = toInt(r.get("driver_number"));
-                Integer position = toInt(r.get("position"));
-                if (driverNum == null || position == null) continue;
+            for (Map<String, Object> qr : qualResults) {
+                Integer position = toInt(qr.get("position"));
+                Map<String, Object> driverMap = (Map<String, Object>) qr.get("Driver");
+                if (driverMap == null || position == null) continue;
 
-                Map<String, Object> driverInfo = driverInfoMap.get(driverNum);
-                if (driverInfo == null) continue;
+                String givenName = String.valueOf(driverMap.getOrDefault("givenName", ""));
+                String familyName = String.valueOf(driverMap.getOrDefault("familyName", ""));
+                String fullName = givenName + " " + familyName;
 
-                String fullName = String.valueOf(driverInfo.getOrDefault("full_name", ""));
-                Optional<Driver> driverOpt = findDriver(fullName, driverNum);
+                Optional<Driver> driverOpt = findDriver(fullName.trim());
                 if (driverOpt.isEmpty()) {
-                    log.debug("[Qualifying] Driver not found: {} #{}", fullName, driverNum);
+                    log.debug("[Qualifying] Driver not found: {}", fullName);
                     continue;
                 }
 
-                Double q1 = toDouble(r.get("q1"));
-                Double q2 = toDouble(r.get("q2"));
-                Double q3 = toDouble(r.get("q3"));
+                // Parse Q1/Q2/Q3 times from string "1:27.869" → seconds
+                Double q1 = parseTimeString(String.valueOf(qr.getOrDefault("Q1", "")));
+                Double q2 = parseTimeString(String.valueOf(qr.getOrDefault("Q2", "")));
+                Double q3 = parseTimeString(String.valueOf(qr.getOrDefault("Q3", "")));
                 Double best = q3 != null ? q3 : (q2 != null ? q2 : q1);
 
                 boolean elQ1 = q2 == null && q1 != null;
@@ -188,81 +200,46 @@ public class QualifyingService {
             }
 
             if (results.isEmpty()) return false;
-
             results.sort(Comparator.comparingInt(QualifyingResult::getGridPosition));
             qualifyingRepo.saveAll(results);
-            log.info("✅ [Qualifying] Synced {} — {} drivers (via /results)", race.getName(), results.size());
+            log.info("✅ [Qualifying] Synced {} round {} — {} drivers", race.getName(), round, results.size());
             return true;
 
         } catch (Exception e) {
-            log.error("[Qualifying] Sync error for {}: {}", race.getName(), e.getMessage());
+            log.error("[Qualifying] Jolpica sync error for {}: {}", race.getName(), e.getMessage());
             return false;
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private boolean syncFromLaps(Integer sessionKey, Race race) {
+    // ─── Parse time string "1:27.869" → seconds ──────────────────────────
+    private Double parseTimeString(String time) {
+        if (time == null || time.isEmpty() || time.equals("null")) return null;
         try {
-            sleep(400);
-            String driversUrl = OPENF1_BASE + "/drivers?session_key=" + sessionKey;
-            List<Map<String, Object>> openf1Drivers = restTemplate.getForObject(driversUrl, List.class);
-            if (openf1Drivers == null || openf1Drivers.isEmpty()) return false;
-
-            sleep(400);
-            String lapsUrl = OPENF1_BASE + "/laps?session_key=" + sessionKey;
-            List<Map<String, Object>> laps = restTemplate.getForObject(lapsUrl, List.class);
-            if (laps == null || laps.isEmpty()) return false;
-
-            Map<Integer, Double> bestTimes = new HashMap<>();
-            for (Map<String, Object> lap : laps) {
-                Integer driverNum = toInt(lap.get("driver_number"));
-                Object durObj = lap.get("lap_duration");
-                if (driverNum == null || durObj == null) continue;
-                double dur = ((Number) durObj).doubleValue();
-                if (dur <= 0) continue;
-                bestTimes.merge(driverNum, dur, Math::min);
+            if (time.contains(":")) {
+                String[] parts = time.split(":");
+                int mins = Integer.parseInt(parts[0]);
+                double secs = Double.parseDouble(parts[1]);
+                return mins * 60.0 + secs;
             }
-
-            Map<Integer, Map<String, Object>> driverInfoMap = new HashMap<>();
-            for (Map<String, Object> d : openf1Drivers) {
-                Integer num = toInt(d.get("driver_number"));
-                if (num != null) driverInfoMap.put(num, d);
-            }
-
-            List<Map.Entry<Integer, Double>> sorted = new ArrayList<>(bestTimes.entrySet());
-            sorted.sort(Map.Entry.comparingByValue());
-
-            List<QualifyingResult> results = new ArrayList<>();
-            for (int i = 0; i < sorted.size(); i++) {
-                Integer driverNum = sorted.get(i).getKey();
-                Double bestTime = sorted.get(i).getValue();
-                Map<String, Object> driverInfo = driverInfoMap.get(driverNum);
-                if (driverInfo == null) continue;
-
-                String fullName = String.valueOf(driverInfo.getOrDefault("full_name", ""));
-                Optional<Driver> driverOpt = findDriver(fullName, driverNum);
-                if (driverOpt.isEmpty()) continue;
-
-                QualifyingResult result = QualifyingResult.builder()
-                    .race(race)
-                    .driver(driverOpt.get())
-                    .gridPosition(i + 1)
-                    .q1Time(bestTime)
-                    .bestTime(bestTime)
-                    .build();
-                results.add(result);
-            }
-
-            if (results.isEmpty()) return false;
-            qualifyingRepo.saveAll(results);
-            log.info("✅ [Qualifying] Synced {} — {} drivers (via laps fallback)", race.getName(), results.size());
-            return true;
-
+            return Double.parseDouble(time);
         } catch (Exception e) {
-            log.error("[Qualifying] Laps fallback error: {}", e.getMessage());
-            return false;
+            return null;
         }
     }
+
+    // ─── Find round number for a race ────────────────────────────────────
+    private Integer findRoundNumber(Race race) {
+        String nameLower = race.getName().toLowerCase();
+        for (Map.Entry<String, Integer> entry : RACE_ROUND_MAP.entrySet()) {
+            if (nameLower.contains(entry.getKey()) || entry.getKey().contains(nameLower.replace("grand prix", "").trim())) {
+                return entry.getValue();
+            }
+        }
+        // Fallback: use roundNumber from DB
+        return race.getRoundNumber() > 0 ? race.getRoundNumber() : null;
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────
 
     private String formatLapTime(double seconds) {
         int mins = (int) (seconds / 60);
@@ -274,35 +251,16 @@ public class QualifyingService {
         return race.getName().toLowerCase().contains("sprint");
     }
 
-    private String extractCountry(String raceName) {
-        return raceName.toLowerCase()
-            .replace("grand prix", "")
-            .replace("sprint", "")
-            .trim();
-    }
-
-    private boolean matchCountry(String openf1Country, String raceCountry) {
-        String c1 = openf1Country.toLowerCase();
-        String c2 = raceCountry.toLowerCase();
-        return c1.contains(c2) || c2.contains(c1) ||
-            (c1.contains("united states") && (c2.contains("miami") || c2.contains("united states"))) ||
-            (c1.contains("great britain") && c2.contains("british")) ||
-            (c1.contains("china") && c2.contains("chinese")) ||
-            (c1.contains("japan") && c2.contains("japanese")) ||
-            (c1.contains("australia") && c2.contains("australian"));
-    }
-
-    private Optional<Driver> findDriver(String fullName, Integer carNumber) {
+    private Optional<Driver> findDriver(String fullName) {
         return driverRepo.findAll().stream()
             .filter(d -> {
                 String dName = d.getName().toLowerCase();
                 String fName = fullName.toLowerCase();
                 String[] fParts = fName.split(" ");
                 String fLast = fParts.length > 0 ? fParts[fParts.length - 1] : "";
-                return dName.equals(fName)
-                    || dName.contains(fLast)
-                    || fName.contains(dName.split(" ")[dName.split(" ").length - 1])
-                    || (carNumber != null && d.getCarNumber() == carNumber);
+                String[] dParts = dName.split(" ");
+                String dLast = dParts.length > 0 ? dParts[dParts.length - 1] : "";
+                return dName.equals(fName) || dLast.equals(fLast) || dName.contains(fLast) || fName.contains(dLast);
             })
             .findFirst();
     }
@@ -311,12 +269,6 @@ public class QualifyingService {
         if (o == null) return null;
         if (o instanceof Number) return ((Number) o).intValue();
         try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
-    }
-
-    private Double toDouble(Object o) {
-        if (o == null) return null;
-        if (o instanceof Number) return ((Number) o).doubleValue();
-        try { return Double.parseDouble(o.toString()); } catch (Exception e) { return null; }
     }
 
     private void sleep(long ms) {
