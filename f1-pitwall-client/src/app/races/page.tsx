@@ -137,7 +137,7 @@ export default function RacesPage() {
                                     </div>
 
                                     <div className="flex items-center gap-4">
-                                        {isCompleted && (
+                                        {(isCompleted || race.status === "SCHEDULED") && (
                                             <Link
                                                 href={`/races/${race.id}/qualifying`}
                                                 className="text-xs font-mono text-zinc-500 hover:text-yellow-400 border border-zinc-700 hover:border-yellow-500 px-3 py-1.5 rounded-lg transition-all"
