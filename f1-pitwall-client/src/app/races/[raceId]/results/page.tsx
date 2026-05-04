@@ -50,8 +50,10 @@ export default function RaceResultsPage() {
   const [existingResults, setExistingResults] = useState<RaceResultResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
@@ -71,13 +73,8 @@ export default function RaceResultsPage() {
       setRace(raceData);
       setDrivers(driversData);
       setExistingResults(resultsData);
-
-      if (resultsData.length > 0) {
-        setMode("view");
-      } else {
-        initRows(driversData);
-        setMode("edit");
-      }
+      if (resultsData.length > 0) setMode("view");
+      else { initRows(driversData); setMode("edit"); }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -85,16 +82,10 @@ export default function RaceResultsPage() {
   const initRows = (driversData: Driver[]) => {
     const sorted = [...driversData].sort((a, b) => a.carNumber - b.carNumber);
     setRows(sorted.map((d, i) => ({
-      driverId: d.id,
-      driverName: d.name,
-      teamName: d.team?.name || "",
-      teamColor: d.team?.colorHex || "#666",
-      carNumber: d.carNumber,
-      startPosition: i + 1,
-      finishPosition: i + 1,
-      hasFastestLap: false,
-      fastestLapTime: 0,
-      dnfReason: "",
+      driverId: d.id, driverName: d.name,
+      teamName: d.team?.name || "", teamColor: d.team?.colorHex || "#666",
+      carNumber: d.carNumber, startPosition: i + 1, finishPosition: i + 1,
+      hasFastestLap: false, fastestLapTime: 0, dnfReason: "",
     })));
   };
 
@@ -102,7 +93,6 @@ export default function RaceResultsPage() {
     setRows(prev => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
-      // Only one driver can have fastest lap
       if (field === "hasFastestLap" && value === true) {
         next.forEach((r, i) => { if (i !== index) next[i] = { ...next[i], hasFastestLap: false }; });
       }
@@ -114,30 +104,46 @@ export default function RaceResultsPage() {
     setSubmitting(true);
     try {
       const payload = rows.map(r => ({
-        driverId: r.driverId,
-        startPosition: r.startPosition,
-        finishPosition: r.finishPosition,
-        hasFastestLap: r.hasFastestLap,
-        fastestLapTime: r.fastestLapTime,
-        fastestLapNumber: 0,
+        driverId: r.driverId, startPosition: r.startPosition,
+        finishPosition: r.finishPosition, hasFastestLap: r.hasFastestLap,
+        fastestLapTime: r.fastestLapTime, fastestLapNumber: 0,
         dnfReason: r.dnfReason || null,
       }));
-
       const res = await authFetch(`${API}/api/race-results/race/${raceId}`, {
-        method: "POST",
-        body: JSON.stringify(payload),
+        method: "POST", body: JSON.stringify(payload),
       });
-
       if (res.ok) {
         const data = await res.json();
         setExistingResults(data);
         setMode("view");
         setSubmitted(true);
       } else {
-        alert("Failed to submit results. Check console.");
+        alert("Failed to submit results.");
       }
     } catch (err) { console.error(err); }
     finally { setSubmitting(false); }
+  };
+
+  // Re-sync từ OpenF1 — dùng khi có penalty thay đổi thứ hạng
+  const handleResync = async () => {
+    if (!confirm("Re-sync sẽ xóa kết quả hiện tại và fetch lại từ OpenF1.\nTiếp tục?")) return;
+    setResyncing(true);
+    setFeedback("");
+    try {
+      const res = await authFetch(`${API}/api/sync/race/${raceId}/results`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setFeedback("✓ Re-sync thành công!");
+        await fetchData();
+      } else {
+        setFeedback("✗ Re-sync thất bại: " + (data.error || "unknown error"));
+      }
+    } catch (e) {
+      setFeedback("✗ Lỗi kết nối");
+    } finally {
+      setResyncing(false);
+      setTimeout(() => setFeedback(""), 4000);
+    }
   };
 
   if (loading) return (
@@ -158,17 +164,32 @@ export default function RaceResultsPage() {
             <p className="text-zinc-500 font-mono text-xs tracking-widest uppercase mb-2">
               Round {race?.roundNumber} · {race?.date}
             </p>
-            <h1 className="text-3xl font-black tracking-tighter text-white">
-              {race?.name}
-            </h1>
+            <h1 className="text-3xl font-black tracking-tighter text-white">{race?.name}</h1>
             <p className="text-zinc-500 text-sm mt-1">{race?.circuit?.name} · {race?.circuit?.country}</p>
           </div>
-          {mode === "view" && existingResults.length > 0 && (
-            <button onClick={() => { setMode("edit"); initRows(drivers); }}
-              className="text-xs border border-zinc-700 hover:border-red-500 text-zinc-500 hover:text-red-400 px-4 py-2 rounded-lg transition-all font-mono">
-              EDIT RESULTS
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {feedback && (
+              <span className={`text-xs font-mono px-3 py-1.5 rounded border ${
+                feedback.startsWith("✓") ? "text-green-400 border-green-500/30 bg-green-500/10" : "text-red-400 border-red-500/30 bg-red-500/10"
+              }`}>{feedback}</span>
+            )}
+            {mode === "view" && existingResults.length > 0 && (
+              <>
+                <button onClick={handleResync} disabled={resyncing}
+                  className={`text-xs border px-4 py-2 rounded-lg transition-all font-mono flex items-center gap-2 ${
+                    resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                  }`}>
+                  {resyncing ? (
+                    <><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />RE-SYNCING...</>
+                  ) : "⚠️ RE-SYNC (PENALTY)"}
+                </button>
+                <button onClick={() => { setMode("edit"); initRows(drivers); }}
+                  className="text-xs border border-zinc-700 hover:border-red-500 text-zinc-500 hover:text-red-400 px-4 py-2 rounded-lg transition-all font-mono">
+                  EDIT RESULTS
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {submitted && (
@@ -179,7 +200,6 @@ export default function RaceResultsPage() {
         )}
 
         {mode === "view" && existingResults.length > 0 ? (
-          /* View results */
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
               <h2 className="text-sm font-bold text-zinc-300 tracking-widest">RACE RESULTS</h2>
@@ -224,7 +244,6 @@ export default function RaceResultsPage() {
             </table>
           </div>
         ) : (
-          /* Edit / input results */
           <div>
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6">
               <div className="px-6 py-4 border-b border-zinc-800">
@@ -283,11 +302,8 @@ export default function RaceResultsPage() {
                 </table>
               </div>
             </div>
-
             <div className="flex items-center justify-between">
-              <p className="text-xs text-zinc-600 font-mono">
-                Points: 25-18-15-12-10-8-6-4-2-1 · +1 fastest lap (top 10 only)
-              </p>
+              <p className="text-xs text-zinc-600 font-mono">Points: 25-18-15-12-10-8-6-4-2-1 · +1 fastest lap (top 10 only)</p>
               <button onClick={handleSubmit} disabled={submitting}
                 className="bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 text-white font-bold px-8 py-3 rounded-lg transition-colors text-sm">
                 {submitting ? "SUBMITTING..." : "SUBMIT RESULTS →"}
