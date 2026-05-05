@@ -21,7 +21,6 @@ public class SyncController {
     private final RaceResultRepository raceResultRepo;
     private final QualifyingResultRepository qualifyingRepo;
 
-    // Sync tất cả races đã hoàn thành
     @PostMapping("/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
     public ResponseEntity<Map<String, Object>> syncAll() {
@@ -29,7 +28,6 @@ public class SyncController {
         return ResponseEntity.ok(result);
     }
 
-    // Re-sync race results (xóa cũ, sync lại — dùng khi có penalty)
     @PostMapping("/race/{raceId}/results")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
     public ResponseEntity<Map<String, Object>> resyncRaceResults(@PathVariable Long raceId) {
@@ -42,7 +40,6 @@ public class SyncController {
         }
     }
 
-    // Re-sync qualifying (xóa cũ, sync lại)
     @PostMapping("/race/{raceId}/qualifying")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
     public ResponseEntity<Map<String, Object>> resyncQualifying(@PathVariable Long raceId) {
@@ -55,7 +52,6 @@ public class SyncController {
         }
     }
 
-    // Sync một session cụ thể bằng session key
     @PostMapping("/session/{sessionKey}")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
     public ResponseEntity<Map<String, Object>> syncSession(
