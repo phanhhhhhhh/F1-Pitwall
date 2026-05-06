@@ -139,4 +139,11 @@ public class DataMigrationController {
             return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
         }
     }
+
+    @DeleteMapping("/clear-race/{raceId}")
+    public ResponseEntity<Map<String, Object>> clearRaceResults(@PathVariable Long raceId) {
+        int count = raceResultRepo.findByRaceIdOrderByFinishPosition(raceId).size();
+        raceResultRepo.deleteByRaceId(raceId);
+        return ResponseEntity.ok(Map.of("deleted", count, "raceId", raceId));
+    }
 }
