@@ -146,4 +146,27 @@ public class DataMigrationController {
         raceResultRepo.deleteByRaceId(raceId);
         return ResponseEntity.ok(Map.of("deleted", count, "raceId", raceId));
     }
+
+    @PutMapping("/update-result/{resultId}")
+    public ResponseEntity<Map<String, Object>> updateResult(
+            @PathVariable Long resultId,
+            @RequestParam(required = false) Integer points,
+            @RequestParam(required = false) Integer position) {
+        try {
+            RaceResult result = raceResultRepo.findById(resultId)
+                .orElseThrow(() -> new RuntimeException("Not found: " + resultId));
+
+            if (points != null) result.setPoints(points);
+            if (position != null) result.setFinishPosition(position);
+
+            raceResultRepo.save(result);
+
+            return ResponseEntity.ok(Map.of("success", true,
+                "driver", result.getDriver().getName(),
+                "newPoints", result.getPoints(),
+                "newPosition", result.getFinishPosition()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
 }
