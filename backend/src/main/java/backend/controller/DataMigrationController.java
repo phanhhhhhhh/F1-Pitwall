@@ -114,4 +114,29 @@ public class DataMigrationController {
             "message", totalDeleted > 0 ? "Duplicates removed" : "No duplicates found"
         ));
     }
+
+    @PostMapping("/fix-fastest-lap")
+    public ResponseEntity<Map<String, Object>> fixFastestLap(
+            @RequestParam Long removeFromId,
+            @RequestParam Long addToId) {
+        try {
+            RaceResult wrong = raceResultRepo.findById(removeFromId)
+                .orElseThrow(() -> new RuntimeException("Not found: " + removeFromId));
+            wrong.setHasFastestLap(false);
+            wrong.setPoints(wrong.getPoints() - 1);
+            raceResultRepo.save(wrong);
+
+            RaceResult correct = raceResultRepo.findById(addToId)
+                .orElseThrow(() -> new RuntimeException("Not found: " + addToId));
+            correct.setHasFastestLap(true);
+            correct.setPoints(correct.getPoints() + 1);
+            raceResultRepo.save(correct);
+
+            return ResponseEntity.ok(Map.of("success", true,
+                "removed", wrong.getDriver().getName(),
+                "added", correct.getDriver().getName()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
 }
