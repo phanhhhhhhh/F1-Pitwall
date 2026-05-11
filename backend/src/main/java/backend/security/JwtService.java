@@ -62,7 +62,18 @@ public class JwtService {
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        final String type = extractClaim(token, claims -> claims.get("type", String.class));
+        return username.equals(userDetails.getUsername())
+                && !isTokenExpired(token)
+                && "access".equals(type);
+    }
+
+    public boolean isRefreshTokenValid(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        final String type = extractClaim(token, claims -> claims.get("type", String.class));
+        return username.equals(userDetails.getUsername())
+                && !isTokenExpired(token)
+                && "refresh".equals(type);
     }
 
     private boolean isTokenExpired(String token) {
@@ -78,6 +89,12 @@ public class JwtService {
     }
 
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(secretKey.getBytes());
+        byte[] keyBytes = secretKey.getBytes();
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                    "JWT secret quá ngắn: cần ít nhất 32 ký tự, hiện tại chỉ có " + keyBytes.length
+            );
+        }
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 }
