@@ -23,11 +23,17 @@ public class RaceResultService {
     private static final float[] POINTS = { 25, 18, 15, 12, 10, 8, 6, 4, 2, 1 };
     private static final float FASTEST_LAP_POINT = 1.0f;
 
-
     @Transactional
     public List<RaceResultResponse> submitResults(Long raceId, List<RaceResultRequest> requests) {
         Race race = raceRepo.findById(raceId)
                 .orElseThrow(() -> new RuntimeException("Race not found: " + raceId));
+
+        long fastestLapCount = requests.stream()
+                .filter(RaceResultRequest::isHasFastestLap)
+                .count();
+        if (fastestLapCount > 1) {
+            throw new IllegalArgumentException("Only one driver can have fastest lap, got: " + fastestLapCount);
+        }
 
         raceResultRepo.deleteByRaceId(raceId);
 
@@ -57,46 +63,42 @@ public class RaceResultService {
         race.setStatus(RaceStatus.COMPLETED);
         raceRepo.save(race);
 
-        // Notify race result
-        if (!requests.isEmpty()) {
-            // Find winner
-            requests.stream()
-                .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)
-                .findFirst()
-                .ifPresent(winner -> {
-                    driverRepo.findById(winner.getDriverId()).ifPresent(driver -> {
-                        notificationService.notifyRaceResult(
-                            race.getName(),
-                            driver.getName(),
-                            driver.getTeam() != null ? driver.getTeam().getName() : "Unknown"
-                        );
-                    });
-                });
+        List<RaceResult> saved = raceResultRepo.saveAll(results);
 
-            // Notify DNFs
+        if (!requests.isEmpty()) {
             requests.stream()
-                .filter(r -> r.getDnfReason() != null && !r.getDnfReason().isEmpty())
-                .forEach(dnf -> {
-                    driverRepo.findById(dnf.getDriverId()).ifPresent(driver -> {
-                        notificationService.notifyDnf(
-                            driver.getName(),
-                            race.getName(),
-                            dnf.getDnfReason()
-                        );
+                    .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)
+                    .findFirst()
+                    .ifPresent(winner -> {
+                        driverRepo.findById(winner.getDriverId()).ifPresent(driver -> {
+                            notificationService.notifyRaceResult(
+                                    race.getName(),
+                                    driver.getName(),
+                                    driver.getTeam() != null ? driver.getTeam().getName() : "Unknown"
+                            );
+                        });
                     });
-                });
+
+            requests.stream()
+                    .filter(r -> r.getDnfReason() != null && !r.getDnfReason().isEmpty())
+                    .forEach(dnf -> {
+                        driverRepo.findById(dnf.getDriverId()).ifPresent(driver -> {
+                            notificationService.notifyDnf(
+                                    driver.getName(),
+                                    race.getName(),
+                                    dnf.getDnfReason()
+                            );
+                        });
+                    });
         }
 
-        List<RaceResult> saved = raceResultRepo.saveAll(results);
         return saved.stream().map(this::toResponse).collect(Collectors.toList());
     }
-
 
     public List<RaceResultResponse> getResultsByRace(Long raceId) {
         return raceResultRepo.findByRaceIdOrderByFinishPosition(raceId)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
-
 
     public List<DriverStandingResponse> getDriverStandings(int season) {
         List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
@@ -107,7 +109,7 @@ public class RaceResultService {
             Long driverId = r.getDriver().getId();
             DriverStats stats = statsMap.computeIfAbsent(driverId, k -> new DriverStats(r.getDriver()));
             stats.totalPoints += r.getPoints();
-            if (r.getFinishPosition() == 1) stats.wins++;
+            if (r.getFinishPosition() == 1 && r.getDnfReason() == null) stats.wins++;
             if (r.getFinishPosition() <= 3 && r.getDnfReason() == null) stats.podiums++;
             if (r.isHasFastestLap()) stats.fastestLaps++;
         }
@@ -144,7 +146,6 @@ public class RaceResultService {
         return standings;
     }
 
-
     public List<ConstructorStandingResponse> getConstructorStandings(int season) {
         List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
 
@@ -158,7 +159,7 @@ public class RaceResultService {
 
             ConstructorStats stats = statsMap.computeIfAbsent(teamId, k -> new ConstructorStats(team));
             stats.totalPoints += r.getPoints();
-            if (r.getFinishPosition() == 1) stats.wins++;
+            if (r.getFinishPosition() == 1 && r.getDnfReason() == null) stats.wins++;
             if (r.getFinishPosition() <= 3 && r.getDnfReason() == null) stats.podiums++;
 
             stats.driverPoints.merge(driver.getName(), (double) r.getPoints(), Double::sum);
@@ -200,7 +201,6 @@ public class RaceResultService {
         return standings;
     }
 
-
     private float calculatePoints(int position, boolean hasFastestLap, String dnfReason) {
         if (dnfReason != null && !dnfReason.isEmpty()) return 0;
         float pts = (position >= 1 && position <= 10) ? POINTS[position - 1] : 0;
@@ -229,7 +229,6 @@ public class RaceResultService {
                 .roundNumber(r.getRace().getRoundNumber())
                 .build();
     }
-
 
     private static class DriverStats {
         Driver driver;

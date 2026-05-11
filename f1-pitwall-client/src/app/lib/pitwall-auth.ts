@@ -19,15 +19,21 @@ export interface User {
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 
+let refreshPromise: Promise<boolean> | null = null;
+
+const isBrowser = () => typeof window !== "undefined";
+
 export function setTokens(access: string, refresh: string) {
     accessToken = access;
     refreshToken = refresh;
-    sessionStorage.setItem("pitwall_access", access);
-    sessionStorage.setItem("pitwall_refresh", refresh);
+    if (isBrowser()) {
+        sessionStorage.setItem("pitwall_access", access);
+        sessionStorage.setItem("pitwall_refresh", refresh);
+    }
 }
 
 export function getAccessToken(): string | null {
-    if (!accessToken) {
+    if (!accessToken && isBrowser()) {
         accessToken = sessionStorage.getItem("pitwall_access");
     }
     return accessToken;
@@ -36,8 +42,10 @@ export function getAccessToken(): string | null {
 export function clearTokens() {
     accessToken = null;
     refreshToken = null;
-    sessionStorage.removeItem("pitwall_access");
-    sessionStorage.removeItem("pitwall_refresh");
+    if (isBrowser()) {
+        sessionStorage.removeItem("pitwall_access");
+        sessionStorage.removeItem("pitwall_refresh");
+    }
 }
 
 export async function login(username: string, password: string): Promise<AuthResponse> {
@@ -86,29 +94,31 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
         },
     });
 
-    if (res.status === 401 && refreshToken) {
+
+    const currentRefresh = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
+
+    if (res.status === 401 && currentRefresh) {
         const refreshed = await tryRefreshToken();
         if (refreshed) {
             return fetch(url, {
                 ...options,
                 headers: {
                     ...options.headers,
-                    "Content-Type": "application/json",
                     Authorization: `Bearer ${getAccessToken()}`,
                 },
             });
         } else {
             clearTokens();
-            window.location.href = "/login";
+            if (isBrowser()) window.location.href = "/login";
         }
     }
 
     return res;
 }
 
-async function tryRefreshToken(): Promise<boolean> {
+async function doRefresh(): Promise<boolean> {
     try {
-        const stored = refreshToken || sessionStorage.getItem("pitwall_refresh");
+        const stored = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
         if (!stored) return false;
 
         const res = await fetch(`${API_URL}/api/auth/refresh`, {
@@ -120,9 +130,17 @@ async function tryRefreshToken(): Promise<boolean> {
         if (res.ok) {
             const data = await res.json();
             accessToken = data.accessToken;
-            sessionStorage.setItem("pitwall_access", data.accessToken);
+            if (isBrowser()) sessionStorage.setItem("pitwall_access", data.accessToken);
             return true;
         }
-    } catch { }
+    } catch (e) {
+        console.warn("Token refresh failed:", e);
+    }
     return false;
+}
+
+async function tryRefreshToken(): Promise<boolean> {
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = doRefresh().finally(() => { refreshPromise = null; });
+    return refreshPromise;
 }
