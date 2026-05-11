@@ -1,6 +1,6 @@
 package backend.model;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -18,6 +18,10 @@ public class StrategyPlan {
     private int pitLap1;
     private int pitLap2;
     private int pitLap3;
+
+    @Column(name = "pit_laps_json")
+    private String pitLapsJson;
+
     private boolean executed;
     private String notes;
 

@@ -33,11 +33,6 @@ public class RaceResult {
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private Race race;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "championship_id")
-    @ToString.Exclude @EqualsAndHashCode.Exclude
-    private Championship championship;
-
     @JsonIgnore
     @OneToMany(mappedBy = "raceResult", cascade = CascadeType.ALL)
     @ToString.Exclude @EqualsAndHashCode.Exclude
