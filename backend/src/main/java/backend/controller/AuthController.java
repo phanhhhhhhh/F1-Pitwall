@@ -4,21 +4,29 @@ import backend.dto.*;
 import backend.model.User;
 import backend.repository.UserRepository;
 import backend.security.JwtService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.*;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthenticationManager authManager;
     private final UserDetailsService userDetailsService;
@@ -26,8 +34,11 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${app.jwt.access-token-expiration}")
+    private long accessTokenExpiration;
+
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         try {
             authManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
@@ -44,7 +55,7 @@ public class AuthController {
                     .refreshToken(refreshToken)
                     .username(user.getUsername())
                     .role(user.getRole().name())
-                    .expiresIn(900)
+                    .expiresIn(accessTokenExpiration / 1000)
                     .build());
 
         } catch (BadCredentialsException e) {
@@ -54,7 +65,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Username '" + request.getUsername() + "' already exists"));
@@ -83,7 +94,7 @@ public class AuthController {
                 .refreshToken(refreshToken)
                 .username(newUser.getUsername())
                 .role(newUser.getRole().name())
-                .expiresIn(900)
+                .expiresIn(accessTokenExpiration / 1000)
                 .build());
     }
 
@@ -91,20 +102,26 @@ public class AuthController {
     public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> body) {
         String refreshToken = body.get("refreshToken");
 
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "refreshToken is required"));
+        }
+
         try {
             String username = jwtService.extractUsername(refreshToken);
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            if (jwtService.isTokenValid(refreshToken, userDetails)) {
+            if (jwtService.isRefreshTokenValid(refreshToken, userDetails)) {
                 User user = userRepository.findByUsername(username).orElseThrow();
                 String newAccessToken = jwtService.generateAccessToken(userDetails, user.getRole().name());
 
                 return ResponseEntity.ok(Map.of(
                         "accessToken", newAccessToken,
-                        "expiresIn", 900
+                        "expiresIn", accessTokenExpiration / 1000
                 ));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("Refresh token validation failed: {}", e.getMessage());
         }
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -112,9 +129,11 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(@RequestHeader("Authorization") String authHeader) {
-        String token = authHeader.substring(7);
-        String username = jwtService.extractUsername(token);
+    public ResponseEntity<?> getCurrentUser() {
+        String username = Objects.requireNonNull(SecurityContextHolder.getContext()
+                        .getAuthentication())
+                .getName();
+
         User user = userRepository.findByUsername(username).orElseThrow();
 
         return ResponseEntity.ok(Map.of(
