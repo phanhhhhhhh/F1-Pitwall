@@ -8,6 +8,7 @@ import backend.repository.QualifyingResultRepository;
 import backend.repository.RaceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -23,39 +24,19 @@ public class QualifyingService {
     private final QualifyingResultRepository qualifyingRepo;
     private final RaceRepository raceRepo;
     private final DriverRepository driverRepo;
-    private final RestTemplate restTemplate = new RestTemplate();
+
+    private final RestTemplate restTemplate = createRestTemplate();
+
+    private static RestTemplate createRestTemplate() {
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        return new RestTemplate(factory);
+    }
 
     private static final String JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
 
-    // Round number mapping for 2026 season
-    private static final Map<String, Integer> RACE_ROUND_MAP = Map.ofEntries(
-        Map.entry("australian grand prix", 1),
-        Map.entry("chinese grand prix", 2),
-        Map.entry("japanese grand prix", 3),
-        Map.entry("miami grand prix", 4),
-        Map.entry("saudi arabian grand prix", 5),
-        Map.entry("bahrain grand prix", 6),
-        Map.entry("canadian grand prix", 7),
-        Map.entry("monaco grand prix", 8),
-        Map.entry("barcelona-catalunya grand prix", 9),
-        Map.entry("austrian grand prix", 10),
-        Map.entry("british grand prix", 11),
-        Map.entry("belgian grand prix", 12),
-        Map.entry("hungarian grand prix", 13),
-        Map.entry("dutch grand prix", 14),
-        Map.entry("italian grand prix", 15),
-        Map.entry("spanish grand prix", 16),
-        Map.entry("azerbaijan grand prix", 17),
-        Map.entry("singapore grand prix", 18),
-        Map.entry("united states grand prix", 19),
-        Map.entry("mexico city grand prix", 20),
-        Map.entry("são paulo grand prix", 21),
-        Map.entry("las vegas grand prix", 22),
-        Map.entry("qatar grand prix", 23),
-        Map.entry("abu dhabi grand prix", 24)
-    );
 
-    // ─── Get qualifying results for a race ───────────────────────────────
     public List<Map<String, Object>> getQualifyingResults(Long raceId) {
         List<QualifyingResult> results = qualifyingRepo.findByRaceIdOrderByGridPosition(raceId);
         return results.stream().map(r -> {
@@ -64,7 +45,7 @@ public class QualifyingService {
             map.put("gridPosition", r.getGridPosition());
             map.put("driverName", r.getDriver() != null ? r.getDriver().getName() : "");
             map.put("teamName", r.getDriver() != null && r.getDriver().getTeam() != null
-                ? r.getDriver().getTeam().getName() : "");
+                    ? r.getDriver().getTeam().getName() : "");
             map.put("teamColor", r.getDriver() != null && r.getDriver().getTeam() != null
                     ? r.getDriver().getTeam().getColorHex() : "#888");
             map.put("carNumber", r.getDriver() != null ? r.getDriver().getCarNumber() : 0);
@@ -81,7 +62,6 @@ public class QualifyingService {
         }).collect(Collectors.toList());
     }
 
-    // ─── Sync qualifying for a specific race ─────────────────────────────
     @Transactional
     public Map<String, Object> syncQualifying(Long raceId) {
         Race race = raceRepo.findById(raceId)
@@ -90,29 +70,27 @@ public class QualifyingService {
         if (isSprintRace(race)) {
             return Map.of("success", false, "message", "Sprint races not supported for qualifying sync");
         }
-
-        Integer round = findRoundNumber(race);
+        Integer round = race.getRoundNumber() > 0 ? race.getRoundNumber() : null;
         if (round == null) {
             return Map.of("success", false, "message", "No round number found for " + race.getName());
         }
 
         boolean success = syncFromJolpica(round, race);
         return Map.of(
-            "success", success,
-            "raceId", raceId,
-            "raceName", race.getName(),
-            "round", round
+                "success", success,
+                "raceId", raceId,
+                "raceName", race.getName(),
+                "round", round
         );
     }
 
-    // ─── Sync all qualifying sessions ────────────────────────────────────
     @Transactional
     public Map<String, Object> syncAllQualifying() {
         List<String> synced = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
         List<String> errors = new ArrayList<>();
 
-        List<Race> races = raceRepo.findBySeason(2026);
+        List<Race> races = raceRepo.findBySeasonOrderByRoundNumber(2026);
         for (Race race : races) {
             if (isSprintRace(race)) continue;
             if (qualifyingRepo.existsByRaceId(race.getId())) {
@@ -120,7 +98,7 @@ public class QualifyingService {
                 continue;
             }
             try {
-                sleep(500);
+                sleep();
                 Map<String, Object> result = syncQualifying(race.getId());
                 if (Boolean.TRUE.equals(result.get("success"))) {
                     synced.add(race.getName());
@@ -135,7 +113,6 @@ public class QualifyingService {
         return Map.of("synced", synced, "skipped", skipped, "errors", errors, "total", synced.size());
     }
 
-    // ─── Sync from Jolpica/Ergast API ────────────────────────────────────
     @SuppressWarnings("unchecked")
     @Transactional
     public boolean syncFromJolpica(int round, Race race) {
@@ -157,8 +134,10 @@ public class QualifyingService {
             List<Map<String, Object>> races = (List<Map<String, Object>>) raceTable.get("Races");
             if (races == null || races.isEmpty()) return false;
 
-            List<Map<String, Object>> qualResults = (List<Map<String, Object>>) races.get(0).get("QualifyingResults");
+            List<Map<String, Object>> qualResults = (List<Map<String, Object>>) races.getFirst().get("QualifyingResults");
             if (qualResults == null || qualResults.isEmpty()) return false;
+
+            List<Driver> allDrivers = driverRepo.findAll();
 
             List<QualifyingResult> results = new ArrayList<>();
             for (Map<String, Object> qr : qualResults) {
@@ -170,13 +149,12 @@ public class QualifyingService {
                 String familyName = String.valueOf(driverMap.getOrDefault("familyName", ""));
                 String fullName = givenName + " " + familyName;
 
-                Optional<Driver> driverOpt = findDriver(fullName.trim());
+                Optional<Driver> driverOpt = findDriver(fullName.trim(), allDrivers);
                 if (driverOpt.isEmpty()) {
                     log.debug("[Qualifying] Driver not found: {}", fullName);
                     continue;
                 }
 
-                // Parse Q1/Q2/Q3 times from string "1:27.869" → seconds
                 Double q1 = parseTimeString(String.valueOf(qr.getOrDefault("Q1", "")));
                 Double q2 = parseTimeString(String.valueOf(qr.getOrDefault("Q2", "")));
                 Double q3 = parseTimeString(String.valueOf(qr.getOrDefault("Q3", "")));
@@ -185,18 +163,13 @@ public class QualifyingService {
                 boolean elQ1 = q2 == null && q1 != null;
                 boolean elQ2 = q2 != null && q3 == null;
 
-                QualifyingResult result = QualifyingResult.builder()
-                    .race(race)
-                    .driver(driverOpt.get())
-                    .gridPosition(position)
-                    .q1Time(q1)
-                    .q2Time(q2)
-                    .q3Time(q3)
-                    .bestTime(best)
-                    .eliminatedQ1(elQ1)
-                    .eliminatedQ2(elQ2)
-                    .build();
-                results.add(result);
+                results.add(QualifyingResult.builder()
+                        .race(race)
+                        .driver(driverOpt.get())
+                        .gridPosition(position)
+                        .q1Time(q1).q2Time(q2).q3Time(q3).bestTime(best)
+                        .eliminatedQ1(elQ1).eliminatedQ2(elQ2)
+                        .build());
             }
 
             if (results.isEmpty()) return false;
@@ -211,7 +184,6 @@ public class QualifyingService {
         }
     }
 
-    // ─── Parse time string "1:27.869" → seconds ──────────────────────────
     private Double parseTimeString(String time) {
         if (time == null || time.isEmpty() || time.equals("null")) return null;
         try {
@@ -227,20 +199,6 @@ public class QualifyingService {
         }
     }
 
-    // ─── Find round number for a race ────────────────────────────────────
-    private Integer findRoundNumber(Race race) {
-        String nameLower = race.getName().toLowerCase();
-        for (Map.Entry<String, Integer> entry : RACE_ROUND_MAP.entrySet()) {
-            if (nameLower.contains(entry.getKey()) || entry.getKey().contains(nameLower.replace("grand prix", "").trim())) {
-                return entry.getValue();
-            }
-        }
-        // Fallback: use roundNumber from DB
-        return race.getRoundNumber() > 0 ? race.getRoundNumber() : null;
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────
-
     private String formatLapTime(double seconds) {
         int mins = (int) (seconds / 60);
         double secs = seconds % 60;
@@ -251,18 +209,18 @@ public class QualifyingService {
         return race.getName().toLowerCase().contains("sprint");
     }
 
-    private Optional<Driver> findDriver(String fullName) {
-        return driverRepo.findAll().stream()
-            .filter(d -> {
-                String dName = d.getName().toLowerCase();
-                String fName = fullName.toLowerCase();
-                String[] fParts = fName.split(" ");
-                String fLast = fParts.length > 0 ? fParts[fParts.length - 1] : "";
-                String[] dParts = dName.split(" ");
-                String dLast = dParts.length > 0 ? dParts[dParts.length - 1] : "";
-                return dName.equals(fName) || dLast.equals(fLast) || dName.contains(fLast) || fName.contains(dLast);
-            })
-            .findFirst();
+    private Optional<Driver> findDriver(String fullName, List<Driver> allDrivers) {
+        return allDrivers.stream()
+                .filter(d -> {
+                    String dName = d.getName().toLowerCase();
+                    String fName = fullName.toLowerCase();
+                    String[] fParts = fName.split(" ");
+                    String fLast = fParts.length > 0 ? fParts[fParts.length - 1] : "";
+                    String[] dParts = dName.split(" ");
+                    String dLast = dParts.length > 0 ? dParts[dParts.length - 1] : "";
+                    return dName.equals(fName) || dLast.equals(fLast) || dName.contains(fLast) || fName.contains(dLast);
+                })
+                .findFirst();
     }
 
     private Integer toInt(Object o) {
@@ -271,7 +229,7 @@ public class QualifyingService {
         try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
     }
 
-    private void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    private void sleep() {
+        try { Thread.sleep((long) 500); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 }

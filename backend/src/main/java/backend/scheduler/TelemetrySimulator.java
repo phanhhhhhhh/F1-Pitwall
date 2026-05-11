@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 @EnableScheduling
@@ -17,9 +19,10 @@ public class TelemetrySimulator {
     private final SimpMessagingTemplate messagingTemplate;
 
     private final Map<String, DriverState> driverStates = new LinkedHashMap<>();
-    private boolean initialized = false;
-    private int globalLap = 1;
-    private int tickCount = 0;
+
+    private final AtomicBoolean initialized = new AtomicBoolean(false);
+    private final AtomicInteger globalLap = new AtomicInteger(1);
+    private final AtomicInteger tickCount = new AtomicInteger(0);
 
     private static final Object[][] DRIVERS = {
             { "Lando Norris",     "McLaren",           "#FF8000", 1 },
@@ -48,7 +51,8 @@ public class TelemetrySimulator {
         boolean inCorner;
     }
 
-    private void initialize() {
+    private synchronized void initialize() {
+        if (initialized.get()) return;
         driverStates.clear();
         double gap = 0;
         for (int i = 0; i < DRIVERS.length; i++) {
@@ -76,21 +80,24 @@ public class TelemetrySimulator {
             gap += 0.5 + RNG.nextDouble() * 2;
             driverStates.put(s.name, s);
         }
-        initialized = true;
+        initialized.set(true);
     }
 
     @Scheduled(fixedRate = 1000)
     public void broadcastTelemetry() {
-        if (!initialized) initialize();
-        tickCount++;
-        if (tickCount % 90 == 0) {
-            globalLap++;
+        if (!initialized.get()) initialize();
+
+        int tick = tickCount.incrementAndGet();
+
+        if (tick % 90 == 0) {
+            int lap = globalLap.incrementAndGet();
             driverStates.values().forEach(s -> {
-                s.lap = globalLap;
+                s.lap = lap;
                 s.fuelLoad = Math.max(0, s.fuelLoad - 1.8);
             });
         }
-        double cornerPhase = (tickCount % 15) / 15.0;
+
+        double cornerPhase = (tick % 15) / 15.0;
         boolean inCorner = cornerPhase > 0.3 && cornerPhase < 0.7;
 
         List<TelemetryPayload> payloads = new ArrayList<>();
@@ -112,18 +119,14 @@ public class TelemetrySimulator {
                 s.drsActive = s.position > 1 && s.gap < 1.0;
             }
 
-
             s.rpm = (int) (s.speed * 50 + RNG.nextInt(500));
             s.rpm = Math.min(15000, Math.max(6000, s.rpm));
-
 
             s.tyreTemp += (s.brake > 30 ? 0.5 : -0.1) + RNG.nextDouble() * 0.3;
             s.tyreTemp = Math.min(120, Math.max(60, s.tyreTemp));
 
-
             s.gap += (RNG.nextDouble() - 0.5) * 0.05;
             s.gap = Math.max(0, s.gap);
-
 
             s.lapTime = 85 + (s.position * 0.1) + RNG.nextDouble() * 0.5;
 
@@ -148,6 +151,7 @@ public class TelemetrySimulator {
                     .timestamp(System.currentTimeMillis())
                     .build());
         }
+
         messagingTemplate.convertAndSend("/topic/telemetry", payloads);
 
         for (TelemetryPayload p : payloads) {
