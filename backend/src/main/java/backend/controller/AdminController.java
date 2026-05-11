@@ -29,8 +29,6 @@ public class AdminController {
     private final NotificationRepository notificationRepo;
     private final PasswordEncoder passwordEncoder;
 
-    // ─── Dashboard Stats ─────────────────────────────────────────────────
-
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
@@ -42,7 +40,6 @@ public class AdminController {
         stats.put("totalNotifications", notificationRepo.count());
         stats.put("unreadNotifications", notificationRepo.countByReadFalse());
 
-        // Users by role
         Map<String, Long> byRole = new LinkedHashMap<>();
         byRole.put("ADMIN", userRepo.countByRole(User.Role.ADMIN));
         byRole.put("ENGINEER", userRepo.countByRole(User.Role.ENGINEER));
@@ -51,8 +48,6 @@ public class AdminController {
 
         return ResponseEntity.ok(stats);
     }
-
-    // ─── User Management ─────────────────────────────────────────────────
 
     @GetMapping("/users")
     public ResponseEntity<List<Map<String, Object>>> getUsers() {
@@ -73,16 +68,15 @@ public class AdminController {
             @RequestBody Map<String, String> body) {
         User user = userRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
         try {
             User.Role newRole = User.Role.valueOf(body.get("role").toUpperCase());
             user.setRole(newRole);
             userRepo.save(user);
             return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "username", user.getUsername(),
-                "role", user.getRole().name(),
-                "message", "Role updated successfully"
+                    "id", user.getId(),
+                    "username", user.getUsername(),
+                    "role", user.getRole().name(),
+                    "message", "Role updated successfully"
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid role"));
@@ -111,7 +105,6 @@ public class AdminController {
         User user = userRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Prevent deleting the only admin
         if (user.getRole() == User.Role.ADMIN && userRepo.countByRole(User.Role.ADMIN) <= 1) {
             return ResponseEntity.badRequest().body(Map.of("error", "Cannot delete the only admin"));
         }
@@ -127,23 +120,44 @@ public class AdminController {
         String email = body.get("email");
         String role = body.get("role");
 
+        if (username == null || username.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "username is required"));
+        }
+        if (password == null || password.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "password must be at least 6 characters"));
+        }
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "email is required"));
+        }
+
         if (userRepo.existsByUsername(username)) {
             return ResponseEntity.badRequest().body(Map.of("error", "Username already exists"));
+        }
+
+        if (userRepo.existsByEmail(email)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email already in use"));
+        }
+
+        User.Role userRole;
+        try {
+            userRole = User.Role.valueOf(role != null ? role.toUpperCase() : "VIEWER");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid role: " + role));
         }
 
         User user = User.builder()
                 .username(username)
                 .password(passwordEncoder.encode(password))
                 .email(email)
-                .role(User.Role.valueOf(role != null ? role.toUpperCase() : "VIEWER"))
+                .role(userRole)
                 .build();
 
         User saved = userRepo.save(user);
         return ResponseEntity.ok(Map.of(
-            "id", saved.getId(),
-            "username", saved.getUsername(),
-            "email", saved.getEmail(),
-            "role", saved.getRole().name()
+                "id", saved.getId(),
+                "username", saved.getUsername(),
+                "email", saved.getEmail(),
+                "role", saved.getRole().name()
         ));
     }
 }
