@@ -1,6 +1,8 @@
 package backend.service;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -13,30 +15,39 @@ import java.util.*;
 public class OpenF1LiveService {
 
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
-    private final RestTemplate restTemplate = new RestTemplate();
+
+    private final RestTemplate restTemplate = createRestTemplate();
+
+    private static RestTemplate createRestTemplate() {
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        return new RestTemplate(factory);
+    }
 
     private static final List<String> MONITORED_SESSIONS = List.of(
-        "Race", "Sprint", "Qualifying", "Sprint Qualifying",
-        "Practice 3", "Practice 2", "Practice 1"
+            "Race", "Sprint", "Qualifying", "Sprint Qualifying",
+            "Practice 3", "Practice 2", "Practice 1"
     );
 
     private static final Map<String, String> SESSION_EMOJI = Map.of(
-        "Race", "🏁",
-        "Sprint", "⚡",
-        "Qualifying", "⏱️",
-        "Sprint Qualifying", "⏱️",
-        "Practice 1", "🔧",
-        "Practice 2", "🔧",
-        "Practice 3", "🔧"
+            "Race", "🏁",
+            "Sprint", "⚡",
+            "Qualifying", "⏱️",
+            "Sprint Qualifying", "⏱️",
+            "Practice 1", "🔧",
+            "Practice 2", "🔧",
+            "Practice 3", "🔧"
     );
 
-    private List<Map<String, Object>> cachedLiveData = new ArrayList<>();
-    private Integer cachedSessionKey = null;
-    private String cachedSessionName = null;
-    private String cachedSessionType = null;
-    private String cachedCircuitName = null;
-    private String cachedCountryName = null;
-    private boolean isSessionLive = false;
+    private volatile List<Map<String, Object>> cachedLiveData = new ArrayList<>();
+    private volatile Integer cachedSessionKey = null;
+    private volatile String cachedSessionName = null;
+    private volatile String cachedSessionType = null;
+    private volatile String cachedCircuitName = null;
+    private volatile String cachedCountryName = null;
+    @Getter
+    private volatile boolean isSessionLive = false;
 
     @Scheduled(fixedRate = 30000)
     public void checkAndFetchLiveData() {
@@ -89,7 +100,7 @@ public class OpenF1LiveService {
                 String dateStart = String.valueOf(session.getOrDefault("date_start", ""));
                 String dateEnd = String.valueOf(session.getOrDefault("date_end", ""));
                 if (dateStart.startsWith(today) || dateEnd.startsWith(today) ||
-                    dateStart.startsWith(yesterday)) {
+                        dateStart.startsWith(yesterday)) {
                     todaySessions.add(session);
                 }
             }
@@ -99,13 +110,11 @@ public class OpenF1LiveService {
             for (String sessionType : MONITORED_SESSIONS) {
                 for (Map<String, Object> session : todaySessions) {
                     String name = String.valueOf(session.getOrDefault("session_name", ""));
-                    if (name.equalsIgnoreCase(sessionType)) {
-                        return session;
-                    }
+                    if (name.equalsIgnoreCase(sessionType)) return session;
                 }
             }
 
-            return todaySessions.get(0);
+            return todaySessions.getFirst();
 
         } catch (Exception e) {
             log.debug("[OpenF1Live] No live session: {}", e.getMessage());
@@ -127,16 +136,14 @@ public class OpenF1LiveService {
             if (stints == null || drivers == null) return;
 
             Map<Integer, Map<String, Object>> latestStint = new HashMap<>();
-            if (stints != null) {
-                for (Map<String, Object> stint : stints) {
-                    Integer driverNum = toInt(stint.get("driver_number"));
-                    if (driverNum == null) continue;
-                    latestStint.merge(driverNum, stint, (ex, ne) -> {
-                        Integer exN = toInt(ex.get("stint_number"));
-                        Integer neN = toInt(ne.get("stint_number"));
-                        return (neN != null && exN != null && neN > exN) ? ne : ex;
-                    });
-                }
+            for (Map<String, Object> stint : stints) {
+                Integer driverNum = toInt(stint.get("driver_number"));
+                if (driverNum == null) continue;
+                latestStint.merge(driverNum, stint, (ex, ne) -> {
+                    Integer exN = toInt(ex.get("stint_number"));
+                    Integer neN = toInt(ne.get("stint_number"));
+                    return (neN != null && exN != null && neN > exN) ? ne : ex;
+                });
             }
 
             Map<Integer, Integer> latestPosition = new HashMap<>();
@@ -202,21 +209,12 @@ public class OpenF1LiveService {
         try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
     }
 
-
-    public boolean isSessionLive() { return isSessionLive; }
-
     public List<Map<String, Object>> getLiveData() { return cachedLiveData; }
-
     public Integer getSessionKey() { return cachedSessionKey; }
-
     public String getSessionName() { return cachedSessionName; }
-
     public String getSessionType() { return cachedSessionType; }
-
     public String getCircuitName() { return cachedCircuitName; }
-
     public String getCountryName() { return cachedCountryName; }
-
     public String getSessionEmoji() {
         return SESSION_EMOJI.getOrDefault(cachedSessionType, "🏎️");
     }
@@ -233,9 +231,5 @@ public class OpenF1LiveService {
         result.put("driversCount", cachedLiveData.size());
         result.put("data", cachedLiveData);
         return result;
-    }
-
-    private void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 }

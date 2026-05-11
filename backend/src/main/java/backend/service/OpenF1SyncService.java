@@ -9,6 +9,7 @@ import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,10 +28,17 @@ public class OpenF1SyncService {
     private final RaceResultRepository raceResultRepo;
     private final DriverRepository driverRepo;
     private final NotificationService notificationService;
-    private final RestTemplate restTemplate = new RestTemplate();
+
+    private final RestTemplate restTemplate = createRestTemplate();
+
+    private static RestTemplate createRestTemplate() {
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        return new RestTemplate(factory);
+    }
 
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
-
     private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
     private static final int[] RACE_POINTS = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};
 
@@ -43,7 +52,6 @@ public class OpenF1SyncService {
         }
     }
 
-    @Transactional
     public Map<String, Object> syncRecentSessions() {
         Map<String, Object> summary = new LinkedHashMap<>();
         List<String> synced = new ArrayList<>();
@@ -66,8 +74,8 @@ public class OpenF1SyncService {
                 String dateEnd = String.valueOf(session.getOrDefault("date_end", ""));
 
                 if (!sessionName.equals("Race") && !sessionName.equals("Sprint")) continue;
-
                 if (dateEnd.isEmpty() || dateEnd.equals("null")) continue;
+
                 LocalDate sessionDate = LocalDate.parse(dateEnd.substring(0, 10));
                 if (!sessionDate.isBefore(LocalDate.now())) continue;
 
@@ -80,12 +88,12 @@ public class OpenF1SyncService {
                     boolean result = syncSession(sessionKey, countryName, isSprint);
                     if (result) synced.add(label);
                     else skipped.add(label + " (already synced or no data)");
-
-                    sleep(1500); // 1.5 giây giữa mỗi session
                 } catch (Exception e) {
                     errors.add(label + ": " + e.getMessage());
                     log.warn("[OpenF1] Failed to sync {}: {}", label, e.getMessage());
                 }
+
+                sleep(1500);
             }
         } catch (Exception e) {
             log.error("[OpenF1] Sync error: {}", e.getMessage());
@@ -111,6 +119,20 @@ public class OpenF1SyncService {
         sleep(800);
         if (openf1Drivers == null || openf1Drivers.isEmpty()) return false;
 
+        List<Driver> allDrivers = driverRepo.findAll();
+
+        Map<Integer, Integer> finalPositions = positions.stream()
+                .filter(p -> p.get("driver_number") != null && p.get("position") != null)
+                .sorted(Comparator.comparing(p -> String.valueOf(p.getOrDefault("date", ""))))
+                .collect(Collectors.toMap(
+                        p -> toInt(p.get("driver_number")),
+                        p -> toInt(p.get("position")),
+                        (existing, replacement) -> replacement,
+                        LinkedHashMap::new
+                ));
+
+        if (finalPositions.isEmpty()) return false;
+
         Map<Integer, Boolean> fastestLapByDriver = new HashMap<>();
         if (!isSprint) {
             try {
@@ -118,9 +140,9 @@ public class OpenF1SyncService {
                 List<Map<String, Object>> laps = restTemplate.getForObject(lapUrl, List.class);
                 if (laps != null && !laps.isEmpty()) {
                     Map<String, Object> fastestLap = laps.stream()
-                        .filter(l -> l.get("lap_duration") != null)
-                        .min(Comparator.comparingDouble(l -> ((Number) l.get("lap_duration")).doubleValue()))
-                        .orElse(null);
+                            .filter(l -> l.get("lap_duration") != null)
+                            .min(Comparator.comparingDouble(l -> ((Number) l.get("lap_duration")).doubleValue()))
+                            .orElse(null);
                     if (fastestLap != null) {
                         Integer driverNum = toInt(fastestLap.get("driver_number"));
                         if (driverNum != null) fastestLapByDriver.put(driverNum, true);
@@ -131,25 +153,14 @@ public class OpenF1SyncService {
             }
         }
 
-        Map<Integer, Integer> finalPositions = new HashMap<>();
-        for (Map<String, Object> pos : positions) {
-            Integer driverNum = toInt(pos.get("driver_number"));
-            Integer position = toInt(pos.get("position"));
-            if (driverNum != null && position != null) {
-                finalPositions.put(driverNum, position);
-            }
-        }
-
-        if (finalPositions.isEmpty()) return false;
-
         Map<Integer, Map<String, Object>> driverInfoMap = new HashMap<>();
         for (Map<String, Object> d : openf1Drivers) {
             Integer num = toInt(d.get("driver_number"));
             if (num != null) driverInfoMap.put(num, d);
         }
 
-        String sessionType = isSprint ? "Sprint" : "Race";
         Optional<Race> raceOpt = findMatchingRace(countryName, isSprint);
+        String sessionType = isSprint ? "Sprint" : "Race";
         if (raceOpt.isEmpty()) {
             log.warn("[OpenF1] No matching race found for {} {}", countryName, sessionType);
             return false;
@@ -172,7 +183,7 @@ public class OpenF1SyncService {
             if (driverInfo == null) continue;
 
             String fullName = String.valueOf(driverInfo.getOrDefault("full_name", ""));
-            Optional<Driver> driverOpt = findDriver(fullName, driverNum);
+            Optional<Driver> driverOpt = findDriver(fullName, driverNum, allDrivers);
             if (driverOpt.isEmpty()) continue;
 
             float points = 0;
@@ -189,12 +200,12 @@ public class OpenF1SyncService {
             }
 
             RaceResult result = RaceResult.builder()
-                .race(race)
-                .driver(driverOpt.get())
-                .finishPosition(position != null ? position : 0)
-                .points(points)
-                .hasFastestLap(hasFastestLap)
-                .build();
+                    .race(race)
+                    .driver(driverOpt.get())
+                    .finishPosition(position != null ? position : 0)
+                    .points(points)
+                    .hasFastestLap(hasFastestLap)
+                    .build();
             results.add(result);
         }
 
@@ -206,15 +217,15 @@ public class OpenF1SyncService {
         raceRepo.save(race);
 
         results.stream()
-            .filter(r -> r.getFinishPosition() == 1)
-            .findFirst()
-            .ifPresent(winner -> {
-                notificationService.notifyRaceResult(
-                    race.getName() + (isSprint ? " (Sprint)" : ""),
-                    winner.getDriver().getName(),
-                    winner.getDriver().getTeam() != null ? winner.getDriver().getTeam().getName() : ""
-                );
-            });
+                .filter(r -> r.getFinishPosition() == 1)
+                .findFirst()
+                .ifPresent(winner -> {
+                    notificationService.notifyRaceResult(
+                            race.getName() + (isSprint ? " (Sprint)" : ""),
+                            winner.getDriver().getName(),
+                            winner.getDriver().getTeam() != null ? winner.getDriver().getTeam().getName() : ""
+                    );
+                });
 
         log.info("✅ [OpenF1] Synced {} {} — {} results", countryName, sessionType, results.size());
         return true;
@@ -223,49 +234,49 @@ public class OpenF1SyncService {
     private Optional<Race> findMatchingRace(String countryName, boolean isSprint) {
         List<Race> races = raceRepo.findBySeason(2026);
         return races.stream()
-            .filter(r -> {
-                String name = r.getName().toLowerCase();
-                String country = countryName.toLowerCase();
-                boolean nameMatch =
-                    name.contains(country) ||
-                    (country.equals("china") && name.contains("chinese")) ||
-                    (country.equals("united states") && (name.contains("miami") || name.contains("austin") || name.contains("united states"))) ||
-                    (country.equals("great britain") && name.contains("british")) ||
-                    (country.equals("united arab emirates") && name.contains("abu dhabi")) ||
-                    (country.equals("brazil") && (name.contains("brazil") || name.contains("paulo"))) ||
-                    (country.equals("italy") && (name.contains("italian") || name.contains("emilia"))) ||
-                    (country.equals("netherlands") && name.contains("dutch")) ||
-                    (country.equals("belgium") && name.contains("belgian")) ||
-                    (country.equals("hungary") && name.contains("hungarian")) ||
-                    (country.equals("spain") && (name.contains("spanish") || name.contains("barcelona"))) ||
-                    (country.equals("austria") && name.contains("austrian")) ||
-                    (country.equals("japan") && name.contains("japanese")) ||
-                    (country.equals("australia") && name.contains("australian")) ||
-                    (country.equals("saudi arabia") && name.contains("saudi")) ||
-                    (country.equals("canada") && name.contains("canadian")) ||
-                    (country.equals("mexico") && name.contains("mexico")) ||
-                    (country.equals("qatar") && name.contains("qatar"));
-                boolean typeMatch = isSprint
-                    ? name.contains("sprint")
-                    : !name.contains("sprint");
-                return nameMatch && typeMatch;
-            })
-            .findFirst();
+                .filter(r -> {
+                    String name = r.getName().toLowerCase();
+                    String country = countryName.toLowerCase();
+                    boolean nameMatch =
+                            name.contains(country) ||
+                                    (country.equals("china") && name.contains("chinese")) ||
+                                    (country.equals("united states") && (name.contains("miami") || name.contains("austin") || name.contains("united states"))) ||
+                                    (country.equals("great britain") && name.contains("british")) ||
+                                    (country.equals("united arab emirates") && name.contains("abu dhabi")) ||
+                                    (country.equals("brazil") && (name.contains("brazil") || name.contains("paulo"))) ||
+                                    (country.equals("italy") && (name.contains("italian") || name.contains("emilia"))) ||
+                                    (country.equals("netherlands") && name.contains("dutch")) ||
+                                    (country.equals("belgium") && name.contains("belgian")) ||
+                                    (country.equals("hungary") && name.contains("hungarian")) ||
+                                    (country.equals("spain") && (name.contains("spanish") || name.contains("barcelona") || name.contains("madrid"))) ||
+                                    (country.equals("austria") && name.contains("austrian")) ||
+                                    (country.equals("japan") && name.contains("japanese")) ||
+                                    (country.equals("australia") && name.contains("australian")) ||
+                                    (country.equals("saudi arabia") && name.contains("saudi")) ||
+                                    (country.equals("canada") && name.contains("canadian")) ||
+                                    (country.equals("mexico") && name.contains("mexico")) ||
+                                    (country.equals("qatar") && name.contains("qatar")) ||
+                                    (country.equals("azerbaijan") && name.contains("azerbaijan")) ||
+                                    (country.equals("monaco") && name.contains("monaco")) ||
+                                    (country.equals("singapore") && name.contains("singapore"));
+
+                    boolean typeMatch = !isSprint && !name.contains("sprint");
+                    return nameMatch && typeMatch;
+                })
+                .findFirst();
     }
 
-    private Optional<Driver> findDriver(String fullName, Integer carNumber) {
-        List<Driver> drivers = driverRepo.findAll();
-
-        return drivers.stream()
-            .filter(d -> {
-                String dName = d.getName().toLowerCase();
-                String fName = fullName.toLowerCase();
-                return dName.equals(fName) ||
-                    fName.contains(dName.split(" ")[dName.split(" ").length - 1].toLowerCase()) ||
-                    dName.contains(fName.split(" ")[fName.split(" ").length - 1].toLowerCase()) ||
-                    (carNumber != null && d.getCarNumber() == carNumber);
-            })
-            .findFirst();
+    private Optional<Driver> findDriver(String fullName, Integer carNumber, List<Driver> allDrivers) {
+        return allDrivers.stream()
+                .filter(d -> {
+                    String dName = d.getName().toLowerCase();
+                    String fName = fullName.toLowerCase();
+                    return dName.equals(fName) ||
+                            fName.contains(dName.split(" ")[dName.split(" ").length - 1].toLowerCase()) ||
+                            dName.contains(fName.split(" ")[fName.split(" ").length - 1].toLowerCase()) ||
+                            (carNumber != null && d.getCarNumber() == carNumber);
+                })
+                .findFirst();
     }
 
     private Integer toInt(Object o) {
