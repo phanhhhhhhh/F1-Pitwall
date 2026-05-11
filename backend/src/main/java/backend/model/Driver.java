@@ -18,10 +18,11 @@ public class Driver {
     private Long id;
 
     @NotBlank
+    @Column(nullable = false)
     private String name;
 
     @Min(1) @Max(99)
-    @Column(unique = true)
+    @Column(unique = true, nullable = false)
     private int carNumber;
 
     private String nationality;
