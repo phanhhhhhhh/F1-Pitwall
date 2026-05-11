@@ -32,16 +32,16 @@ public class DataMigrationController {
         List<String> skipped = new ArrayList<>();
 
         List<Map<String, Object>> sprintRaces = List.of(
-            Map.of("name", "Chinese Grand Prix Sprint", "round", 2,
-                   "date", "2026-03-22", "country", "China", "status", "COMPLETED"),
-            Map.of("name", "Miami Grand Prix Sprint", "round", 6,
-                   "date", "2026-05-02", "country", "United States", "status", "COMPLETED"),
-            Map.of("name", "Belgian Grand Prix Sprint", "round", 13,
-                   "date", "2026-07-25", "country", "Belgium", "status", "SCHEDULED"),
-            Map.of("name", "São Paulo Grand Prix Sprint", "round", 21,
-                   "date", "2026-11-07", "country", "Brazil", "status", "SCHEDULED"),
-            Map.of("name", "Qatar Grand Prix Sprint", "round", 23,
-                   "date", "2026-11-28", "country", "Qatar", "status", "SCHEDULED")
+                Map.of("name", "Chinese Grand Prix Sprint", "round", 2,
+                        "date", "2026-03-22", "country", "China", "status", "COMPLETED"),
+                Map.of("name", "Miami Grand Prix Sprint", "round", 6,
+                        "date", "2026-05-02", "country", "United States", "status", "COMPLETED"),
+                Map.of("name", "Belgian Grand Prix Sprint", "round", 13,
+                        "date", "2026-07-25", "country", "Belgium", "status", "SCHEDULED"),
+                Map.of("name", "São Paulo Grand Prix Sprint", "round", 21,
+                        "date", "2026-11-07", "country", "Brazil", "status", "SCHEDULED"),
+                Map.of("name", "Qatar Grand Prix Sprint", "round", 23,
+                        "date", "2026-11-28", "country", "Qatar", "status", "SCHEDULED")
         );
 
         for (Map<String, Object> sr : sprintRaces) {
@@ -54,7 +54,7 @@ public class DataMigrationController {
             String country = (String) sr.get("country");
             Optional<Circuit> circuit = circuitRepo.findAll().stream()
                     .filter(c -> country.equalsIgnoreCase(c.getCountry()) ||
-                                 c.getName().toLowerCase().contains(country.toLowerCase()))
+                            c.getName().toLowerCase().contains(country.toLowerCase()))
                     .findFirst();
             if (circuit.isEmpty()) {
                 skipped.add(name + " (circuit not found for: " + country + ")");
@@ -73,7 +73,6 @@ public class DataMigrationController {
         return ResponseEntity.ok(Map.of("added", added, "skipped", skipped, "total", added.size()));
     }
 
-    // Fix duplicate race results — xóa bản ghi trùng, chỉ giữ 1 per driver per race
     @PostMapping("/fix-duplicates")
     public ResponseEntity<Map<String, Object>> fixDuplicates() {
         List<String> fixed = new ArrayList<>();
@@ -84,9 +83,8 @@ public class DataMigrationController {
             List<RaceResult> results = raceResultRepo.findByRaceIdOrderByFinishPosition(race.getId());
             if (results.isEmpty()) continue;
 
-            // Group by driverId, keep only the one with lowest id (first inserted)
             Map<Long, List<RaceResult>> byDriver = results.stream()
-                .collect(Collectors.groupingBy(r -> r.getDriver().getId()));
+                    .collect(Collectors.groupingBy(r -> r.getDriver().getId()));
 
             List<Long> toDelete = new ArrayList<>();
             for (Map.Entry<Long, List<RaceResult>> entry : byDriver.entrySet()) {
@@ -100,18 +98,16 @@ public class DataMigrationController {
             }
 
             if (!toDelete.isEmpty()) {
-                for (Long id : toDelete) {
-                    raceResultRepo.deleteById(id);
-                }
+                for (Long id : toDelete) raceResultRepo.deleteById(id);
                 totalDeleted += toDelete.size();
                 fixed.add(race.getName() + ": deleted " + toDelete.size() + " duplicates");
             }
         }
 
         return ResponseEntity.ok(Map.of(
-            "fixed", fixed,
-            "totalDeleted", totalDeleted,
-            "message", totalDeleted > 0 ? "Duplicates removed" : "No duplicates found"
+                "fixed", fixed,
+                "totalDeleted", totalDeleted,
+                "message", totalDeleted > 0 ? "Duplicates removed" : "No duplicates found"
         ));
     }
 
@@ -121,22 +117,23 @@ public class DataMigrationController {
             @RequestParam Long addToId) {
         try {
             RaceResult wrong = raceResultRepo.findById(removeFromId)
-                .orElseThrow(() -> new RuntimeException("Not found: " + removeFromId));
+                    .orElseThrow(() -> new RuntimeException("Not found: " + removeFromId));
             wrong.setHasFastestLap(false);
             wrong.setPoints(wrong.getPoints() - 1);
             raceResultRepo.save(wrong);
 
             RaceResult correct = raceResultRepo.findById(addToId)
-                .orElseThrow(() -> new RuntimeException("Not found: " + addToId));
+                    .orElseThrow(() -> new RuntimeException("Not found: " + addToId));
             correct.setHasFastestLap(true);
             correct.setPoints(correct.getPoints() + 1);
             raceResultRepo.save(correct);
 
             return ResponseEntity.ok(Map.of("success", true,
-                "removed", wrong.getDriver().getName(),
-                "added", correct.getDriver().getName()));
+                    "removed", wrong.getDriver().getName(),
+                    "added", correct.getDriver().getName()));
         } catch (Exception e) {
-            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 
@@ -153,8 +150,17 @@ public class DataMigrationController {
             @RequestParam(required = false) Integer points,
             @RequestParam(required = false) Integer position) {
         try {
+            if (points != null && points < 0) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("success", false, "error", "Points cannot be negative"));
+            }
+            if (position != null && (position < 0 || position > 22)) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("success", false, "error", "Position must be between 0 and 22"));
+            }
+
             RaceResult result = raceResultRepo.findById(resultId)
-                .orElseThrow(() -> new RuntimeException("Not found: " + resultId));
+                    .orElseThrow(() -> new RuntimeException("Not found: " + resultId));
 
             if (points != null) result.setPoints(points);
             if (position != null) result.setFinishPosition(position);
@@ -162,11 +168,12 @@ public class DataMigrationController {
             raceResultRepo.save(result);
 
             return ResponseEntity.ok(Map.of("success", true,
-                "driver", result.getDriver().getName(),
-                "newPoints", result.getPoints(),
-                "newPosition", result.getFinishPosition()));
+                    "driver", result.getDriver().getName(),
+                    "newPoints", result.getPoints(),
+                    "newPosition", result.getFinishPosition()));
         } catch (Exception e) {
-            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 }

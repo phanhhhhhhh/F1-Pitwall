@@ -15,7 +15,6 @@ public class OpenF1LiveController {
 
     private final OpenF1LiveService openF1LiveService;
 
-    // Status — includes session info
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getStatus() {
         return ResponseEntity.ok(Map.of(
@@ -30,13 +29,11 @@ public class OpenF1LiveController {
         ));
     }
 
-    // Live tyre data
     @GetMapping("/tyres")
     public ResponseEntity<List<Map<String, Object>>> getLiveTyres() {
         return ResponseEntity.ok(openF1LiveService.getLiveData());
     }
 
-    // Force fetch
     @PostMapping("/fetch")
     public ResponseEntity<Map<String, Object>> forceFetch() {
         return ResponseEntity.ok(openF1LiveService.forceFetch());

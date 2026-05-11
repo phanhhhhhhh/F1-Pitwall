@@ -1,6 +1,7 @@
 package backend.controller;
 
 import backend.repository.QualifyingResultRepository;
+import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
 import backend.service.OpenF1SyncService;
 import backend.service.QualifyingService;
@@ -20,6 +21,7 @@ public class SyncController {
     private final QualifyingService qualifyingService;
     private final RaceResultRepository raceResultRepo;
     private final QualifyingResultRepository qualifyingRepo;
+    private final RaceRepository raceRepo;
 
     @PostMapping("/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
@@ -30,13 +32,37 @@ public class SyncController {
 
     @PostMapping("/race/{raceId}/results")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
-    public ResponseEntity<Map<String, Object>> resyncRaceResults(@PathVariable Long raceId) {
+    public ResponseEntity<Map<String, Object>> resyncRaceResults(
+            @PathVariable Long raceId,
+            @RequestParam(required = false) Integer sessionKey,
+            @RequestParam(defaultValue = "false") boolean sprint) {
         try {
+            var race = raceRepo.findById(raceId)
+                    .orElseThrow(() -> new RuntimeException("Race not found: " + raceId));
+
             raceResultRepo.deleteByRaceId(raceId);
-            Map<String, Object> result = syncService.syncRecentSessions();
-            return ResponseEntity.ok(Map.of("success", true, "raceId", raceId, "message", "Re-synced successfully"));
+
+            if (sessionKey != null) {
+                String countryName = race.getCircuit() != null
+                        ? race.getCircuit().getCountry() : "";
+                boolean success = syncService.syncSession(sessionKey, countryName, sprint);
+                return ResponseEntity.ok(Map.of(
+                        "success", success,
+                        "raceId", raceId,
+                        "message", success ? "Re-synced successfully" : "No data found for session"
+                ));
+            } else {
+                Map<String, Object> result = syncService.syncRecentSessions();
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "raceId", raceId,
+                        "message", "Full season re-sync triggered",
+                        "detail", result
+                ));
+            }
         } catch (Exception e) {
-            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 
@@ -48,7 +74,8 @@ public class SyncController {
             Map<String, Object> result = qualifyingService.syncQualifying(raceId);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.ok(Map.of("success", false, "error", e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 
@@ -60,9 +87,9 @@ public class SyncController {
             @RequestParam(defaultValue = "") String countryName) {
         boolean success = syncService.syncSession(sessionKey, countryName, sprint);
         return ResponseEntity.ok(Map.of(
-            "success", success,
-            "sessionKey", sessionKey,
-            "type", sprint ? "Sprint" : "Race"
+                "success", success,
+                "sessionKey", sessionKey,
+                "type", sprint ? "Sprint" : "Race"
         ));
     }
 }
