@@ -18,7 +18,6 @@ export interface User {
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
-
 let refreshPromise: Promise<boolean> | null = null;
 
 const isBrowser = () => typeof window !== "undefined";
@@ -29,6 +28,7 @@ export function setTokens(access: string, refresh: string) {
     if (isBrowser()) {
         sessionStorage.setItem("pitwall_access", access);
         sessionStorage.setItem("pitwall_refresh", refresh);
+        document.cookie = "pitwall_session=1; path=/; SameSite=Strict";
     }
 }
 
@@ -45,6 +45,7 @@ export function clearTokens() {
     if (isBrowser()) {
         sessionStorage.removeItem("pitwall_access");
         sessionStorage.removeItem("pitwall_refresh");
+        document.cookie = "pitwall_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
 }
 
@@ -93,7 +94,6 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
     });
-
 
     const currentRefresh = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
 

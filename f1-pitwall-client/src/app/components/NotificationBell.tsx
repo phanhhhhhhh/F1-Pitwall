@@ -33,7 +33,6 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -44,7 +43,6 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Fetch initial count
   useEffect(() => {
     if (!getAccessToken()) return;
     fetchCount();
@@ -52,21 +50,22 @@ export default function NotificationBell() {
     return () => clearInterval(interval);
   }, []);
 
-  // WebSocket for real-time notifications
   useEffect(() => {
     if (!getAccessToken()) return;
 
     const loadAndConnect = () => {
-      // Reuse existing SockJS/Stomp if already loaded
       if (typeof window !== "undefined" && (window as any).Stomp) {
         connectWs();
         return;
       }
+
       const s = document.createElement("script");
       s.src = "https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js";
+      s.onerror = () => console.warn("[NotificationBell] Failed to load SockJS — WebSocket notifications unavailable");
       s.onload = () => {
         const s2 = document.createElement("script");
         s2.src = "https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js";
+        s2.onerror = () => console.warn("[NotificationBell] Failed to load StompJS");
         s2.onload = () => setTimeout(connectWs, 200);
         document.head.appendChild(s2);
       };
@@ -79,17 +78,18 @@ export default function NotificationBell() {
       if (!factory) return;
       const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/ws";
       const client = factory.over(() => new w.SockJS(wsUrl));
-      client.debug = () => {};
+      client.debug = () => { };
       client.connect({}, () => {
         client.subscribe("/topic/notifications", (msg: any) => {
           const notif: Notification = JSON.parse(msg.body);
           setNotifications(prev => [notif, ...prev].slice(0, 50));
           setUnreadCount(prev => prev + 1);
-          // Browser notification if supported
           if (Notification.permission === "granted") {
             new Notification(notif.title, { body: notif.message, icon: "/favicon.ico" });
           }
         });
+      }, () => {
+        console.warn("[NotificationBell] WebSocket connection failed");
       });
     };
 
@@ -101,7 +101,7 @@ export default function NotificationBell() {
       const res = await authFetch(`${API}/api/notifications/count`);
       const data = await res.json();
       setUnreadCount(data.count);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const fetchNotifications = async () => {
@@ -110,7 +110,7 @@ export default function NotificationBell() {
       const res = await authFetch(`${API}/api/notifications`);
       const data = await res.json();
       setNotifications(data);
-    } catch (e) {} finally {
+    } catch (e) { } finally {
       setLoading(false);
     }
   };
@@ -146,7 +146,6 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell button */}
       <button onClick={handleOpen}
         className="relative p-2 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-zinc-800">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,10 +159,8 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-white">Notifications</span>
@@ -189,7 +186,6 @@ export default function NotificationBell() {
             </div>
           </div>
 
-          {/* List */}
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
               <div className="text-center py-8 text-zinc-600 text-sm font-mono">Loading...</div>
@@ -218,7 +214,6 @@ export default function NotificationBell() {
             )}
           </div>
 
-          {/* Footer */}
           {notifications.length > 0 && (
             <div className="px-4 py-2 border-t border-zinc-800 text-center">
               <p className="text-xs text-zinc-600 font-mono">{notifications.length} total notifications</p>

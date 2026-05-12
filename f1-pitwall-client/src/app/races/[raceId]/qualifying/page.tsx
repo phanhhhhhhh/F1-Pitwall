@@ -44,6 +44,11 @@ function formatTime(sec: number): string {
     return `${m}:${s}`;
 }
 
+function safeBest(values: (number | null)[]): number | null {
+    const valid = values.filter((v): v is number => v !== null && isFinite(v));
+    return valid.length > 0 ? Math.min(...valid) : null;
+}
+
 export default function QualifyingPage() {
     const router = useRouter();
     const params = useParams();
@@ -90,7 +95,6 @@ export default function QualifyingPage() {
         finally { setSyncing(false); }
     };
 
-    // Re-sync — xóa data cũ và fetch lại (dùng khi có penalty/disqualification)
     const handleResync = async () => {
         if (!confirm("Re-sync sẽ xóa qualifying data hiện tại và fetch lại.\nTiếp tục?")) return;
         setResyncing(true);
@@ -112,16 +116,15 @@ export default function QualifyingPage() {
         }
     };
 
-    const bestQ1 = Math.min(...results.filter(r => r.q1TimeRaw).map(r => r.q1TimeRaw!));
-    const bestQ2 = Math.min(...results.filter(r => r.q2TimeRaw).map(r => r.q2TimeRaw!));
-    const bestQ3 = Math.min(...results.filter(r => r.q3TimeRaw).map(r => r.q3TimeRaw!));
+    const bestQ1 = safeBest(results.map(r => r.q1TimeRaw));
+    const bestQ2 = safeBest(results.map(r => r.q2TimeRaw));
+    const bestQ3 = safeBest(results.map(r => r.q3TimeRaw));
 
     return (
         <div className="min-h-screen bg-zinc-950">
             <Navbar />
             <main className="max-w-7xl mx-auto px-8 py-10">
 
-                {/* Header */}
                 <div className="flex items-end justify-between mb-8">
                     <div>
                         <p className="text-zinc-500 font-mono text-xs tracking-widest uppercase mb-2">
@@ -134,24 +137,21 @@ export default function QualifyingPage() {
                     </div>
                     <div className="flex items-center gap-3 flex-wrap justify-end">
                         {feedback && (
-                            <span className={`text-xs font-mono px-3 py-1.5 rounded border ${
-                                feedback.startsWith("✓") ? "text-green-400 border-green-500/30 bg-green-500/10" : "text-red-400 border-red-500/30 bg-red-500/10"
-                            }`}>{feedback}</span>
+                            <span className={`text-xs font-mono px-3 py-1.5 rounded border ${feedback.startsWith("✓") ? "text-green-400 border-green-500/30 bg-green-500/10" : "text-red-400 border-red-500/30 bg-red-500/10"
+                                }`}>{feedback}</span>
                         )}
                         {hasData && (
                             <button onClick={handleResync} disabled={resyncing}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
-                                    resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
-                                }`}>
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                                    }`}>
                                 {resyncing ? (
                                     <><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />RE-SYNCING...</>
                                 ) : "⚠️ RE-SYNC (PENALTY)"}
                             </button>
                         )}
                         <button onClick={handleSync} disabled={syncing}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
-                                syncing ? "border-zinc-700 text-zinc-500" : "border-red-500/50 text-red-400 hover:bg-red-500/10"
-                            }`}>
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${syncing ? "border-zinc-700 text-zinc-500" : "border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                }`}>
                             {syncing ? (
                                 <><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />SYNCING...</>
                             ) : "↻ SYNC FROM OPENF1"}
@@ -182,7 +182,7 @@ export default function QualifyingPage() {
                     </div>
                 ) : (
                     <div className="space-y-8">
-                        {/* Starting grid visual */}
+                        { }
                         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                             <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
                                 <p className="text-xs font-mono text-zinc-500 tracking-widest">STARTING GRID</p>
@@ -223,7 +223,7 @@ export default function QualifyingPage() {
                             </div>
                         </div>
 
-                        {/* Full qualifying table */}
+                        { }
                         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                             <div className="px-6 py-4 border-b border-zinc-800">
                                 <p className="text-xs font-mono text-zinc-500 tracking-widest">QUALIFYING TIMES</p>
@@ -286,13 +286,13 @@ export default function QualifyingPage() {
                                                         <span className="text-xs font-bold" style={{ color: r.teamColor }}>{r.teamName}</span>
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        {r.q3TimeRaw ? <TimeDelta time={r.q3TimeRaw} best={isFinite(bestQ3) ? bestQ3 : null} /> : <span className="text-zinc-800">—</span>}
+                                                        <TimeDelta time={r.q3TimeRaw} best={bestQ3} />
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        {r.q2TimeRaw ? <TimeDelta time={r.q2TimeRaw} best={isFinite(bestQ2) ? bestQ2 : null} /> : <span className="text-zinc-800">—</span>}
+                                                        <TimeDelta time={r.q2TimeRaw} best={bestQ2} />
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        {r.q1TimeRaw ? <TimeDelta time={r.q1TimeRaw} best={isFinite(bestQ1) ? bestQ1 : null} /> : <span className="text-zinc-800">—</span>}
+                                                        <TimeDelta time={r.q1TimeRaw} best={bestQ1} />
                                                     </td>
                                                 </tr>
                                             </>
