@@ -10,10 +10,13 @@ export function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    const token = request.cookies.get("pitwall_access")?.value
-        || request.headers.get("Authorization");
 
-    if (!token) {
+    const sessionCookie = request.cookies.get("pitwall_session")?.value;
+
+    if (!sessionCookie) {
+        if (pathname.startsWith("/api/")) {
+            return NextResponse.next();
+        }
         return NextResponse.redirect(new URL("/login", request.url));
     }
 
@@ -21,5 +24,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+    matcher: ["/((?!_next/static|_next/image|favicon.ico|public).*)"],
 };

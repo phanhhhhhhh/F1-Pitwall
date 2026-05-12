@@ -24,18 +24,13 @@ const statusStyle: Record<string, string> = {
   ONGOING: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
 };
 
-const RACE_WINNERS: Record<string, { driver: string; team: string }> = {
-  "Australian Grand Prix": { driver: "G. Russell", team: "Mercedes" },
-  "Chinese Grand Prix": { driver: "K. Antonelli", team: "Mercedes" },
-  "Japanese Grand Prix": { driver: "K. Antonelli", team: "Mercedes" },
-};
-
 export default function Home() {
   const router = useRouter();
   const [stats, setStats] = useState({ drivers: 0, teams: 0, races: 0, circuits: 0 });
   const [loading, setLoading] = useState(true);
   const [races, setRaces] = useState<any[]>([]);
   const [topDrivers, setTopDrivers] = useState<any[]>([]);
+  const [raceWinners, setRaceWinners] = useState<Record<string, { driver: string; team: string }>>({});
   const [countdown, setCountdown] = useState("");
 
   useEffect(() => {
@@ -65,7 +60,7 @@ export default function Home() {
         if (res.ok) return res;
       } catch (e) {
         if (i === retries - 1) throw e;
-        await new Promise(r => setTimeout(r, 2000)); // chờ 2s rồi retry
+        await new Promise(r => setTimeout(r, 2000));
       }
     }
     throw new Error("Failed after retries");
@@ -73,18 +68,41 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      const [driversRes, teamsRes, racesRes, circuitsRes] = await Promise.all([
-        authFetch(`${API}/api/drivers`),
-        authFetch(`${API}/api/teams`),
-        authFetch(`${API}/api/races/season/2026`),
-        authFetch(`${API}/api/circuits`),
+      const [driversRes, teamsRes, racesRes, circuitsRes, standingsRes] = await Promise.all([
+        fetchWithRetry(`${API}/api/drivers`),
+        fetchWithRetry(`${API}/api/teams`),
+        fetchWithRetry(`${API}/api/races/season/2026`),
+        fetchWithRetry(`${API}/api/circuits`),
+        fetchWithRetry(`${API}/api/race-results/standings/drivers/2026`),
       ]);
-      const [drivers, teams, racesData, circuits] = await Promise.all([
-        driversRes.json(), teamsRes.json(), racesRes.json(), circuitsRes.json(),
+      const [drivers, teams, racesData, circuits, standings] = await Promise.all([
+        driversRes.json(), teamsRes.json(), racesRes.json(),
+        circuitsRes.json(), standingsRes.json(),
       ]);
+
       setStats({ drivers: drivers.length, teams: teams.length, races: racesData.length, circuits: circuits.length });
       setRaces(racesData.slice(0, 5));
       setTopDrivers(drivers.slice(0, 5));
+
+      const completedRaces = racesData.filter((r: any) => r.status === "COMPLETED");
+      const winnerMap: Record<string, { driver: string; team: string }> = {};
+      await Promise.all(
+        completedRaces.map(async (race: any) => {
+          try {
+            const res = await fetchWithRetry(`${API}/api/race-results/race/${race.id}`);
+            const results = await res.json();
+            const winner = results.find((r: any) => r.finishPosition === 1 && !r.dnfReason);
+            if (winner) {
+              winnerMap[race.name] = {
+                driver: winner.driverName.split(" ").pop() || winner.driverName,
+                team: winner.teamName,
+              };
+            }
+          } catch (e) { }
+        })
+      );
+      setRaceWinners(winnerMap);
+
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -97,7 +115,7 @@ export default function Home() {
       <Navbar />
       <main className="max-w-7xl mx-auto px-8 py-10">
 
-        {/* Header */}
+        { }
         <div className="mb-10 flex items-end justify-between">
           <div>
             <p className="text-zinc-500 font-mono text-xs tracking-widest uppercase mb-2">
@@ -107,7 +125,6 @@ export default function Home() {
               F1 PITWALL <span className="text-red-500">OVERVIEW</span>
             </h1>
           </div>
-          {/* Next Race Banner */}
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-6 py-4 text-right">
             <p className="text-xs font-mono text-zinc-500 tracking-widest mb-1">NEXT RACE · ROUND 6</p>
             <p className="text-white font-black text-lg">🇺🇸 Miami Grand Prix</p>
@@ -115,7 +132,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stats */}
+        { }
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {[
             { label: "DRIVERS", value: stats.drivers, sub: "2026 Grid", href: "/drivers" },
@@ -134,7 +151,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Season Progress */}
+        { }
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-10">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-mono text-zinc-400 tracking-widest">2026 SEASON PROGRESS</p>
@@ -151,7 +168,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Race Calendar */}
+          { }
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-sm font-bold tracking-widest text-zinc-300">RACE CALENDAR</h2>
@@ -159,7 +176,8 @@ export default function Home() {
             </div>
             <div className="space-y-2">
               {loading ? <p className="text-zinc-600 font-mono text-sm">Loading...</p> : races.map((race) => {
-                const winner = RACE_WINNERS[race.name];
+
+                const winner = raceWinners[race.name];
                 return (
                   <div key={race.id} className="flex items-center justify-between py-3 border-b border-zinc-800/50 last:border-0">
                     <div className="flex items-center gap-3">
@@ -185,7 +203,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Drivers */}
+          { }
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-sm font-bold tracking-widest text-zinc-300">DRIVER ROSTER</h2>
@@ -195,10 +213,7 @@ export default function Home() {
               {loading ? <p className="text-zinc-600 font-mono text-sm">Loading...</p> : topDrivers.map((driver, i) => (
                 <div key={driver.id} className="flex items-center gap-4 py-3 border-b border-zinc-800/50 last:border-0">
                   <span className="text-2xl font-black text-zinc-700 w-6 text-center">{i + 1}</span>
-                  <div
-                    className="w-0.5 h-8 rounded-full"
-                    style={{ backgroundColor: driver.team?.colorHex || "#666" }}
-                  />
+                  <div className="w-0.5 h-8 rounded-full" style={{ backgroundColor: driver.team?.colorHex || "#666" }} />
                   <div className="flex-1">
                     <p className="text-sm font-bold text-white">{driver.name}</p>
                     <p className="text-xs mt-0.5" style={{ color: driver.team?.colorHex || "#666" }}>
