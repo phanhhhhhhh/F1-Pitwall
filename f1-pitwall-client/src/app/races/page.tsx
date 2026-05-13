@@ -17,12 +17,6 @@ const COUNTRY_FLAGS: Record<string, string> = {
     "UAE": "🇦🇪", "Qatar": "🇶🇦",
 };
 
-const RACE_WINNERS: Record<string, { driver: string; team: string; time: string }> = {
-    "Australian Grand Prix": { driver: "George Russell", team: "Mercedes", time: "1:23:06.801" },
-    "Chinese Grand Prix": { driver: "Kimi Antonelli", team: "Mercedes", time: "1:33:15.607" },
-    "Japanese Grand Prix": { driver: "Kimi Antonelli", team: "Mercedes", time: "1:28:03.403" },
-};
-
 const statusStyle: Record<string, string> = {
     COMPLETED: "text-green-400 bg-green-500/10 border-green-500/30",
     CANCELLED: "text-red-400 bg-red-500/10 border-red-500/30",
@@ -30,18 +24,57 @@ const statusStyle: Record<string, string> = {
     ONGOING: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
 };
 
+interface RaceWinner {
+    driver: string;
+    team: string;
+    time?: string;
+}
+
 export default function RacesPage() {
     const router = useRouter();
     const [races, setRaces] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("ALL");
+    // Fix: fetch từ API thay vì hardcode
+    const [raceWinners, setRaceWinners] = useState<Record<string, RaceWinner>>({});
 
     useEffect(() => {
         if (!getAccessToken()) { router.push("/login"); return; }
-        authFetch(`${API}/api/races/season/2026`)
-            .then(r => r.json()).then(setRaces)
-            .catch(console.error).finally(() => setLoading(false));
+        fetchData();
     }, []);
+
+    const fetchData = async () => {
+        try {
+            const res = await authFetch(`${API}/api/races/season/2026`);
+            const racesData = await res.json();
+            setRaces(racesData);
+
+            // Fetch winners cho các race đã completed song song
+            const completedRaces = racesData.filter((r: any) => r.status === "COMPLETED");
+            const winnerMap: Record<string, RaceWinner> = {};
+
+            await Promise.all(
+                completedRaces.map(async (race: any) => {
+                    try {
+                        const rRes = await authFetch(`${API}/api/race-results/race/${race.id}`);
+                        const results = await rRes.json();
+                        const winner = results.find((r: any) => r.finishPosition === 1 && !r.dnfReason);
+                        if (winner) {
+                            winnerMap[race.name] = {
+                                driver: winner.driverName,
+                                team: winner.teamName,
+                            };
+                        }
+                    } catch (e) { }
+                })
+            );
+            setRaceWinners(winnerMap);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const completed = races.filter(r => r.status === "COMPLETED").length;
     const cancelled = races.filter(r => r.status === "CANCELLED").length;
@@ -100,7 +133,7 @@ export default function RacesPage() {
                 ) : (
                     <div className="space-y-3">
                         {filtered.map((race) => {
-                            const winner = RACE_WINNERS[race.name];
+                            const winner = raceWinners[race.name];
                             const isCancelled = race.status === "CANCELLED";
                             const isCompleted = race.status === "COMPLETED";
 
@@ -123,9 +156,10 @@ export default function RacesPage() {
                                             <p className="text-xs text-zinc-500 font-mono mt-0.5">
                                                 {race.circuit?.name} · {race.date}
                                             </p>
+                                            {/* Fix: winner từ API — tự cập nhật khi submit race results */}
                                             {winner && (
                                                 <p className="text-xs text-yellow-400 mt-1">
-                                                    🏆 {winner.driver} ({winner.team}) · {winner.time}
+                                                    🏆 {winner.driver} ({winner.team})
                                                 </p>
                                             )}
                                             {isCancelled && (
