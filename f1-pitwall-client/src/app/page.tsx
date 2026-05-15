@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "./lib/pitwall-auth";
 import Navbar from "./components/Navbar";
@@ -24,6 +24,13 @@ const statusStyle: Record<string, string> = {
   ONGOING: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
 };
 
+interface NextRace {
+  name: string;
+  date: string;
+  roundNumber: number;
+  circuit?: { country: string };
+}
+
 export default function Home() {
   const router = useRouter();
   const [stats, setStats] = useState({ drivers: 0, teams: 0, races: 0, circuits: 0 });
@@ -31,6 +38,7 @@ export default function Home() {
   const [races, setRaces] = useState<any[]>([]);
   const [topDrivers, setTopDrivers] = useState<any[]>([]);
   const [raceWinners, setRaceWinners] = useState<Record<string, { driver: string; team: string }>>({});
+  const [nextRace, setNextRace] = useState<NextRace | null>(null);
   const [countdown, setCountdown] = useState("");
 
   useEffect(() => {
@@ -39,10 +47,15 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const target = new Date("2026-05-03T20:00:00Z");
+    if (!nextRace) return;
+
+    const target = new Date(nextRace.date + "T00:00:00Z");
     const update = () => {
       const diff = target.getTime() - Date.now();
-      if (diff <= 0) { setCountdown("RACE DAY"); return; }
+      if (diff <= 0) {
+        setCountdown("RACE DAY 🏁");
+        return;
+      }
       const d = Math.floor(diff / 86400000);
       const h = Math.floor((diff % 86400000) / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
@@ -51,9 +64,9 @@ export default function Home() {
     update();
     const id = setInterval(update, 60000);
     return () => clearInterval(id);
-  }, []);
+  }, [nextRace]);
 
-  const fetchWithRetry = async (url: string, retries = 3): Promise<Response> => {
+  const fetchWithRetry = useCallback(async (url: string, retries = 3): Promise<Response> => {
     for (let i = 0; i < retries; i++) {
       try {
         const res = await authFetch(url);
@@ -64,32 +77,36 @@ export default function Home() {
       }
     }
     throw new Error("Failed after retries");
-  };
+  }, []);
 
   const fetchData = async () => {
     try {
-      const [driversRes, teamsRes, racesRes, circuitsRes, standingsRes] = await Promise.all([
-        fetchWithRetry(`${API}/api/drivers`),
-        fetchWithRetry(`${API}/api/teams`),
-        fetchWithRetry(`${API}/api/races/season/2026`),
-        fetchWithRetry(`${API}/api/circuits`),
-        fetchWithRetry(`${API}/api/race-results/standings/drivers/2026`),
+      const [driversRes, teamsRes, racesRes, circuitsRes] = await Promise.all([
+        authFetch(`${API}/api/drivers`),
+        authFetch(`${API}/api/teams`),
+        authFetch(`${API}/api/races/season/2026`),
+        authFetch(`${API}/api/circuits`),
       ]);
-      const [drivers, teams, racesData, circuits, standings] = await Promise.all([
-        driversRes.json(), teamsRes.json(), racesRes.json(),
-        circuitsRes.json(), standingsRes.json(),
+      const [drivers, teams, racesData, circuits] = await Promise.all([
+        driversRes.json(), teamsRes.json(), racesRes.json(), circuitsRes.json(),
       ]);
 
       setStats({ drivers: drivers.length, teams: teams.length, races: racesData.length, circuits: circuits.length });
-      setRaces(racesData.slice(0, 5));
+      setRaces(racesData.slice(0, 6));
       setTopDrivers(drivers.slice(0, 5));
+
+      const today = new Date().toISOString().split("T")[0];
+      const upcoming = racesData
+        .filter((r: any) => r.status === "SCHEDULED" && r.date >= today)
+        .sort((a: any, b: any) => a.date.localeCompare(b.date));
+      if (upcoming.length > 0) setNextRace(upcoming[0]);
 
       const completedRaces = racesData.filter((r: any) => r.status === "COMPLETED");
       const winnerMap: Record<string, { driver: string; team: string }> = {};
       await Promise.all(
         completedRaces.map(async (race: any) => {
           try {
-            const res = await fetchWithRetry(`${API}/api/race-results/race/${race.id}`);
+            const res = await authFetch(`${API}/api/race-results/race/${race.id}`);
             const results = await res.json();
             const winner = results.find((r: any) => r.finishPosition === 1 && !r.dnfReason);
             if (winner) {
@@ -109,14 +126,15 @@ export default function Home() {
 
   const completed = races.filter(r => r.status === "COMPLETED").length;
   const cancelled = races.filter(r => r.status === "CANCELLED").length;
+  const allCompleted = races.filter(r => r.status === "COMPLETED").length;
 
   return (
     <div className="min-h-screen bg-zinc-950">
       <Navbar />
       <main className="max-w-7xl mx-auto px-8 py-10">
 
-        { }
-        <div className="mb-10 flex items-end justify-between">
+        {/* Header */}
+        <div className="mb-10 flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="text-zinc-500 font-mono text-xs tracking-widest uppercase mb-2">
               Season 2026 · Command Center
@@ -125,19 +143,36 @@ export default function Home() {
               F1 PITWALL <span className="text-red-500">OVERVIEW</span>
             </h1>
           </div>
+
+          {/* Fix: Next race dynamic */}
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-6 py-4 text-right">
-            <p className="text-xs font-mono text-zinc-500 tracking-widest mb-1">NEXT RACE · ROUND 6</p>
-            <p className="text-white font-black text-lg">🇺🇸 Miami Grand Prix</p>
-            <p className="text-red-500 font-mono font-bold text-xl">{countdown}</p>
+            {nextRace ? (
+              <>
+                <p className="text-xs font-mono text-zinc-500 tracking-widest mb-1">
+                  NEXT RACE · ROUND {nextRace.roundNumber}
+                </p>
+                <p className="text-white font-black text-lg">
+                  {COUNTRY_FLAGS[nextRace.circuit?.country || ""] || "🏁"} {nextRace.name}
+                </p>
+                <p className="text-red-500 font-mono font-bold text-xl">{countdown}</p>
+                <p className="text-zinc-600 text-xs font-mono mt-1">{nextRace.date}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-mono text-zinc-500 tracking-widest mb-1">SEASON</p>
+                <p className="text-white font-black text-lg">2026 Season</p>
+                <p className="text-zinc-500 font-mono text-sm mt-1">No upcoming races</p>
+              </>
+            )}
           </div>
         </div>
 
-        { }
+        {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {[
             { label: "DRIVERS", value: stats.drivers, sub: "2026 Grid", href: "/drivers" },
             { label: "TEAMS", value: stats.teams, sub: "Constructors", href: "/teams" },
-            { label: "RACES", value: stats.races, sub: `${completed} completed · ${cancelled} cancelled`, href: "/races" },
+            { label: "RACES", value: stats.races, sub: `${allCompleted} completed · ${cancelled} cancelled`, href: "/races" },
             { label: "CIRCUITS", value: stats.circuits, sub: "Worldwide", href: "/circuits" },
           ].map((s) => (
             <Link key={s.label} href={s.href}
@@ -151,24 +186,24 @@ export default function Home() {
           ))}
         </div>
 
-        { }
+        {/* Season Progress */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-10">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-mono text-zinc-400 tracking-widest">2026 SEASON PROGRESS</p>
-            <p className="text-xs text-zinc-500">{completed} / 22 active races completed</p>
+            <p className="text-xs text-zinc-500">{allCompleted} / 22 active races completed</p>
           </div>
           <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-            <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${(completed / 22) * 100}%` }} />
+            <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${(allCompleted / 22) * 100}%` }} />
           </div>
           <div className="flex gap-4 mt-3">
-            <span className="text-xs text-green-400">● {completed} Completed</span>
+            <span className="text-xs text-green-400">● {allCompleted} Completed</span>
             <span className="text-xs text-red-400">● {cancelled} Cancelled</span>
-            <span className="text-xs text-zinc-500">● {22 - completed - cancelled} Scheduled</span>
+            <span className="text-xs text-zinc-500">● {22 - allCompleted - cancelled} Scheduled</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          { }
+          {/* Race Calendar */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-sm font-bold tracking-widest text-zinc-300">RACE CALENDAR</h2>
@@ -176,21 +211,20 @@ export default function Home() {
             </div>
             <div className="space-y-2">
               {loading ? <p className="text-zinc-600 font-mono text-sm">Loading...</p> : races.map((race) => {
-
                 const winner = raceWinners[race.name];
+                const isCancelled = race.status === "CANCELLED";
                 return (
-                  <div key={race.id} className="flex items-center justify-between py-3 border-b border-zinc-800/50 last:border-0">
+                  <div key={race.id}
+                    className={`flex items-center justify-between py-3 border-b border-zinc-800/50 last:border-0 ${isCancelled ? "opacity-40" : ""}`}>
                     <div className="flex items-center gap-3">
-                      <span className="text-lg w-6">
-                        {COUNTRY_FLAGS[race.circuit?.country] || "🏁"}
-                      </span>
+                      <span className="text-lg w-6">{COUNTRY_FLAGS[race.circuit?.country] || "🏁"}</span>
                       <div>
                         <p className="text-sm font-bold text-white">{race.name}</p>
                         {winner && (
                           <p className="text-xs text-zinc-500 mt-0.5">🏆 {winner.driver} · {winner.team}</p>
                         )}
-                        {!winner && race.status === "CANCELLED" && (
-                          <p className="text-xs text-red-400/70 mt-0.5">Cancelled — Middle East conflict</p>
+                        {isCancelled && (
+                          <p className="text-xs text-red-400/70 mt-0.5">Cancelled</p>
                         )}
                       </div>
                     </div>
@@ -203,7 +237,7 @@ export default function Home() {
             </div>
           </div>
 
-          { }
+          {/* Drivers */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-sm font-bold tracking-widest text-zinc-300">DRIVER ROSTER</h2>
