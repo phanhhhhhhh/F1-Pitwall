@@ -273,7 +273,7 @@ export default function AdminPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h2 className="text-lg font-black text-white mb-1">OpenF1 Auto-Sync</h2>
-                  <p className="text-zinc-500 text-sm">Tự động fetch kết quả race và sprint từ OpenF1 API, tính điểm đúng theo hệ thống F1.</p>
+                  <p className="text-zinc-500 text-sm">Automatically fetch race and sprint results from OpenF1 API, correctly calculate points according to F1 system.</p>
                 </div>
                 <button onClick={handleSyncAll} disabled={syncing}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all ${
@@ -306,7 +306,7 @@ export default function AdminPage() {
               </div>
 
               <p className="text-xs text-zinc-600 font-mono">
-                ℹ️ Chỉ sync các race đã hoàn thành và chưa có kết quả trong DB · Fastest lap +1pt cho top 10 (Race only)
+                ℹ️ Only sync completed races without results in DB · Fastest lap +1pt for top 10 (Race only)
               </p>
             </div>
 
@@ -360,12 +360,12 @@ export default function AdminPage() {
             <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-5">
               <h3 className="text-xs font-mono text-zinc-500 tracking-widest mb-3">HOW IT WORKS</h3>
               <div className="space-y-2 text-xs text-zinc-600">
-                <p>1. Fetch tất cả sessions 2026 từ OpenF1 API</p>
-                <p>2. Lọc chỉ Race và Sprint sessions đã hoàn thành</p>
-                <p>3. Match với race trong database theo tên quốc gia</p>
-                <p>4. Fetch positions → tính điểm đúng hệ thống</p>
-                <p>5. Lưu vào DB và push notification</p>
-                <p>6. Auto-repeat mỗi 1 tiếng</p>
+                <p>1. Fetch all 2026 sessions from OpenF1 API</p>
+                <p>2. Filter only completed Race and Sprint sessions</p>
+                <p>3. Match with race in database by country name</p>
+                <p>4. Fetch positions → calculate points using correct system</p>
+                <p>5. Save to DB and push notification</p>
+                <p>6. Auto-repeat every 1 hour</p>
               </div>
             </div>
           </div>

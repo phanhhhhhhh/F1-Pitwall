@@ -1,5 +1,5 @@
 // src/app/lib/export.ts
-// Helper functions để download files từ backend
+// Helper functions to download files from backend
 
 import { getAccessToken } from "./pitwall-auth";
 
