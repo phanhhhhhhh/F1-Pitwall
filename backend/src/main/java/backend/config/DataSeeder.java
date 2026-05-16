@@ -336,9 +336,24 @@ public class DataSeeder implements CommandLineRunner {
                 Race.builder().name("Qatar Grand Prix").date(LocalDate.of(2026,11,29))
                         .season(2026).roundNumber(23).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Lusail International Circuit")).build(),
                 Race.builder().name("Abu Dhabi Grand Prix").date(LocalDate.of(2026,12,6))
-                        .season(2026).roundNumber(24).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Yas Marina Circuit")).build()
+                        .season(2026).roundNumber(24).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Yas Marina Circuit")).build(),
+
+                // Sprint races — 6 chặng có sprint trong mùa 2026
+                // round_number khớp với race chính tương ứng
+                Race.builder().name("Chinese Grand Prix Sprint").date(LocalDate.of(2026,3,22))
+                        .season(2026).roundNumber(2).status(RaceStatus.COMPLETED).circuit(circuitMap.get("Shanghai International Circuit")).build(),
+                Race.builder().name("Miami Grand Prix Sprint").date(LocalDate.of(2026,5,2))
+                        .season(2026).roundNumber(6).status(RaceStatus.COMPLETED).circuit(circuitMap.get("Miami International Autodrome")).build(),
+                Race.builder().name("Canadian Grand Prix Sprint").date(LocalDate.of(2026,5,23))
+                        .season(2026).roundNumber(7).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Circuit Gilles-Villeneuve")).build(),
+                Race.builder().name("British Grand Prix Sprint").date(LocalDate.of(2026,7,4))
+                        .season(2026).roundNumber(11).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Silverstone Circuit")).build(),
+                Race.builder().name("Dutch Grand Prix Sprint").date(LocalDate.of(2026,8,22))
+                        .season(2026).roundNumber(14).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Circuit Zandvoort")).build(),
+                Race.builder().name("Singapore Grand Prix Sprint").date(LocalDate.of(2026,10,10))
+                        .season(2026).roundNumber(18).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Marina Bay Street Circuit")).build()
         ));
-        System.out.println("🗓️ [Pitwall] 24 races seeded");
+        System.out.println("🗓️ [Pitwall] 30 races seeded (24 GP + 6 Sprint)");
     }
 
     private void seedChampionships() {
