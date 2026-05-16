@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import Navbar from "../components/Navbar";
+import RaceWeekendWidget from "../components/RaceWeekendWidget";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -27,7 +28,6 @@ const statusStyle: Record<string, string> = {
 interface RaceWinner {
     driver: string;
     team: string;
-    time?: string;
 }
 
 export default function RacesPage() {
@@ -35,7 +35,6 @@ export default function RacesPage() {
     const [races, setRaces] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("ALL");
-    // Fix: fetch từ API thay vì hardcode
     const [raceWinners, setRaceWinners] = useState<Record<string, RaceWinner>>({});
 
     useEffect(() => {
@@ -49,10 +48,8 @@ export default function RacesPage() {
             const racesData = await res.json();
             setRaces(racesData);
 
-            // Fetch winners cho các race đã completed song song
             const completedRaces = racesData.filter((r: any) => r.status === "COMPLETED");
             const winnerMap: Record<string, RaceWinner> = {};
-
             await Promise.all(
                 completedRaces.map(async (race: any) => {
                     try {
@@ -106,6 +103,11 @@ export default function RacesPage() {
                     </div>
                 </div>
 
+                {/* Race Weekend Widget */}
+                <div className="mb-8">
+                    <RaceWeekendWidget />
+                </div>
+
                 {/* Filter tabs */}
                 <div className="flex gap-2 mb-8">
                     {[
@@ -136,27 +138,26 @@ export default function RacesPage() {
                             const winner = raceWinners[race.name];
                             const isCancelled = race.status === "CANCELLED";
                             const isCompleted = race.status === "COMPLETED";
+                            const isSprint = race.name.toLowerCase().includes("sprint");
 
                             return (
                                 <div key={race.id}
-                                    className={`flex items-center justify-between rounded-xl px-6 py-4 border transition-all ${isCancelled
-                                        ? "bg-red-950/20 border-red-900/30 opacity-60"
-                                        : "bg-zinc-900 border-zinc-800 hover:border-zinc-600"
-                                        }`}
-                                >
+                                    className={`flex items-center justify-between rounded-xl px-6 py-4 border transition-all ${isCancelled ? "bg-red-950/20 border-red-900/30 opacity-60" :
+                                            isSprint ? "bg-orange-950/10 border-orange-900/20" :
+                                                "bg-zinc-900 border-zinc-800 hover:border-zinc-600"
+                                        }`}>
                                     <div className="flex items-center gap-5">
                                         <span className="text-2xl font-black text-zinc-700 w-8 text-center">
                                             {race.roundNumber}
                                         </span>
                                         <span className="text-xl w-6">
-                                            {COUNTRY_FLAGS[race.circuit?.country] || "🏁"}
+                                            {isSprint ? "⚡" : COUNTRY_FLAGS[race.circuit?.country] || "🏁"}
                                         </span>
                                         <div>
                                             <h2 className="text-base font-bold text-white">{race.name}</h2>
                                             <p className="text-xs text-zinc-500 font-mono mt-0.5">
                                                 {race.circuit?.name} · {race.date}
                                             </p>
-                                            {/* Fix: winner từ API — tự cập nhật khi submit race results */}
                                             {winner && (
                                                 <p className="text-xs text-yellow-400 mt-1">
                                                     🏆 {winner.driver} ({winner.team})
@@ -171,19 +172,15 @@ export default function RacesPage() {
                                     </div>
 
                                     <div className="flex items-center gap-4">
-                                        {(isCompleted || race.status === "SCHEDULED") && (
-                                            <Link
-                                                href={`/races/${race.id}/qualifying`}
-                                                className="text-xs font-mono text-zinc-500 hover:text-yellow-400 border border-zinc-700 hover:border-yellow-500 px-3 py-1.5 rounded-lg transition-all"
-                                            >
-                                                {race.name.toLowerCase().includes("sprint") ? "SPRINT QUALI →" : "QUALIFYING →"}
+                                        {!isSprint && (isCompleted || race.status === "SCHEDULED") && (
+                                            <Link href={`/races/${race.id}/qualifying`}
+                                                className="text-xs font-mono text-zinc-500 hover:text-yellow-400 border border-zinc-700 hover:border-yellow-500 px-3 py-1.5 rounded-lg transition-all">
+                                                QUALIFYING →
                                             </Link>
                                         )}
                                         {isCompleted && (
-                                            <Link
-                                                href={`/races/${race.id}/results`}
-                                                className="text-xs font-mono text-zinc-500 hover:text-red-400 border border-zinc-700 hover:border-red-500 px-3 py-1.5 rounded-lg transition-all"
-                                            >
+                                            <Link href={`/races/${race.id}/results`}
+                                                className="text-xs font-mono text-zinc-500 hover:text-red-400 border border-zinc-700 hover:border-red-500 px-3 py-1.5 rounded-lg transition-all">
                                                 RESULTS →
                                             </Link>
                                         )}

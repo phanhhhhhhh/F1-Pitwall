@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "./lib/pitwall-auth";
 import Navbar from "./components/Navbar";
+import RaceWeekendWidget from "./components/RaceWeekendWidget";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -48,14 +49,10 @@ export default function Home() {
 
   useEffect(() => {
     if (!nextRace) return;
-
     const target = new Date(nextRace.date + "T00:00:00Z");
     const update = () => {
       const diff = target.getTime() - Date.now();
-      if (diff <= 0) {
-        setCountdown("RACE DAY 🏁");
-        return;
-      }
+      if (diff <= 0) { setCountdown("RACE DAY 🏁"); return; }
       const d = Math.floor(diff / 86400000);
       const h = Math.floor((diff % 86400000) / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
@@ -97,7 +94,7 @@ export default function Home() {
 
       const today = new Date().toISOString().split("T")[0];
       const upcoming = racesData
-        .filter((r: any) => r.status === "SCHEDULED" && r.date >= today)
+        .filter((r: any) => r.status === "SCHEDULED" && r.date >= today && !r.name.toLowerCase().includes("sprint"))
         .sort((a: any, b: any) => a.date.localeCompare(b.date));
       if (upcoming.length > 0) setNextRace(upcoming[0]);
 
@@ -143,8 +140,6 @@ export default function Home() {
               F1 PITWALL <span className="text-red-500">OVERVIEW</span>
             </h1>
           </div>
-
-          {/* Fix: Next race dynamic */}
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-6 py-4 text-right">
             {nextRace ? (
               <>
@@ -202,7 +197,8 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Main grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Race Calendar */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
@@ -220,12 +216,8 @@ export default function Home() {
                       <span className="text-lg w-6">{COUNTRY_FLAGS[race.circuit?.country] || "🏁"}</span>
                       <div>
                         <p className="text-sm font-bold text-white">{race.name}</p>
-                        {winner && (
-                          <p className="text-xs text-zinc-500 mt-0.5">🏆 {winner.driver} · {winner.team}</p>
-                        )}
-                        {isCancelled && (
-                          <p className="text-xs text-red-400/70 mt-0.5">Cancelled</p>
-                        )}
+                        {winner && <p className="text-xs text-zinc-500 mt-0.5">🏆 {winner.driver} · {winner.team}</p>}
+                        {isCancelled && <p className="text-xs text-red-400/70 mt-0.5">Cancelled</p>}
                       </div>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded border font-mono ${statusStyle[race.status]}`}>
@@ -235,6 +227,11 @@ export default function Home() {
                 );
               })}
             </div>
+          </div>
+
+          {/* Race Weekend Widget */}
+          <div>
+            <RaceWeekendWidget />
           </div>
 
           {/* Drivers */}
@@ -250,9 +247,7 @@ export default function Home() {
                   <div className="w-0.5 h-8 rounded-full" style={{ backgroundColor: driver.team?.colorHex || "#666" }} />
                   <div className="flex-1">
                     <p className="text-sm font-bold text-white">{driver.name}</p>
-                    <p className="text-xs mt-0.5" style={{ color: driver.team?.colorHex || "#666" }}>
-                      {driver.team?.name}
-                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: driver.team?.colorHex || "#666" }}>{driver.team?.name}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-mono text-zinc-300">#{driver.carNumber}</p>
