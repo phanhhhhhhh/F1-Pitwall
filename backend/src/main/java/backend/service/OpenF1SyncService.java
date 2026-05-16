@@ -28,8 +28,6 @@ public class OpenF1SyncService {
     private final DriverRepository driverRepo;
     private final NotificationService notificationService;
 
-    // Fix: dùng Jolpica/Ergast thay vì OpenF1 cho race results
-    // OpenF1 /position chỉ là telemetry realtime, không phải final classification
     private static final String JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
@@ -44,6 +42,18 @@ public class OpenF1SyncService {
 
     private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
     private static final int[] RACE_POINTS = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};
+
+    private static final Map<Integer, Integer> DB_TO_JOLPICA_ROUND = Map.of(
+            1, 1,
+            2, 2,
+            3, 3,
+            4, -1,
+            5, -1,
+            6, 4,
+            7, 5,
+            8, 6,
+            9, 7
+    );
 
     @Scheduled(fixedRate = 3600000)
     public void autoSyncCompletedRaces() {
@@ -101,13 +111,26 @@ public class OpenF1SyncService {
 
     @Transactional
     public boolean syncRaceByRound(Race race, boolean isSprint) {
-        int round = race.getRoundNumber();
-        if (round <= 0) return false;
+        int dbRound = race.getRoundNumber();
+        if (dbRound <= 0) return false;
+
+
+        int round;
+        if (DB_TO_JOLPICA_ROUND.containsKey(dbRound)) {
+            round = DB_TO_JOLPICA_ROUND.get(dbRound);
+            if (round == -1) {
+                log.debug("[Sync] Skipping cancelled race: {}", race.getName());
+                return false;
+            }
+        } else {
+
+            round = dbRound - 2;
+        }
 
         List<Driver> allDrivers = driverRepo.findAll();
 
         try {
-            // Jolpica endpoint cho race results và sprint results
+
             String endpoint = isSprint ? "/sprint" : "/results";
             String url = JOLPICA_BASE + "/2026/" + round + endpoint + ".json";
             log.info("[Sync] Fetching {} from: {}", race.getName(), url);
@@ -148,7 +171,7 @@ public class OpenF1SyncService {
                     continue;
                 }
 
-                // Lấy điểm trực tiếp từ Jolpica — đã bao gồm fastest lap bonus
+
                 float points = 0;
                 try {
                     points = Float.parseFloat(String.valueOf(r.getOrDefault("points", "0")));
@@ -158,7 +181,7 @@ public class OpenF1SyncService {
                     }
                 }
 
-                // Fastest lap
+
                 boolean hasFastestLap = false;
                 if (!isSprint) {
                     try {
@@ -206,12 +229,12 @@ public class OpenF1SyncService {
             return true;
 
         } catch (Exception e) {
-            log.warn("[Sync] Jolpica failed for {} round {}: {}", race.getName(), round, e.getMessage());
+            log.warn("[Sync] Jolpica failed for {} (DB round={}, Jolpica round={}): {}", race.getName(), dbRound, round, e.getMessage());
             return false;
         }
     }
 
-    // Backward compatible — gọi từ SyncController
+
     @Transactional
     public boolean syncSession(int sessionKey, String countryName, boolean isSprint) {
         List<Race> races = raceRepo.findBySeasonOrderByRoundNumber(2026);
