@@ -124,22 +124,22 @@ export default function RaceResultsPage() {
     finally { setSubmitting(false); }
   };
 
-  // Re-sync từ OpenF1 — dùng khi có penalty thay đổi thứ hạng
+  // Re-sync from OpenF1 — used when penalties change standings
   const handleResync = async () => {
-    if (!confirm("Re-sync sẽ xóa kết quả hiện tại và fetch lại từ OpenF1.\nTiếp tục?")) return;
+    if (!confirm("Re-sync will delete current results and fetch again from OpenF1.\nContinue?")) return;
     setResyncing(true);
     setFeedback("");
     try {
       const res = await authFetch(`${API}/api/sync/race/${raceId}/results`, { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        setFeedback("✓ Re-sync thành công!");
+        setFeedback("✓ Re-sync successful!");
         await fetchData();
       } else {
-        setFeedback("✗ Re-sync thất bại: " + (data.error || "unknown error"));
+        setFeedback("✗ Re-sync failed: " + (data.error || "unknown error"));
       }
     } catch (e) {
-      setFeedback("✗ Lỗi kết nối");
+      setFeedback("✗ Connection error");
     } finally {
       setResyncing(false);
       setTimeout(() => setFeedback(""), 4000);

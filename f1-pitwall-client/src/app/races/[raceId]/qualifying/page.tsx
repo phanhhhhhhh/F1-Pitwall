@@ -96,20 +96,20 @@ export default function QualifyingPage() {
     };
 
     const handleResync = async () => {
-        if (!confirm("Re-sync sẽ xóa qualifying data hiện tại và fetch lại.\nTiếp tục?")) return;
+        if (!confirm("Re-sync will delete current qualifying data and fetch again.\nContinue?")) return;
         setResyncing(true);
         setFeedback("");
         try {
             const res = await authFetch(`${API}/api/sync/race/${raceId}/qualifying`, { method: "POST" });
             const data = await res.json();
             if (data.success) {
-                setFeedback("✓ Re-sync thành công!");
+                setFeedback("✓ Re-sync successful!");
                 await fetchData();
             } else {
-                setFeedback("✗ " + (data.message || data.error || "Re-sync thất bại"));
+                setFeedback("✗ " + (data.message || data.error || "Re-sync failed"));
             }
         } catch (e) {
-            setFeedback("✗ Lỗi kết nối");
+            setFeedback("✗ Connection error");
         } finally {
             setResyncing(false);
             setTimeout(() => setFeedback(""), 4000);
