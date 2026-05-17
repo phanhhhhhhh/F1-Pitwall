@@ -16,44 +16,21 @@ const TYRE = {
 };
 
 type TyreType = keyof typeof TYRE;
-
 const PIT_LOSS = 22;
 
-interface Stint {
-  id: string;
-  tyre: TyreType;
-  laps: number;
-}
-
-interface Strategy {
-  id: string;
-  name: string;
-  color: string;
-  stints: Stint[];
-}
-
-interface Circuit {
-  id: number;
-  name: string;
-  totalLaps: number;
-  lapRecordSec: number;
-  country: string;
-}
+interface Stint { id: string; tyre: TyreType; laps: number; }
+interface Strategy { id: string; name: string; color: string; stints: Stint[]; }
+interface Circuit { id: number; name: string; totalLaps: number; lapRecordSec: number; country: string; }
 
 function calcRaceTime(stints: Stint[], baseLapTime: number): number {
   let total = 0;
-  const pitStops = stints.length - 1;
-
   stints.forEach(stint => {
     const tyre = TYRE[stint.tyre];
     for (let lap = 1; lap <= stint.laps; lap++) {
-      const degradation = tyre.degradation * lap;
-      const lapTime = baseLapTime + tyre.lapTime + degradation;
-      total += lapTime;
+      total += baseLapTime + tyre.lapTime + tyre.degradation * lap;
     }
   });
-
-  total += pitStops * PIT_LOSS;
+  total += (stints.length - 1) * PIT_LOSS;
   return total;
 }
 
@@ -82,71 +59,6 @@ function formatLapTime(seconds: number): string {
 const STRATEGY_COLORS = ["#ef4444", "#3b82f6", "#22c55e", "#f97316", "#a855f7"];
 const STRATEGY_NAMES = ["Strategy A", "Strategy B", "Strategy C", "Strategy D", "Strategy E"];
 
-function StrategyTimeline({ strategy, totalLaps, baseLapTime, maxTime }: {
-  strategy: Strategy; totalLaps: number; baseLapTime: number; maxTime: number;
-}) {
-  const raceTime = calcRaceTime(strategy.stints, baseLapTime);
-  const pct = (raceTime / maxTime) * 100;
-
-  let lapCursor = 0;
-  return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: strategy.color }} />
-          <span className="text-sm font-bold text-white">{strategy.name}</span>
-          <span className="text-xs text-zinc-500 font-mono">{strategy.stints.length - 1} stop{strategy.stints.length > 2 ? "s" : ""}</span>
-        </div>
-        <span className="text-sm font-mono font-bold text-white">{formatTime(raceTime)}</span>
-      </div>
-
-      {/* Stint blocks */}
-      <div className="flex h-8 rounded-lg overflow-hidden gap-0.5">
-        {strategy.stints.map((stint, i) => {
-          const widthPct = (stint.laps / totalLaps) * 100;
-          lapCursor += stint.laps;
-          return (
-            <div key={stint.id}
-              className="flex items-center justify-center text-xs font-bold transition-all hover:brightness-125 cursor-default relative group"
-              style={{ width: `${widthPct}%`, backgroundColor: TYRE[stint.tyre].color + (i % 2 === 0 ? "dd" : "aa") }}
-              title={`${stint.tyre} · ${stint.laps} laps`}
-            >
-              {widthPct > 8 && (
-                <span className="text-black font-black text-xs">
-                  {TYRE[stint.tyre].label}{stint.laps}
-                </span>
-              )}
-              {/* Pit stop marker */}
-              {i < strategy.stints.length - 1 && (
-                <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-white/50" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Time bar */}
-      <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, backgroundColor: strategy.color }} />
-      </div>
-
-      <div className="flex gap-3 mt-2">
-        {strategy.stints.map((stint, i) => (
-          <span key={stint.id} className="text-xs text-zinc-600">
-            <span className="font-bold" style={{ color: TYRE[stint.tyre].color }}>{stint.tyre}</span>
-            {" "}{stint.laps}L
-            {i < strategy.stints.length - 1 && " →"}
-          </span>
-        ))}
-        <span className="text-xs text-zinc-700 ml-auto">
-          +{(raceTime - maxTime * (Math.min(...[raceTime]) / maxTime)).toFixed(1)}s pit loss
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export default function StrategyPage() {
   const router = useRouter();
   const [circuits, setCircuits] = useState<Circuit[]>([]);
@@ -154,20 +66,15 @@ export default function StrategyPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([
     {
       id: "s1", name: "Strategy A", color: STRATEGY_COLORS[0],
-      stints: [
-        { id: "st1", tyre: "SOFT", laps: 20 },
-        { id: "st2", tyre: "MEDIUM", laps: 32 },
-      ]
+      stints: [{ id: "st1", tyre: "SOFT", laps: 20 }, { id: "st2", tyre: "MEDIUM", laps: 32 }]
     },
     {
       id: "s2", name: "Strategy B", color: STRATEGY_COLORS[1],
-      stints: [
-        { id: "st3", tyre: "MEDIUM", laps: 26 },
-        { id: "st4", tyre: "HARD", laps: 26 },
-      ]
+      stints: [{ id: "st3", tyre: "MEDIUM", laps: 26 }, { id: "st4", tyre: "HARD", laps: 26 }]
     },
   ]);
   const [loading, setLoading] = useState(true);
+  const [hoveredStrat, setHoveredStrat] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
@@ -175,38 +82,34 @@ export default function StrategyPage() {
       .then(r => r.json())
       .then((data: Circuit[]) => {
         setCircuits(data);
-        const miami = data.find((c: Circuit) => c.name.includes("Miami") || c.name.includes("Albert"));
-        setSelectedCircuit(miami || data[0]);
+        setSelectedCircuit(data.find((c: Circuit) => c.name.includes("Albert")) || data[0]);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const totalLaps = selectedCircuit?.totalLaps || 57;
   const baseLapTime = selectedCircuit?.lapRecordSec ? selectedCircuit.lapRecordSec + 2 : 92;
 
-  const syncStrategyLaps = (strategy: Strategy): Strategy => {
-    const usedLaps = strategy.stints.slice(0, -1).reduce((sum, s) => sum + s.laps, 0);
-    const lastStint = { ...strategy.stints[strategy.stints.length - 1], laps: Math.max(1, totalLaps - usedLaps) };
-    return { ...strategy, stints: [...strategy.stints.slice(0, -1), lastStint] };
+  const syncStrategyLaps = (s: Strategy): Strategy => {
+    const usedLaps = s.stints.slice(0, -1).reduce((sum, st) => sum + st.laps, 0);
+    const last = { ...s.stints[s.stints.length - 1], laps: Math.max(1, totalLaps - usedLaps) };
+    return { ...s, stints: [...s.stints.slice(0, -1), last] };
   };
 
   const raceTimes = strategies.map(s => calcRaceTime(syncStrategyLaps(s).stints, baseLapTime));
-  const maxTime = Math.max(...raceTimes);
   const minTime = Math.min(...raceTimes);
+  const maxTime = Math.max(...raceTimes);
   const bestStratIdx = raceTimes.indexOf(minTime);
 
   const addStrategy = () => {
     if (strategies.length >= 5) return;
     const idx = strategies.length;
     setStrategies(prev => [...prev, {
-      id: `s${Date.now()}`,
-      name: STRATEGY_NAMES[idx],
-      color: STRATEGY_COLORS[idx],
+      id: `s${Date.now()}`, name: STRATEGY_NAMES[idx], color: STRATEGY_COLORS[idx],
       stints: [
         { id: `st${Date.now()}a`, tyre: "SOFT", laps: Math.floor(totalLaps / 2) },
         { id: `st${Date.now()}b`, tyre: "HARD", laps: Math.ceil(totalLaps / 2) },
-      ]
+      ],
     }]);
   };
 
@@ -218,14 +121,9 @@ export default function StrategyPage() {
   const addStint = (stratId: string) => {
     setStrategies(prev => prev.map(s => {
       if (s.id !== stratId || s.stints.length >= 5) return s;
-      const newStint: Stint = { id: `st${Date.now()}`, tyre: "HARD", laps: 10 };
-      const stints = [...s.stints, newStint];
-      const perStint = Math.floor(totalLaps / stints.length);
-      return {
-        ...s, stints: stints.map((st, i) => ({
-          ...st, laps: i === stints.length - 1 ? totalLaps - perStint * (stints.length - 1) : perStint
-        }))
-      };
+      const stints = [...s.stints, { id: `st${Date.now()}`, tyre: "HARD" as TyreType, laps: 10 }];
+      const per = Math.floor(totalLaps / stints.length);
+      return { ...s, stints: stints.map((st, i) => ({ ...st, laps: i === stints.length - 1 ? totalLaps - per * (stints.length - 1) : per })) };
     }));
   };
 
@@ -233,102 +131,125 @@ export default function StrategyPage() {
     setStrategies(prev => prev.map(s => {
       if (s.id !== stratId || s.stints.length <= 1) return s;
       const stints = s.stints.filter(st => st.id !== stintId);
-      const perStint = Math.floor(totalLaps / stints.length);
-      return {
-        ...s, stints: stints.map((st, i) => ({
-          ...st, laps: i === stints.length - 1 ? totalLaps - perStint * (stints.length - 1) : perStint
-        }))
-      };
+      const per = Math.floor(totalLaps / stints.length);
+      return { ...s, stints: stints.map((st, i) => ({ ...st, laps: i === stints.length - 1 ? totalLaps - per * (stints.length - 1) : per })) };
     }));
   };
 
   const updateStint = (stratId: string, stintId: string, field: keyof Stint, value: any) => {
-    setStrategies(prev => prev.map(s => {
-      if (s.id !== stratId) return s;
-      return { ...s, stints: s.stints.map(st => st.id === stintId ? { ...st, [field]: value } : st) };
-    }));
+    setStrategies(prev => prev.map(s => s.id !== stratId ? s :
+      { ...s, stints: s.stints.map(st => st.id === stintId ? { ...st, [field]: value } : st) }));
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-zinc-950 relative overflow-x-hidden">
+      <style>{`
+        @keyframes slideUp { from { transform:translateY(16px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        @keyframes glowPulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
+        @keyframes shimmer { 0% { transform:translateX(-100%); } 100% { transform:translateX(300%); } }
+        @keyframes stintPop { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+        .slide-up { animation: slideUp .4s ease-out both; }
+        .glow-pulse { animation: glowPulse 3s ease-in-out infinite; }
+        .animate-shimmer { animation: shimmer 2s ease-in-out infinite; }
+      `}</style>
+
+      {/* Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-zinc-950" />
+        <div className="absolute top-0 left-1/4 w-[600px] h-[400px] bg-red-500/4 rounded-full blur-[150px] glow-pulse" />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-blue-900/5 rounded-full blur-[100px]" />
+        <div className="absolute inset-0 opacity-[0.012]" style={{
+          backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)",
+          backgroundSize: "60px 60px",
+        }} />
+      </div>
+
       <Navbar />
-      <main className="max-w-7xl mx-auto px-8 py-10">
+
+      <main className="relative z-10 max-w-7xl mx-auto px-8 py-10">
 
         {/* Header */}
-        <div className="flex items-end justify-between mb-8">
+        <div className="flex items-end justify-between mb-8 flex-wrap gap-4 slide-up">
           <div>
-            <p className="text-zinc-500 font-mono text-xs tracking-widest uppercase mb-2">
-              Race Engineering · Pit Strategy
-            </p>
-            <h1 className="text-4xl font-black tracking-tighter text-white">
-              PIT STRATEGY <span className="text-red-500">SIMULATOR</span>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <p className="text-red-500/60 font-mono text-xs tracking-[0.3em]">RACE ENGINEERING · PIT STRATEGY</p>
+            </div>
+            <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
+              PIT STRATEGY<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">SIMULATOR</span>
             </h1>
           </div>
           <button onClick={addStrategy} disabled={strategies.length >= 5}
-            className="bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-bold px-5 py-2.5 rounded-lg text-sm transition-colors">
+            className="relative overflow-hidden px-6 py-3 rounded-xl font-black text-sm tracking-widest text-white transition-all duration-300 disabled:opacity-30"
+            style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: "0 0 20px rgba(239,68,68,0.3)" }}>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-700" />
             + ADD STRATEGY
           </button>
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-3 text-red-500 animate-pulse font-mono text-sm">
-            <div className="w-2 h-2 bg-red-500 rounded-full" /> LOADING...
+          <div className="flex flex-col items-center justify-center py-32 gap-4">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 border-2 border-red-500/20 rounded-full" />
+              <div className="absolute inset-0 border-2 border-red-500 rounded-full border-t-transparent animate-spin" />
+            </div>
+            <p className="text-red-500/70 font-mono text-xs tracking-widest animate-pulse">LOADING CIRCUITS...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            {/* ─── Left: Circuit + Strategy Builder ──────────────────── */}
-            <div className="lg:col-span-1 space-y-6">
+            {/* ── LEFT PANEL ── */}
+            <div className="lg:col-span-1 space-y-4">
 
               {/* Circuit selector */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+              <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl p-5 slide-up" style={{ animationDelay: "100ms" }}>
                 <p className="text-xs font-mono text-zinc-500 tracking-widest mb-3">CIRCUIT</p>
                 <select
                   value={selectedCircuit?.id || ""}
                   onChange={e => setSelectedCircuit(circuits.find(c => c.id === Number(e.target.value)) || null)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500"
+                  className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-red-500/50 transition-colors"
                 >
-                  {circuits.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
+                  {circuits.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-
                 {selectedCircuit && (
                   <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
-                      <p className="text-xl font-black text-white">{totalLaps}</p>
-                      <p className="text-xs text-zinc-600">LAPS</p>
-                    </div>
-                    <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
-                      <p className="text-sm font-black text-white">{formatLapTime(baseLapTime)}</p>
-                      <p className="text-xs text-zinc-600">BASE LAP</p>
-                    </div>
+                    {[
+                      { label: "LAPS", value: totalLaps },
+                      { label: "BASE LAP", value: formatLapTime(baseLapTime) },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-zinc-800/50 border border-zinc-700/30 rounded-xl p-3 text-center">
+                        <p className="text-xl font-black text-white tabular-nums">{value}</p>
+                        <p className="text-xs text-zinc-600 font-mono">{label}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Tyre legend */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+              {/* Tyre compounds */}
+              <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl p-5 slide-up" style={{ animationDelay: "150ms" }}>
                 <p className="text-xs font-mono text-zinc-500 tracking-widest mb-3">TYRE COMPOUNDS</p>
                 <div className="space-y-2">
                   {(Object.entries(TYRE) as [TyreType, typeof TYRE[TyreType]][]).map(([name, cfg]) => (
-                    <div key={name} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded flex items-center justify-center text-xs font-black text-black"
-                          style={{ backgroundColor: cfg.color }}>
+                    <div key={name} className="flex items-center justify-between py-1 group">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-black shadow-sm transition-transform duration-200 group-hover:scale-110"
+                          style={{ backgroundColor: cfg.color, boxShadow: `0 0 8px ${cfg.color}40` }}>
                           {cfg.label}
                         </div>
-                        <span className="text-xs text-zinc-400">{name}</span>
+                        <span className="text-xs text-zinc-400 font-medium">{name}</span>
                       </div>
                       <div className="flex gap-3 text-xs text-zinc-600 font-mono">
-                        <span>+{cfg.lapTime.toFixed(1)}s</span>
-                        <span>max {cfg.maxLaps}L</span>
+                        <span className="text-zinc-500">+{cfg.lapTime.toFixed(1)}s</span>
+                        <span className="text-zinc-600">max {cfg.maxLaps}L</span>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-zinc-800">
-                  <p className="text-xs text-zinc-600 font-mono">Pit stop loss: <span className="text-white">{PIT_LOSS}s</span></p>
+                <div className="mt-3 pt-3 border-t border-zinc-800/50 flex items-center justify-between">
+                  <p className="text-xs text-zinc-600 font-mono">Pit stop loss</p>
+                  <p className="text-xs font-black text-white font-mono">{PIT_LOSS}s</p>
                 </div>
               </div>
 
@@ -339,137 +260,152 @@ export default function StrategyPage() {
                 const isBest = sIdx === bestStratIdx;
                 return (
                   <div key={strategy.id}
-                    className={`bg-zinc-900 rounded-xl p-5 border transition-all ${isBest ? "border-2" : "border-zinc-800"}`}
-                    style={isBest ? { borderColor: strategy.color } : {}}>
+                    className="relative bg-zinc-900/80 backdrop-blur rounded-2xl p-5 border transition-all duration-300 slide-up"
+                    style={{
+                      animationDelay: `${200 + sIdx * 80}ms`,
+                      borderColor: isBest ? `${strategy.color}50` : "rgba(39,39,42,0.5)",
+                      boxShadow: isBest ? `0 0 20px ${strategy.color}10` : "none",
+                    }}>
+                    {/* Glow accent */}
+                    {isBest && <div className="absolute top-0 left-0 right-0 h-px rounded-t-2xl" style={{ backgroundColor: strategy.color, boxShadow: `0 0 10px ${strategy.color}` }} />}
+
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: strategy.color }} />
-                        <span className="text-sm font-bold text-white">{strategy.name}</span>
-                        {isBest && <span className="text-xs text-yellow-400 font-mono">★ FASTEST</span>}
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: strategy.color, boxShadow: `0 0 6px ${strategy.color}` }} />
+                        <span className="text-sm font-black text-white">{strategy.name}</span>
+                        {isBest && <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ color: strategy.color, backgroundColor: `${strategy.color}20` }}>★ FASTEST</span>}
                       </div>
-                      <button onClick={() => removeStrategy(strategy.id)}
-                        className="text-zinc-600 hover:text-red-400 text-lg transition-colors">×</button>
+                      <button onClick={() => removeStrategy(strategy.id)} className="text-zinc-700 hover:text-red-400 transition-colors text-lg leading-none">×</button>
                     </div>
 
-                    {/* Stints */}
-                    <div className="space-y-3 mb-4">
+                    <div className="space-y-2.5 mb-4">
                       {synced.stints.map((stint, stintIdx) => (
                         <div key={stint.id} className="flex items-center gap-2">
-                          <span className="text-xs text-zinc-600 w-4">{stintIdx + 1}</span>
+                          <span className="text-xs text-zinc-700 w-4 font-mono">{stintIdx + 1}</span>
                           <select
                             value={stint.tyre}
                             onChange={e => updateStint(strategy.id, stint.id, "tyre", e.target.value as TyreType)}
-                            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-red-500 flex-1"
+                            className="bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-red-500/50 flex-1 transition-colors"
                             style={{ color: TYRE[stint.tyre].color }}
                           >
                             {(Object.keys(TYRE) as TyreType[]).map(t => (
-                              <option key={t} value={t}>{t}</option>
+                              <option key={t} value={t} style={{ color: TYRE[t].color }}>{t}</option>
                             ))}
                           </select>
                           <input
-                            type="number"
-                            min={1}
-                            max={totalLaps - (stintIdx === synced.stints.length - 1 ? synced.stints.slice(0, -1).reduce((s, st) => s + st.laps, 0) : 0)}
+                            type="number" min={1} max={totalLaps}
                             value={stint.laps}
                             onChange={e => updateStint(strategy.id, stint.id, "laps", Math.max(1, Number(e.target.value)))}
                             disabled={stintIdx === synced.stints.length - 1}
-                            className="w-14 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-center text-xs text-white focus:outline-none focus:border-red-500 disabled:opacity-50"
+                            className="w-14 bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-2 py-1.5 text-center text-xs text-white focus:outline-none focus:border-red-500/50 disabled:opacity-40 font-mono"
                           />
                           <span className="text-xs text-zinc-600">L</span>
                           {synced.stints.length > 1 && (
-                            <button onClick={() => removeStint(strategy.id, stint.id)}
-                              className="text-zinc-700 hover:text-red-400 text-sm transition-colors">×</button>
+                            <button onClick={() => removeStint(strategy.id, stint.id)} className="text-zinc-700 hover:text-red-400 transition-colors text-sm">×</button>
                           )}
                         </div>
                       ))}
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between pt-3 border-t border-zinc-800/50">
                       <button onClick={() => addStint(strategy.id)} disabled={synced.stints.length >= 5}
-                        className="text-xs text-zinc-500 hover:text-red-400 transition-colors font-mono disabled:opacity-30">
+                        className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono disabled:opacity-30">
                         + ADD STINT
                       </button>
-                      <span className="text-xs font-mono text-zinc-400">{formatTime(raceTime)}</span>
+                      <span className="text-xs font-mono font-bold" style={{ color: strategy.color }}>{formatTime(raceTime)}</span>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* ─── Right: Visualization ──────────────────────────────── */}
-            <div className="lg:col-span-2 space-y-6">
+            {/* ── RIGHT PANEL ── */}
+            <div className="lg:col-span-2 space-y-5">
 
-              {/* Winner banner */}
-              <div className="rounded-xl p-5 border-2" style={{ borderColor: strategies[bestStratIdx]?.color, backgroundColor: strategies[bestStratIdx]?.color + "10" }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-mono mb-1" style={{ color: strategies[bestStratIdx]?.color }}>
-                      ★ OPTIMAL STRATEGY
-                    </p>
-                    <h2 className="text-2xl font-black text-white">{strategies[bestStratIdx]?.name}</h2>
-                    <p className="text-zinc-400 text-sm mt-1">
-                      {strategies[bestStratIdx]?.stints.length - 1} pit stop{strategies[bestStratIdx]?.stints.length > 2 ? "s" : ""} ·{" "}
-                      {strategies[bestStratIdx] && syncStrategyLaps(strategies[bestStratIdx]).stints.map(s => s.tyre).join(" → ")}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-black text-white">{formatTime(minTime)}</p>
-                    <p className="text-xs text-zinc-500">Total race time</p>
+              {/* Best strategy hero */}
+              <div className="relative rounded-2xl p-6 overflow-hidden border-2 slide-up" style={{
+                borderColor: strategies[bestStratIdx]?.color,
+                backgroundColor: `${strategies[bestStratIdx]?.color}08`,
+                boxShadow: `0 0 40px ${strategies[bestStratIdx]?.color}15`,
+              }}>
+                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${strategies[bestStratIdx]?.color}, transparent)` }} />
+                {/* Background watermark */}
+                <div className="absolute right-6 top-6 font-black text-8xl select-none pointer-events-none opacity-5" style={{ color: strategies[bestStratIdx]?.color }}>
+                  {strategies[bestStratIdx]?.stints.length - 1}S
+                </div>
+                <div className="relative">
+                  <p className="text-xs font-mono mb-2 tracking-widest" style={{ color: strategies[bestStratIdx]?.color }}>★ OPTIMAL STRATEGY</p>
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                      <h2 className="text-3xl font-black text-white">{strategies[bestStratIdx]?.name}</h2>
+                      <p className="text-zinc-400 text-sm mt-1.5 font-mono">
+                        {strategies[bestStratIdx]?.stints.length - 1} pit stop ·{" "}
+                        {strategies[bestStratIdx] && syncStrategyLaps(strategies[bestStratIdx]).stints.map(s => s.tyre).join(" → ")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-4xl font-black text-white tabular-nums">{formatTime(minTime)}</p>
+                      <p className="text-xs text-zinc-500 font-mono mt-1">Total race time</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Timeline comparison */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              {/* Strategy comparison */}
+              <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl p-6 slide-up" style={{ animationDelay: "200ms" }}>
                 <p className="text-xs font-mono text-zinc-500 tracking-widest mb-6">STRATEGY COMPARISON</p>
-
                 {strategies.map((strategy, sIdx) => {
                   const synced = syncStrategyLaps(strategy);
                   const raceTime = calcRaceTime(synced.stints, baseLapTime);
                   const isBest = sIdx === bestStratIdx;
                   const gap = raceTime - minTime;
+                  const isHov = hoveredStrat === strategy.id;
                   return (
-                    <div key={strategy.id} className={`mb-6 pb-6 border-b border-zinc-800 last:border-0 last:mb-0 last:pb-0 ${isBest ? "relative" : ""}`}>
-                      {isBest && (
-                        <div className="absolute -left-6 top-0 bottom-0 w-1 rounded-r" style={{ backgroundColor: strategy.color }} />
-                      )}
+                    <div key={strategy.id}
+                      className="mb-6 pb-6 border-b border-zinc-800/30 last:border-0 last:mb-0 last:pb-0 transition-all duration-200"
+                      onMouseEnter={() => setHoveredStrat(strategy.id)}
+                      onMouseLeave={() => setHoveredStrat(null)}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: strategy.color }} />
-                          <span className="text-sm font-bold text-white">{strategy.name}</span>
-                          {isBest && <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ backgroundColor: strategy.color + "30", color: strategy.color }}>BEST</span>}
+                          <div className="w-3 h-3 rounded-full transition-transform duration-200" style={{ backgroundColor: strategy.color, transform: isHov ? "scale(1.3)" : "scale(1)", boxShadow: isHov ? `0 0 8px ${strategy.color}` : "none" }} />
+                          <span className="text-sm font-black text-white">{strategy.name}</span>
+                          {isBest && (
+                            <span className="text-xs px-2 py-0.5 rounded font-mono font-bold" style={{ backgroundColor: `${strategy.color}25`, color: strategy.color }}>BEST</span>
+                          )}
                         </div>
                         <div className="text-right">
-                          <span className="text-sm font-mono font-bold text-white">{formatTime(raceTime)}</span>
-                          {gap > 0 && <span className="text-xs text-zinc-500 font-mono ml-2">+{gap.toFixed(1)}s</span>}
+                          <span className="text-sm font-mono font-black text-white">{formatTime(raceTime)}</span>
+                          {gap > 0 && <span className="text-xs text-zinc-600 font-mono ml-2">+{gap.toFixed(1)}s</span>}
                         </div>
                       </div>
 
-                      {/* Stint timeline */}
-                      <div className="flex h-10 rounded-lg overflow-hidden gap-px mb-2">
+                      {/* Stint blocks */}
+                      <div className="flex h-10 rounded-xl overflow-hidden gap-px mb-2">
                         {synced.stints.map((stint, i) => (
                           <div key={stint.id}
-                            className="flex items-center justify-center font-black text-black text-xs relative group"
-                            style={{ width: `${(stint.laps / totalLaps) * 100}%`, backgroundColor: TYRE[stint.tyre].color + (i % 2 === 0 ? "" : "bb") }}
-                            title={`${stint.tyre} · ${stint.laps} laps · ${formatTime(calcStintTime(stint, baseLapTime))}`}
-                          >
-                            {(stint.laps / totalLaps) > 0.1 && `${TYRE[stint.tyre].label}${stint.laps}`}
+                            className="flex items-center justify-center font-black text-black text-xs relative group/stint transition-all duration-200"
+                            style={{
+                              width: `${(stint.laps / totalLaps) * 100}%`,
+                              backgroundColor: TYRE[stint.tyre].color + (i % 2 === 0 ? "" : "cc"),
+                              filter: isHov ? "brightness(1.15)" : "brightness(1)",
+                            }}
+                            title={`${stint.tyre} · ${stint.laps} laps`}>
+                            {(stint.laps / totalLaps) > 0.1 && (
+                              <span className="font-black">{TYRE[stint.tyre].label}{stint.laps}</span>
+                            )}
                           </div>
                         ))}
                       </div>
 
-                      {/* Lap markers */}
-                      <div className="flex text-xs text-zinc-700 font-mono">
-                        <span>L1</span>
-                        <span className="ml-auto">L{totalLaps}</span>
+                      <div className="flex text-xs text-zinc-700 font-mono mb-2">
+                        <span>L1</span><span className="ml-auto">L{totalLaps}</span>
                       </div>
 
-                      {/* Stint details */}
-                      <div className="flex gap-4 mt-2 flex-wrap">
+                      <div className="flex gap-4 flex-wrap">
                         {synced.stints.map((stint, i) => (
                           <div key={stint.id} className="flex items-center gap-1.5 text-xs">
-                            <div className="w-3 h-3 rounded" style={{ backgroundColor: TYRE[stint.tyre].color }} />
-                            <span className="text-zinc-400">{stint.tyre}</span>
+                            <div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: TYRE[stint.tyre].color }} />
+                            <span className="text-zinc-400 font-bold">{stint.tyre}</span>
                             <span className="text-zinc-600">{stint.laps}L</span>
                             <span className="text-zinc-700">{formatTime(calcStintTime(stint, baseLapTime))}</span>
                             {i < synced.stints.length - 1 && <span className="text-zinc-700">→ PIT</span>}
@@ -482,16 +418,16 @@ export default function StrategyPage() {
               </div>
 
               {/* Delta table */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <p className="text-xs font-mono text-zinc-500 tracking-widest mb-4">TIME DELTA</p>
+              <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl overflow-hidden slide-up" style={{ animationDelay: "300ms" }}>
+                <div className="px-6 py-4 border-b border-zinc-800/50">
+                  <p className="text-xs font-mono text-zinc-500 tracking-widest">TIME DELTA</p>
+                </div>
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="text-left py-2 text-xs font-mono text-zinc-600">STRATEGY</th>
-                      <th className="text-left py-2 text-xs font-mono text-zinc-600">STOPS</th>
-                      <th className="text-left py-2 text-xs font-mono text-zinc-600">COMPOUNDS</th>
-                      <th className="text-right py-2 text-xs font-mono text-zinc-600">RACE TIME</th>
-                      <th className="text-right py-2 text-xs font-mono text-zinc-600">DELTA</th>
+                    <tr className="border-b border-zinc-800/30">
+                      {["STRATEGY", "STOPS", "COMPOUNDS", "RACE TIME", "DELTA"].map((h, i) => (
+                        <th key={h} className={`py-3 px-4 text-xs font-mono text-zinc-600 ${i >= 3 ? "text-right" : "text-left"}`}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -501,26 +437,28 @@ export default function StrategyPage() {
                       const gap = raceTime - minTime;
                       const isBest = sIdx === bestStratIdx;
                       return (
-                        <tr key={strategy.id} className={`border-b border-zinc-800/50 ${isBest ? "bg-zinc-800/20" : ""}`}>
-                          <td className="py-3">
+                        <tr key={strategy.id}
+                          className="border-b border-zinc-800/20 last:border-0 transition-colors duration-150 hover:bg-zinc-800/20">
+                          <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: strategy.color }} />
-                              <span className="text-sm text-white font-bold">{strategy.name}</span>
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: strategy.color, boxShadow: `0 0 4px ${strategy.color}` }} />
+                              <span className="text-sm text-white font-black">{strategy.name}</span>
                             </div>
                           </td>
-                          <td className="py-3 text-sm text-zinc-400">{synced.stints.length - 1}</td>
-                          <td className="py-3">
+                          <td className="py-3 px-4 text-sm text-zinc-400 font-mono">{synced.stints.length - 1}</td>
+                          <td className="py-3 px-4">
                             <div className="flex gap-1">
                               {synced.stints.map(s => (
-                                <span key={s.id} className="text-xs font-bold px-1.5 py-0.5 rounded"
-                                  style={{ backgroundColor: TYRE[s.tyre].color + "25", color: TYRE[s.tyre].color }}>
+                                <span key={s.id} className="text-xs font-black px-1.5 py-0.5 rounded"
+                                  style={{ backgroundColor: `${TYRE[s.tyre].color}20`, color: TYRE[s.tyre].color }}>
                                   {TYRE[s.tyre].label}
                                 </span>
                               ))}
                             </div>
                           </td>
-                          <td className="py-3 text-right text-sm font-mono text-white">{formatTime(raceTime)}</td>
-                          <td className="py-3 text-right text-sm font-mono" style={{ color: isBest ? "#22c55e" : "#ef4444" }}>
+                          <td className="py-3 px-4 text-right text-sm font-mono font-bold text-white">{formatTime(raceTime)}</td>
+                          <td className="py-3 px-4 text-right text-sm font-mono font-black"
+                            style={{ color: isBest ? "#22c55e" : "#ef4444" }}>
                             {isBest ? "FASTEST" : `+${gap.toFixed(1)}s`}
                           </td>
                         </tr>
@@ -530,10 +468,10 @@ export default function StrategyPage() {
                 </table>
               </div>
 
-              {/* Info */}
-              <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
+              {/* Info note */}
+              <div className="bg-zinc-900/40 border border-zinc-800/30 rounded-xl p-4 slide-up" style={{ animationDelay: "400ms" }}>
                 <p className="text-xs text-zinc-600 font-mono">
-                  ℹ️ Base lap time = circuit record + 2s average race pace · Pit stop loss = {PIT_LOSS}s · Degradation modelled as linear per lap
+                  ℹ️ Base lap = record + 2s · Pit loss = {PIT_LOSS}s · Degradation modelled as linear per lap
                 </p>
               </div>
             </div>
