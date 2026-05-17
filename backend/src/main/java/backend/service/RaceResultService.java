@@ -36,7 +36,6 @@ public class RaceResultService {
         }
 
         raceResultRepo.deleteByRaceId(raceId);
-
         List<RaceResult> results = new ArrayList<>();
 
         for (RaceResultRequest req : requests) {
@@ -45,7 +44,7 @@ public class RaceResultService {
 
             float points = calculatePoints(req.getFinishPosition(), req.isHasFastestLap(), req.getDnfReason());
 
-            RaceResult result = RaceResult.builder()
+            results.add(RaceResult.builder()
                     .race(race)
                     .driver(driver)
                     .startPosition(req.getStartPosition())
@@ -55,41 +54,25 @@ public class RaceResultService {
                     .fastestLapNumber(req.getFastestLapNumber())
                     .fastestLapTime(req.getFastestLapTime())
                     .dnfReason(req.getDnfReason())
-                    .build();
-
-            results.add(result);
+                    .build());
         }
 
         race.setStatus(RaceStatus.COMPLETED);
         raceRepo.save(race);
-
         List<RaceResult> saved = raceResultRepo.saveAll(results);
 
         if (!requests.isEmpty()) {
             requests.stream()
                     .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)
                     .findFirst()
-                    .ifPresent(winner -> {
-                        driverRepo.findById(winner.getDriverId()).ifPresent(driver -> {
-                            notificationService.notifyRaceResult(
-                                    race.getName(),
-                                    driver.getName(),
-                                    driver.getTeam() != null ? driver.getTeam().getName() : "Unknown"
-                            );
-                        });
-                    });
+                    .ifPresent(winner -> driverRepo.findById(winner.getDriverId()).ifPresent(driver ->
+                            notificationService.notifyRaceResult(race.getName(), driver.getName(),
+                                    driver.getTeam() != null ? driver.getTeam().getName() : "Unknown")));
 
             requests.stream()
                     .filter(r -> r.getDnfReason() != null && !r.getDnfReason().isEmpty())
-                    .forEach(dnf -> {
-                        driverRepo.findById(dnf.getDriverId()).ifPresent(driver -> {
-                            notificationService.notifyDnf(
-                                    driver.getName(),
-                                    race.getName(),
-                                    dnf.getDnfReason()
-                            );
-                        });
-                    });
+                    .forEach(dnf -> driverRepo.findById(dnf.getDriverId()).ifPresent(driver ->
+                            notificationService.notifyDnf(driver.getName(), race.getName(), dnf.getDnfReason())));
         }
 
         return saved.stream().map(this::toResponse).collect(Collectors.toList());
@@ -100,9 +83,50 @@ public class RaceResultService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    public List<DriverStandingResponse> getDriverStandings(int season) {
+    /**
+     * Bulk endpoint — trả về tất cả race winners của season trong 1 query
+     * Fix N+1 problem: frontend không cần gọi riêng từng race nữa
+     * GET /api/race-results/winners/{season}
+     * Response: { "Australian Grand Prix": { driverName, teamName, ... }, ... }
+     */
+    public Map<String, RaceWinnerResponse> getSeasonWinners(int season) {
         List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
 
+        // Group by race, pick P1 non-DNF
+        Map<Long, List<RaceResult>> byRace = allResults.stream()
+                .collect(Collectors.groupingBy(r -> r.getRace().getId()));
+
+        Map<String, RaceWinnerResponse> winners = new LinkedHashMap<>();
+        for (List<RaceResult> raceResults : byRace.values()) {
+            if (raceResults.isEmpty()) continue;
+            String raceName = raceResults.get(0).getRace().getName();
+            Long raceId = raceResults.get(0).getRace().getId();
+
+            raceResults.stream()
+                    .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)
+                    .findFirst()
+                    .ifPresent(w -> {
+                        Driver d = w.getDriver();
+                        String lastName = d.getName().contains(" ")
+                                ? d.getName().substring(d.getName().lastIndexOf(" ") + 1)
+                                : d.getName();
+                        winners.put(raceName, RaceWinnerResponse.builder()
+                                .raceName(raceName)
+                                .raceId(raceId)
+                                .driverName(d.getName())
+                                .driverLastName(lastName)
+                                .teamName(d.getTeam() != null ? d.getTeam().getName() : "")
+                                .teamColor(d.getTeam() != null ? d.getTeam().getColorHex() : "#666")
+                                .points(w.getPoints())
+                                .hasFastestLap(w.isHasFastestLap())
+                                .build());
+                    });
+        }
+        return winners;
+    }
+
+    public List<DriverStandingResponse> getDriverStandings(int season) {
+        List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
         Map<Long, DriverStats> statsMap = new LinkedHashMap<>();
 
         for (RaceResult r : allResults) {
@@ -120,8 +144,8 @@ public class RaceResultService {
 
         float leaderPoints = sorted.isEmpty() ? 0 : sorted.get(0).totalPoints;
         float prevPoints = leaderPoints;
-
         List<DriverStandingResponse> standings = new ArrayList<>();
+
         for (int i = 0; i < sorted.size(); i++) {
             DriverStats s = sorted.get(i);
             Driver d = s.driver;
@@ -142,26 +166,21 @@ public class RaceResultService {
                     .build());
             prevPoints = s.totalPoints;
         }
-
         return standings;
     }
 
     public List<ConstructorStandingResponse> getConstructorStandings(int season) {
         List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
-
         Map<Long, ConstructorStats> statsMap = new LinkedHashMap<>();
 
         for (RaceResult r : allResults) {
             Driver driver = r.getDriver();
             if (driver.getTeam() == null) continue;
             Team team = driver.getTeam();
-            Long teamId = team.getId();
-
-            ConstructorStats stats = statsMap.computeIfAbsent(teamId, k -> new ConstructorStats(team));
+            ConstructorStats stats = statsMap.computeIfAbsent(team.getId(), k -> new ConstructorStats(team));
             stats.totalPoints += r.getPoints();
             if (r.getFinishPosition() == 1 && r.getDnfReason() == null) stats.wins++;
             if (r.getFinishPosition() <= 3 && r.getDnfReason() == null) stats.podiums++;
-
             stats.driverPoints.merge(driver.getName(), (double) r.getPoints(), Double::sum);
         }
 
@@ -171,8 +190,8 @@ public class RaceResultService {
 
         float leaderPoints = sorted.isEmpty() ? 0 : sorted.get(0).totalPoints;
         float prevPoints = leaderPoints;
-
         List<ConstructorStandingResponse> standings = new ArrayList<>();
+
         for (int i = 0; i < sorted.size(); i++) {
             ConstructorStats s = sorted.get(i);
             List<Map.Entry<String, Double>> drivers = s.driverPoints.entrySet().stream()
@@ -197,7 +216,6 @@ public class RaceResultService {
                     .build());
             prevPoints = s.totalPoints;
         }
-
         return standings;
     }
 
@@ -231,16 +249,12 @@ public class RaceResultService {
     }
 
     private static class DriverStats {
-        Driver driver;
-        float totalPoints = 0;
-        int wins = 0, podiums = 0, fastestLaps = 0;
+        Driver driver; float totalPoints = 0; int wins = 0, podiums = 0, fastestLaps = 0;
         DriverStats(Driver d) { this.driver = d; }
     }
 
     private static class ConstructorStats {
-        Team team;
-        float totalPoints = 0;
-        int wins = 0, podiums = 0;
+        Team team; float totalPoints = 0; int wins = 0, podiums = 0;
         Map<String, Double> driverPoints = new LinkedHashMap<>();
         ConstructorStats(Team t) { this.team = t; }
     }

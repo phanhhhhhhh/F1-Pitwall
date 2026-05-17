@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/race-results")
@@ -27,6 +28,16 @@ public class RaceResultController {
     @GetMapping("/race/{raceId}")
     public ResponseEntity<List<RaceResultResponse>> getResultsByRace(@PathVariable Long raceId) {
         return ResponseEntity.ok(raceResultService.getResultsByRace(raceId));
+    }
+
+    /**
+     * Bulk winners endpoint — 1 call thay vì N calls
+     * Frontend dùng endpoint này để hiển thị winner trên Race Calendar và Overview
+     * Response: Map<raceName, RaceWinnerResponse>
+     */
+    @GetMapping("/winners/{season}")
+    public ResponseEntity<Map<String, RaceWinnerResponse>> getSeasonWinners(@PathVariable int season) {
+        return ResponseEntity.ok(raceResultService.getSeasonWinners(season));
     }
 
     @GetMapping("/standings/drivers/{season}")
