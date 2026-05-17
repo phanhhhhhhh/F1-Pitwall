@@ -126,7 +126,7 @@ export default function LoginPage() {
                             {/* Username */}
                             <div className="fade-up" style={{ animationDelay: "100ms" }}>
                                 <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">
-                                    Callsign
+                                    Username
                                 </label>
                                 <div className="relative">
                                     <input
@@ -153,7 +153,7 @@ export default function LoginPage() {
                             {/* Password */}
                             <div className="fade-up" style={{ animationDelay: "150ms" }}>
                                 <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">
-                                    Access Code
+                                    Password
                                 </label>
                                 <div className="relative">
                                     <input
