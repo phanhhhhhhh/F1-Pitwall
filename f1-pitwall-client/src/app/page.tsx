@@ -186,24 +186,17 @@ export default function Home() {
         .sort((a: any, b: any) => a.date.localeCompare(b.date));
       if (upcoming.length > 0) setNextRace(upcoming[0]);
 
-      const completedRaces = racesData.filter((r: any) => r.status === "COMPLETED" && !r.name.toLowerCase().includes("sprint"));
-      const winnerMap: Record<string, { driver: string; team: string }> = {};
-      await Promise.all(
-        completedRaces.map(async (race: any) => {
-          try {
-            const res = await authFetch(`${API}/api/race-results/race/${race.id}`);
-            const results = await res.json();
-            const winner = results.find((r: any) => r.finishPosition === 1 && !r.dnfReason);
-            if (winner) {
-              winnerMap[race.name] = {
-                driver: winner.driverName.split(" ").pop() || winner.driverName,
-                team: winner.teamName,
-              };
-            }
-          } catch (e) { }
-        })
-      );
-      setRaceWinners(winnerMap);
+      // Fix: 1 bulk call thay vì N calls riêng cho từng race
+      try {
+        const winnersRes = await authFetch(`${API}/api/race-results/winners/2026`);
+        const winnersData = await winnersRes.json();
+        // winnersData: { "Australian Grand Prix": { driverLastName, teamName, ... } }
+        const winnerMap: Record<string, { driver: string; team: string }> = {};
+        Object.entries(winnersData).forEach(([raceName, w]: [string, any]) => {
+          winnerMap[raceName] = { driver: w.driverLastName || w.driverName, team: w.teamName };
+        });
+        setRaceWinners(winnerMap);
+      } catch (e) { console.error("Failed to fetch winners", e); }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };

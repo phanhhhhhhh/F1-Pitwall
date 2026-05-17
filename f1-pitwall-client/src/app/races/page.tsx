@@ -39,19 +39,16 @@ export default function RacesPage() {
             const racesData = await res.json();
             setRaces(racesData);
 
-            const completedRaces = racesData.filter((r: any) => r.status === "COMPLETED");
-            const winnerMap: Record<string, RaceWinner> = {};
-            await Promise.all(
-                completedRaces.map(async (race: any) => {
-                    try {
-                        const rRes = await authFetch(`${API}/api/race-results/race/${race.id}`);
-                        const results = await rRes.json();
-                        const winner = results.find((r: any) => r.finishPosition === 1 && !r.dnfReason);
-                        if (winner) winnerMap[race.name] = { driver: winner.driverName, team: winner.teamName };
-                    } catch (e) { }
-                })
-            );
-            setRaceWinners(winnerMap);
+            // Fix: 1 bulk call thay vì N calls riêng cho từng race
+            try {
+                const winnersRes = await authFetch(`${API}/api/race-results/winners/2026`);
+                const winnersData = await winnersRes.json();
+                const winnerMap: Record<string, RaceWinner> = {};
+                Object.entries(winnersData).forEach(([raceName, w]: [string, any]) => {
+                    winnerMap[raceName] = { driver: w.driverName, team: w.teamName };
+                });
+                setRaceWinners(winnerMap);
+            } catch (e) { console.error("Failed to fetch winners", e); }
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
     };
@@ -208,12 +205,12 @@ export default function RacesPage() {
                                 <div
                                     key={race.id}
                                     className={`relative group rounded-2xl border transition-all duration-300 overflow-hidden card-in ${isCancelled
-                                            ? "bg-zinc-900/30 border-zinc-800/30 opacity-50"
-                                            : isSprint
-                                                ? "bg-orange-950/10 border-orange-900/20 hover:border-orange-500/30"
-                                                : isCompleted
-                                                    ? "bg-zinc-900/70 border-zinc-800/50 hover:border-green-500/20"
-                                                    : "bg-zinc-900/60 border-zinc-800/50 hover:border-red-500/20"
+                                        ? "bg-zinc-900/30 border-zinc-800/30 opacity-50"
+                                        : isSprint
+                                            ? "bg-orange-950/10 border-orange-900/20 hover:border-orange-500/30"
+                                            : isCompleted
+                                                ? "bg-zinc-900/70 border-zinc-800/50 hover:border-green-500/20"
+                                                : "bg-zinc-900/60 border-zinc-800/50 hover:border-red-500/20"
                                         }`}
                                     style={{
                                         animationDelay: `${idx * 30}ms`,
@@ -258,9 +255,9 @@ export default function RacesPage() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <h2 className={`text-sm font-black transition-colors ${isCancelled ? "text-zinc-600" :
-                                                        isCompleted ? "text-white group-hover:text-green-300" :
-                                                            isSprint ? "text-orange-200 group-hover:text-orange-300" :
-                                                                "text-white group-hover:text-red-300"
+                                                    isCompleted ? "text-white group-hover:text-green-300" :
+                                                        isSprint ? "text-orange-200 group-hover:text-orange-300" :
+                                                            "text-white group-hover:text-red-300"
                                                     }`}>{race.name}</h2>
                                                 {isSprint && (
                                                     <span className="text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 px-1.5 py-0.5 rounded font-mono">SPRINT</span>
