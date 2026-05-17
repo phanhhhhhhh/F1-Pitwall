@@ -7,18 +7,17 @@ import Navbar from "../components/Navbar";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-// ─── Tyre configs ─────────────────────────────────────────────────────────
 const TYRE = {
-  SOFT:   { color: "#ef4444", lapTime: 0, degradation: 0.08, maxLaps: 20, label: "S" },
+  SOFT: { color: "#ef4444", lapTime: 0, degradation: 0.08, maxLaps: 20, label: "S" },
   MEDIUM: { color: "#eab308", lapTime: 0.5, degradation: 0.05, maxLaps: 30, label: "M" },
-  HARD:   { color: "#e2e8f0", lapTime: 1.2, degradation: 0.03, maxLaps: 40, label: "H" },
-  INTER:  { color: "#22c55e", lapTime: 3.0, degradation: 0.04, maxLaps: 25, label: "I" },
-  WET:    { color: "#3b82f6", lapTime: 6.0, degradation: 0.03, maxLaps: 30, label: "W" },
+  HARD: { color: "#e2e8f0", lapTime: 1.2, degradation: 0.03, maxLaps: 40, label: "H" },
+  INTER: { color: "#22c55e", lapTime: 3.0, degradation: 0.04, maxLaps: 25, label: "I" },
+  WET: { color: "#3b82f6", lapTime: 6.0, degradation: 0.03, maxLaps: 30, label: "W" },
 };
 
 type TyreType = keyof typeof TYRE;
 
-const PIT_LOSS = 22; // seconds lost per pit stop
+const PIT_LOSS = 22;
 
 interface Stint {
   id: string;
@@ -41,7 +40,6 @@ interface Circuit {
   country: string;
 }
 
-// ─── Calculate total race time for a strategy ─────────────────────────────
 function calcRaceTime(stints: Stint[], baseLapTime: number): number {
   let total = 0;
   const pitStops = stints.length - 1;
@@ -84,7 +82,6 @@ function formatLapTime(seconds: number): string {
 const STRATEGY_COLORS = ["#ef4444", "#3b82f6", "#22c55e", "#f97316", "#a855f7"];
 const STRATEGY_NAMES = ["Strategy A", "Strategy B", "Strategy C", "Strategy D", "Strategy E"];
 
-// ─── Timeline Bar ──────────────────────────────────────────────────────────
 function StrategyTimeline({ strategy, totalLaps, baseLapTime, maxTime }: {
   strategy: Strategy; totalLaps: number; baseLapTime: number; maxTime: number;
 }) {
@@ -178,7 +175,6 @@ export default function StrategyPage() {
       .then(r => r.json())
       .then((data: Circuit[]) => {
         setCircuits(data);
-        // Default to Miami
         const miami = data.find((c: Circuit) => c.name.includes("Miami") || c.name.includes("Albert"));
         setSelectedCircuit(miami || data[0]);
       })
@@ -189,7 +185,6 @@ export default function StrategyPage() {
   const totalLaps = selectedCircuit?.totalLaps || 57;
   const baseLapTime = selectedCircuit?.lapRecordSec ? selectedCircuit.lapRecordSec + 2 : 92;
 
-  // Sync stints laps to match total laps
   const syncStrategyLaps = (strategy: Strategy): Strategy => {
     const usedLaps = strategy.stints.slice(0, -1).reduce((sum, s) => sum + s.laps, 0);
     const lastStint = { ...strategy.stints[strategy.stints.length - 1], laps: Math.max(1, totalLaps - usedLaps) };
@@ -225,7 +220,6 @@ export default function StrategyPage() {
       if (s.id !== stratId || s.stints.length >= 5) return s;
       const newStint: Stint = { id: `st${Date.now()}`, tyre: "HARD", laps: 10 };
       const stints = [...s.stints, newStint];
-      // Redistribute laps
       const perStint = Math.floor(totalLaps / stints.length);
       return {
         ...s, stints: stints.map((st, i) => ({

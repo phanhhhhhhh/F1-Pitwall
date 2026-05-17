@@ -124,7 +124,6 @@ export default function RaceResultsPage() {
     finally { setSubmitting(false); }
   };
 
-  // Re-sync from OpenF1 — used when penalties change standings
   const handleResync = async () => {
     if (!confirm("Re-sync will delete current results and fetch again from OpenF1.\nContinue?")) return;
     setResyncing(true);
@@ -169,16 +168,14 @@ export default function RaceResultsPage() {
           </div>
           <div className="flex items-center gap-3">
             {feedback && (
-              <span className={`text-xs font-mono px-3 py-1.5 rounded border ${
-                feedback.startsWith("✓") ? "text-green-400 border-green-500/30 bg-green-500/10" : "text-red-400 border-red-500/30 bg-red-500/10"
-              }`}>{feedback}</span>
+              <span className={`text-xs font-mono px-3 py-1.5 rounded border ${feedback.startsWith("✓") ? "text-green-400 border-green-500/30 bg-green-500/10" : "text-red-400 border-red-500/30 bg-red-500/10"
+                }`}>{feedback}</span>
             )}
             {mode === "view" && existingResults.length > 0 && (
               <>
                 <button onClick={handleResync} disabled={resyncing}
-                  className={`text-xs border px-4 py-2 rounded-lg transition-all font-mono flex items-center gap-2 ${
-                    resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
-                  }`}>
+                  className={`text-xs border px-4 py-2 rounded-lg transition-all font-mono flex items-center gap-2 ${resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                    }`}>
                   {resyncing ? (
                     <><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />RE-SYNCING...</>
                   ) : "⚠️ RE-SYNC (PENALTY)"}

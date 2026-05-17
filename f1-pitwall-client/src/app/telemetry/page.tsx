@@ -51,25 +51,24 @@ interface LiveStatus {
 const MAX_HISTORY = 40;
 
 const TYRE_CONFIG: Record<string, { maxLaps: number; color: string; optimalTemp: [number, number] }> = {
-  SOFT:         { maxLaps: 20, color: "#ef4444", optimalTemp: [80, 110] },
-  MEDIUM:       { maxLaps: 30, color: "#eab308", optimalTemp: [90, 120] },
-  HARD:         { maxLaps: 40, color: "#e2e8f0", optimalTemp: [100, 130] },
+  SOFT: { maxLaps: 20, color: "#ef4444", optimalTemp: [80, 110] },
+  MEDIUM: { maxLaps: 30, color: "#eab308", optimalTemp: [90, 120] },
+  HARD: { maxLaps: 40, color: "#e2e8f0", optimalTemp: [100, 130] },
   INTERMEDIATE: { maxLaps: 25, color: "#22c55e", optimalTemp: [50, 80] },
-  WET:          { maxLaps: 30, color: "#3b82f6", optimalTemp: [30, 60] },
-  UNKNOWN:      { maxLaps: 30, color: "#666", optimalTemp: [80, 120] },
+  WET: { maxLaps: 30, color: "#3b82f6", optimalTemp: [30, 60] },
+  UNKNOWN: { maxLaps: 30, color: "#666", optimalTemp: [80, 120] },
 };
 
 const SESSION_COLORS: Record<string, string> = {
-  "Race":              "text-red-400 bg-red-500/10 border-red-500/30",
-  "Sprint":            "text-orange-400 bg-orange-500/10 border-orange-500/30",
-  "Qualifying":        "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
+  "Race": "text-red-400 bg-red-500/10 border-red-500/30",
+  "Sprint": "text-orange-400 bg-orange-500/10 border-orange-500/30",
+  "Qualifying": "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
   "Sprint Qualifying": "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
-  "Practice 1":        "text-blue-400 bg-blue-500/10 border-blue-500/30",
-  "Practice 2":        "text-blue-400 bg-blue-500/10 border-blue-500/30",
-  "Practice 3":        "text-blue-400 bg-blue-500/10 border-blue-500/30",
+  "Practice 1": "text-blue-400 bg-blue-500/10 border-blue-500/30",
+  "Practice 2": "text-blue-400 bg-blue-500/10 border-blue-500/30",
+  "Practice 3": "text-blue-400 bg-blue-500/10 border-blue-500/30",
 };
 
-// ─── Components ────────────────────────────────────────────────────────────
 
 function DualSpeedChart({ data1, data2, color1, color2, label }: {
   data1: number[]; data2: number[]; color1: string; color2: string; label: string;
@@ -332,7 +331,6 @@ function getFlagEmoji(countryName: string): string {
   return flags[countryName] || "🏁";
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────
 
 export default function TelemetryPage() {
   const router = useRouter();
@@ -348,7 +346,6 @@ export default function TelemetryPage() {
   const [liveTyreData, setLiveTyreData] = useState<LiveTyreData[]>([]);
   const stompRef = useRef<StompClient | null>(null);
 
-  // WebSocket
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
     const connect = () => {
@@ -356,7 +353,7 @@ export default function TelemetryPage() {
       if (!stompFactory) { setTimeout(connect, 500); return; }
       const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/ws";
       const stompClient = stompFactory.over(() => new window.SockJS(wsUrl));
-      stompClient.debug = () => {};
+      stompClient.debug = () => { };
       stompClient.connect({}, () => {
         setConnected(true);
         stompClient.subscribe("/topic/telemetry", (message: TelemetryFrame) => {
@@ -384,7 +381,7 @@ export default function TelemetryPage() {
     return () => { stompRef.current?.disconnect(); };
   }, [router]);
 
-  // OpenF1 live status check
+
   const checkLiveStatus = async () => {
     try {
       const res = await authFetch(`${API}/api/openf1/status`);
@@ -456,7 +453,7 @@ export default function TelemetryPage() {
             </div>
           </div>
         ) : mode === "tyres" ? (
-          /* ─── TYRES MODE ─────────────────────────────────────────── */
+
           <div>
             <SessionBanner status={liveStatus} onRefresh={handleRefresh} />
 
@@ -506,7 +503,7 @@ export default function TelemetryPage() {
           </div>
 
         ) : (
-          /* ─── SINGLE / COMPARE MODE ──────────────────────────────── */
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Driver list */}
             <div className="lg:col-span-1 space-y-2">
@@ -570,17 +567,17 @@ export default function TelemetryPage() {
                       ctx.clearRect(0, 0, el.width, el.height);
                       const min = 150, max = 360, w = el.width, h = el.height, pad = 8;
                       ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
-                      [0,1,2,3,4].forEach(i => { const y=pad+(h-pad*2)*(i/4); ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); ctx.fillStyle="rgba(255,255,255,0.2)"; ctx.font="10px monospace"; ctx.fillText(`${Math.round(max-(max-min)*(i/4))}`,4,y-2); });
-                      ctx.beginPath(); ctx.strokeStyle=selectedDriver.teamColor; ctx.lineWidth=2.5; ctx.lineJoin="round";
-                      data.forEach((v,i)=>{ const x=(i/(MAX_HISTORY-1))*w; const y=h-pad-((v-min)/(max-min))*(h-pad*2); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-                      ctx.stroke(); ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath(); ctx.fillStyle=selectedDriver.teamColor+"20"; ctx.fill();
+                      [0, 1, 2, 3, 4].forEach(i => { const y = pad + (h - pad * 2) * (i / 4); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.font = "10px monospace"; ctx.fillText(`${Math.round(max - (max - min) * (i / 4))}`, 4, y - 2); });
+                      ctx.beginPath(); ctx.strokeStyle = selectedDriver.teamColor; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+                      data.forEach((v, i) => { const x = (i / (MAX_HISTORY - 1)) * w; const y = h - pad - ((v - min) / (max - min)) * (h - pad * 2); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+                      ctx.stroke(); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fillStyle = selectedDriver.teamColor + "20"; ctx.fill();
                     }} width={600} height={100} className="w-full" />
                   </div>
                   <div className="grid grid-cols-4 gap-3 mb-6">
                     {[
                       { label: "GEAR", value: `G${selectedDriver.gear}`, big: true },
                       { label: "RPM", value: selectedDriver.rpm.toLocaleString(), big: false },
-                      { label: "LAP TIME", value: `${Math.floor(selectedDriver.lapTime/60)}:${(selectedDriver.lapTime%60).toFixed(3).padStart(6,"0")}`, big: false },
+                      { label: "LAP TIME", value: `${Math.floor(selectedDriver.lapTime / 60)}:${(selectedDriver.lapTime % 60).toFixed(3).padStart(6, "0")}`, big: false },
                       { label: "FUEL", value: `${selectedDriver.fuelLoad.toFixed(1)}kg`, big: false },
                     ].map(s => (
                       <div key={s.label} className="bg-zinc-800/50 rounded-lg p-3 text-center">
@@ -635,9 +632,9 @@ export default function TelemetryPage() {
                           </div>
                         </div>
                         <div className="space-y-4">
-                          <DualSpeedChart data1={speedHistory[selectedDriver?.driverName||""]||[]} data2={speedHistory[compareDriver.driverName]||[]} color1={selectedDriver?.teamColor||"#fff"} color2={compareDriver.teamColor} label="SPEED (km/h)" />
-                          <DualSpeedChart data1={throttleHistory[selectedDriver?.driverName||""]||[]} data2={throttleHistory[compareDriver.driverName]||[]} color1={selectedDriver?.teamColor||"#fff"} color2={compareDriver.teamColor} label="THROTTLE (%)" />
-                          <DualSpeedChart data1={rpmHistory[selectedDriver?.driverName||""]||[]} data2={rpmHistory[compareDriver.driverName]||[]} color1={selectedDriver?.teamColor||"#fff"} color2={compareDriver.teamColor} label="RPM" />
+                          <DualSpeedChart data1={speedHistory[selectedDriver?.driverName || ""] || []} data2={speedHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="SPEED (km/h)" />
+                          <DualSpeedChart data1={throttleHistory[selectedDriver?.driverName || ""] || []} data2={throttleHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="THROTTLE (%)" />
+                          <DualSpeedChart data1={rpmHistory[selectedDriver?.driverName || ""] || []} data2={rpmHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="RPM" />
                         </div>
                       </div>
                       <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
@@ -647,7 +644,7 @@ export default function TelemetryPage() {
                             <CompareRow label="SPEED" v1={selectedDriver.speed} v2={compareDriver.speed} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit=" km/h" />
                             <CompareRow label="THROTTLE" v1={selectedDriver.throttle} v2={compareDriver.throttle} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="%" />
                             <CompareRow label="BRAKE" v1={selectedDriver.brake} v2={compareDriver.brake} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="%" />
-                            <CompareRow label="RPM" v1={selectedDriver.rpm/100} v2={compareDriver.rpm/100} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="00" />
+                            <CompareRow label="RPM" v1={selectedDriver.rpm / 100} v2={compareDriver.rpm / 100} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="00" />
                             <CompareRow label="TYRE TEMP" v1={selectedDriver.tyreTemp} v2={compareDriver.tyreTemp} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="°C" />
                             <CompareRow label="FUEL" v1={selectedDriver.fuelLoad} v2={compareDriver.fuelLoad} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="kg" />
                           </>
