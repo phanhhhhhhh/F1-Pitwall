@@ -1,6 +1,3 @@
-// src/app/lib/export.ts
-// Helper functions to download files from backend
-
 import { getAccessToken } from "./pitwall-auth";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -23,8 +20,6 @@ async function downloadFile(url: string, filename: string, mimeType: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(blobUrl);
 }
-
-// ─── CSV Downloads ──────────────────────────────────────────────────────
 
 export async function downloadDriverStandingsCsv(season: number) {
   await downloadFile(
@@ -50,8 +45,6 @@ export async function downloadRaceResultsCsv(raceId: number, raceName: string) {
     "text/csv"
   );
 }
-
-// ─── PDF/HTML Downloads ─────────────────────────────────────────────────
 
 export async function downloadRaceReportPdf(raceId: number, raceName: string) {
   const filename = raceName.toLowerCase().replace(/ /g, "-") + "-report.html";

@@ -59,7 +59,7 @@ function formatDuration(seconds: number): string {
 function formatLocalTime(dateStr: string): string {
     if (!dateStr) return "—";
     try {
-        return new Date(dateStr).toLocaleTimeString("vi-VN", {
+        return new Date(dateStr).toLocaleTimeString("en-US", {
             hour: "2-digit", minute: "2-digit", timeZoneName: "short"
         });
     } catch { return "—"; }
@@ -68,7 +68,7 @@ function formatLocalTime(dateStr: string): string {
 function formatLocalDate(dateStr: string): string {
     if (!dateStr) return "—";
     try {
-        return new Date(dateStr).toLocaleDateString("vi-VN", {
+        return new Date(dateStr).toLocaleDateString("en-US", {
             weekday: "short", month: "short", day: "numeric"
         });
     } catch { return "—"; }

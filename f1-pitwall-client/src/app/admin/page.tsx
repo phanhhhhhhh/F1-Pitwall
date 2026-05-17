@@ -47,20 +47,16 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"stats" | "users" | "data">("stats");
 
-  // Sync state
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
-  // Create user modal
   const [showCreate, setShowCreate] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", email: "", password: "", role: "VIEWER" });
   const [createError, setCreateError] = useState("");
 
-  // Password reset modal
   const [resetUser, setResetUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
 
-  // Feedback
   const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
@@ -86,7 +82,6 @@ export default function AdminPage() {
     setTimeout(() => setFeedback(""), 3000);
   };
 
-  // ─── Sync all results from OpenF1 ──────────────────────────────────────
   const handleSyncAll = async () => {
     setSyncing(true);
     setSyncResult(null);
@@ -95,7 +90,7 @@ export default function AdminPage() {
       const data: SyncResult = await res.json();
       setSyncResult(data);
       showFeedback(`✓ Sync complete — ${data.total} sessions synced`);
-      fetchData(); // refresh stats
+      fetchData();
     } catch (e) {
       showFeedback("✗ Sync failed");
       console.error(e);
@@ -104,7 +99,6 @@ export default function AdminPage() {
     }
   };
 
-  // ─── User management ───────────────────────────────────────────────────
   const updateRole = async (userId: number, role: string) => {
     const res = await authFetch(`${API}/api/admin/users/${userId}/role`, {
       method: "PATCH",
@@ -174,11 +168,10 @@ export default function AdminPage() {
             </h1>
           </div>
           {feedback && (
-            <div className={`text-sm px-4 py-2 rounded-lg font-mono border ${
-              feedback.startsWith("✓")
+            <div className={`text-sm px-4 py-2 rounded-lg font-mono border ${feedback.startsWith("✓")
                 ? "bg-green-500/10 border-green-500/30 text-green-400"
                 : "bg-red-500/10 border-red-500/30 text-red-400"
-            }`}>
+              }`}>
               {feedback}
             </div>
           )}
@@ -192,9 +185,8 @@ export default function AdminPage() {
             { key: "data", label: "🔄 DATA SYNC" },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key as any)}
-              className={`px-5 py-2 rounded-lg text-xs font-bold border transition-all ${
-                tab === t.key ? "bg-red-500/20 border-red-500 text-red-400" : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
-              }`}>
+              className={`px-5 py-2 rounded-lg text-xs font-bold border transition-all ${tab === t.key ? "bg-red-500/20 border-red-500 text-red-400" : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
+                }`}>
               {t.label}
             </button>
           ))}
@@ -205,7 +197,6 @@ export default function AdminPage() {
             <div className="w-2 h-2 bg-red-500 rounded-full" /> LOADING...
           </div>
         ) : tab === "stats" && stats ? (
-          /* ─── Dashboard ───────────────────────────────────────────── */
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
@@ -265,7 +256,7 @@ export default function AdminPage() {
           </div>
 
         ) : tab === "data" ? (
-          /* ─── Data Sync Tab ───────────────────────────────────────── */
+
           <div className="space-y-6">
 
             {/* Main sync card */}
@@ -276,11 +267,10 @@ export default function AdminPage() {
                   <p className="text-zinc-500 text-sm">Automatically fetch race and sprint results from OpenF1 API, correctly calculate points according to F1 system.</p>
                 </div>
                 <button onClick={handleSyncAll} disabled={syncing}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all ${
-                    syncing
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all ${syncing
                       ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                       : "bg-red-600 hover:bg-red-500 text-white"
-                  }`}>
+                    }`}>
                   {syncing ? (
                     <>
                       <div className="w-4 h-4 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
@@ -371,7 +361,7 @@ export default function AdminPage() {
           </div>
 
         ) : tab === "users" ? (
-          /* ─── Users Tab ───────────────────────────────────────────── */
+
           <div>
             <div className="flex items-center justify-between mb-5">
               <p className="text-zinc-500 text-sm">{users.length} users registered</p>

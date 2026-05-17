@@ -1,4 +1,3 @@
-// src/app/components/ExportButton.tsx
 "use client";
 
 import { useState } from "react";
@@ -42,10 +41,10 @@ export default function ExportButton({
   const colorClass = done
     ? "border-green-500 text-green-400 bg-green-500/10"
     : variant === "csv"
-    ? "border-emerald-700 text-emerald-400 hover:border-emerald-500 hover:bg-emerald-500/10"
-    : variant === "pdf"
-    ? "border-blue-700 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10"
-    : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800";
+      ? "border-emerald-700 text-emerald-400 hover:border-emerald-500 hover:bg-emerald-500/10"
+      : variant === "pdf"
+        ? "border-blue-700 text-blue-400 hover:border-blue-500 hover:bg-blue-500/10"
+        : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800";
 
   return (
     <button
