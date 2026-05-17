@@ -33,7 +33,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
-
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Value("${allowed.origins:http://localhost:3000}")
     private List<String> allowedOrigins;
@@ -43,10 +43,10 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                // OAuth2 cần session tạm để lưu state — IF_REQUIRED thay vì STATELESS
                 .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
-
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setContentType("application/json");
@@ -61,13 +61,11 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
-
+                        // OAuth2 endpoints phải public
+                        .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
-
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-
                         .requestMatchers("/actuator/**").permitAll()
-
                         .requestMatchers("/ws/**", "/ws/info/**").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/drivers/**").hasAnyRole("ADMIN", "ENGINEER", "VIEWER")
@@ -76,12 +74,26 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/drivers/**").hasRole("ADMIN")
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
                         .requestMatchers("/api/openf1/**").authenticated()
                         .requestMatchers("/api/export/**").authenticated()
                         .requestMatchers("/api/qualifying/**").authenticated()
-
                         .anyRequest().authenticated()
+                )
+                // OAuth2 Google login
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(auth ->
+                                auth.baseUri("/oauth2/authorize")
+                        )
+                        .redirectionEndpoint(redirect ->
+                                redirect.baseUri("/login/oauth2/code/*")
+                        )
+                        .successHandler(oAuth2SuccessHandler)
+                        .failureHandler((request, response, exception) -> {
+                            String frontendUrl = allowedOrigins.stream()
+                                    .filter(o -> o.startsWith("https://"))
+                                    .findFirst().orElse("http://localhost:3000");
+                            response.sendRedirect(frontendUrl + "/login?error=oauth_failed");
+                        })
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
