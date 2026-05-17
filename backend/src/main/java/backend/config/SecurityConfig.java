@@ -22,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import backend.security.OAuth2SuccessHandler;
 
 import java.util.List;
 
@@ -43,7 +44,6 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-                // OAuth2 cần session tạm để lưu state — IF_REQUIRED thay vì STATELESS
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
@@ -79,7 +79,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/qualifying/**").authenticated()
                         .anyRequest().authenticated()
                 )
-                // OAuth2 Google login
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(auth ->
                                 auth.baseUri("/oauth2/authorize")
