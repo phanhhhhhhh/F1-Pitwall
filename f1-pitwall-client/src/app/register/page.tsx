@@ -61,7 +61,7 @@ export default function RegisterPage() {
                 .glow-pulse { animation: glow 3s ease-in-out infinite; }
             `}</style>
 
-            {/* Background */}
+            { }
             <div className="absolute inset-0">
                 <div className="absolute inset-0 opacity-[0.03]" style={{
                     backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)",
@@ -73,7 +73,7 @@ export default function RegisterPage() {
                     style={{ animation: "scan 8s linear infinite" }} />
             </div>
 
-            {/* Card */}
+            { }
             <div className={`relative w-full max-w-md transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
                 <div className="absolute inset-0 rounded-3xl bg-red-500/5 blur-xl" />
 
@@ -81,7 +81,7 @@ export default function RegisterPage() {
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-red-500 to-transparent" />
 
                     <div className="p-8">
-                        {/* Logo */}
+                        { }
                         <div className="text-center mb-8 fade-up">
                             <div className="relative inline-block mb-4">
                                 <div className="absolute inset-0 rounded-full border border-red-500/20"
@@ -98,14 +98,32 @@ export default function RegisterPage() {
                             </p>
                         </div>
 
-                        {/* Error */}
+                        { }
                         {error && (
                             <div className="mb-5 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm text-center flex items-center gap-2 justify-center fade-up">
                                 <span>⚠️</span> {error}
                             </div>
                         )}
 
-                        {/* Form */}
+                        { }
+                        <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/oauth2/authorize/google`}
+                            className="flex items-center justify-center gap-3 w-full py-3 rounded-xl border border-zinc-700/50 bg-zinc-800/40 hover:bg-zinc-800 hover:border-zinc-600 transition-all duration-200 text-sm font-bold text-white fade-up">
+                            <svg width="18" height="18" viewBox="0 0 18 18">
+                                <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z" />
+                                <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z" />
+                                <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z" />
+                                <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z" />
+                            </svg>
+                            Continue with Google
+                        </a>
+
+                        <div className="flex items-center gap-3">
+                            <div className="flex-1 h-px bg-zinc-800" />
+                            <span className="text-zinc-600 text-xs font-mono">OR</span>
+                            <div className="flex-1 h-px bg-zinc-800" />
+                        </div>
+
+                        { }
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {fields.map((f, i) => (
                                 <div key={f.key} className="fade-up" style={{ animationDelay: `${i * 60}ms` }}>
@@ -133,7 +151,7 @@ export default function RegisterPage() {
                                         )}
                                     </div>
 
-                                    {/* Password strength */}
+                                    { }
                                     {f.key === "password" && password.length > 0 && (
                                         <div className="mt-2">
                                             <div className="flex gap-1">
@@ -148,7 +166,7 @@ export default function RegisterPage() {
                                         </div>
                                     )}
 
-                                    {/* Confirm match indicator */}
+                                    { }
                                     {f.key === "confirm" && confirm.length > 0 && (
                                         <p className={`text-xs mt-1 font-mono ${password === confirm ? "text-green-400" : "text-red-400"}`}>
                                             {password === confirm ? "✓ Passwords match" : "✗ Passwords do not match"}
@@ -157,7 +175,7 @@ export default function RegisterPage() {
                                 </div>
                             ))}
 
-                            {/* Role notice */}
+                            { }
                             <div className="bg-zinc-800/40 border border-zinc-700/30 rounded-xl px-4 py-3 fade-up" style={{ animationDelay: "240ms" }}>
                                 <p className="text-xs text-zinc-500 font-mono">
                                     🔒 New accounts are granted <span className="text-zinc-300 font-bold">VIEWER</span> role by default.
@@ -165,7 +183,7 @@ export default function RegisterPage() {
                                 </p>
                             </div>
 
-                            {/* Submit */}
+                            { }
                             <div className="fade-up" style={{ animationDelay: "280ms" }}>
                                 <button type="submit" disabled={isLoading}
                                     className="relative w-full py-4 rounded-xl font-black tracking-widest text-sm overflow-hidden transition-all duration-300 disabled:opacity-50 text-white"
@@ -185,7 +203,7 @@ export default function RegisterPage() {
                             </div>
                         </form>
 
-                        {/* Footer */}
+                        { }
                         <div className="mt-6 pt-5 border-t border-zinc-800/50 text-center fade-up" style={{ animationDelay: "320ms" }}>
                             <p className="text-zinc-600 text-xs font-mono">
                                 Already have an account?{" "}
