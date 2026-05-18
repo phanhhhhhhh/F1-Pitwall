@@ -64,8 +64,8 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
     return (
       <Link href={item.href}
         className={`px-4 py-4 text-xs font-bold tracking-widest border-b-2 transition-all flex items-center gap-1.5 ${pathname === item.href || pathname.startsWith(item.href + "/")
-            ? "border-red-500 text-white"
-            : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
+          ? "border-red-500 text-white"
+          : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
           }`}>
         {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
         {item.label.toUpperCase()}
@@ -89,8 +89,8 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
           {group.items.map(item => (
             <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
               className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-colors border-l-2 ${pathname === item.href || pathname.startsWith(item.href + "/")
-                  ? "border-red-500 text-white bg-zinc-800"
-                  : "border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-600"
+                ? "border-red-500 text-white bg-zinc-800"
+                : "border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-600"
                 }`}>
               {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
               {item.label}
@@ -132,9 +132,9 @@ export default function Navbar() {
           <span className="text-zinc-500 text-xs font-mono">LIVE</span>
         </div>
         {user && (
-          <span className="text-xs text-zinc-600 font-mono hidden md:block">
+          <Link href="/profile" className="text-xs text-zinc-600 hover:text-zinc-300 font-mono hidden md:block transition-colors">
             {user.username} · <span className="text-zinc-500">{user.role}</span>
-          </span>
+          </Link>
         )}
         <NotificationBell />
         <button onClick={handleLogout} className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono">LOGOUT</button>
