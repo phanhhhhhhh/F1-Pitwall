@@ -139,9 +139,43 @@ public class AuthController {
         return ResponseEntity.ok(Map.of(
                 "id", user.getId(),
                 "username", user.getUsername(),
-                "email", user.getEmail(),
+                "email", user.getEmail() != null ? user.getEmail() : "",
                 "role", user.getRole().name(),
                 "createdAt", user.getCreatedAt().toString()
         ));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body) {
+        String username = Objects.requireNonNull(SecurityContextHolder.getContext()
+                        .getAuthentication())
+                .getName();
+
+        String currentPassword = body.get("currentPassword");
+        String newPassword     = body.get("newPassword");
+
+        if (currentPassword == null || newPassword == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "currentPassword and newPassword are required"));
+        }
+
+        if (newPassword.length() < 6) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "New password must be at least 6 characters"));
+        }
+
+        User user = userRepository.findByUsername(username).orElseThrow();
+        
+        boolean isOAuthUser = user.getPassword() == null || user.getPassword().isEmpty();
+        if (!isOAuthUser && !passwordEncoder.matches(currentPassword, user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Current password is incorrect"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        log.info("[Auth] Password changed for user: {}", username);
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
 }

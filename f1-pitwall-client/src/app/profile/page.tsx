@@ -205,8 +205,8 @@ export default function ProfilePage() {
                         <div className="px-6 pb-6 border-t border-zinc-800/50">
                             {pwdFeedback && (
                                 <div className={`mt-4 px-4 py-2.5 rounded-xl border text-xs font-mono ${pwdFeedback.startsWith("✓")
-                                        ? "bg-green-500/10 border-green-500/30 text-green-400"
-                                        : "bg-red-500/10 border-red-500/30 text-red-400"
+                                    ? "bg-green-500/10 border-green-500/30 text-green-400"
+                                    : "bg-red-500/10 border-red-500/30 text-red-400"
                                     }`}>{pwdFeedback}</div>
                             )}
 
