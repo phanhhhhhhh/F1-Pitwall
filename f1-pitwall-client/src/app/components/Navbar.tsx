@@ -64,8 +64,8 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
     return (
       <Link href={item.href}
         className={`px-4 py-4 text-xs font-bold tracking-widest border-b-2 transition-all flex items-center gap-1.5 ${pathname === item.href || pathname.startsWith(item.href + "/")
-          ? "border-red-500 text-white"
-          : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
+            ? "border-red-500 text-white"
+            : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
           }`}>
         {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
         {item.label.toUpperCase()}
@@ -89,8 +89,8 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
           {group.items.map(item => (
             <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
               className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-colors border-l-2 ${pathname === item.href || pathname.startsWith(item.href + "/")
-                ? "border-red-500 text-white bg-zinc-800"
-                : "border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-600"
+                  ? "border-red-500 text-white bg-zinc-800"
+                  : "border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-600"
                 }`}>
               {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
               {item.label}
@@ -110,6 +110,10 @@ export default function Navbar() {
     !user || group.roles.includes(user.role)
   );
 
+  const roleColor = user?.role === "ADMIN" ? "#ef4444"
+    : user?.role === "ENGINEER" ? "#3b82f6"
+      : "#52525b";
+
   return (
     <nav className="bg-zinc-950 border-b border-zinc-800 px-6 py-0 flex items-center justify-between sticky top-0 z-50">
       <Link href="/" className="flex items-center gap-3 py-4 mr-2 flex-shrink-0">
@@ -127,17 +131,36 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Live indicator */}
         <div className="hidden sm:flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-zinc-500 text-xs font-mono">LIVE</span>
         </div>
-        {user && (
-          <Link href="/profile" className="text-xs text-zinc-600 hover:text-zinc-300 font-mono hidden md:block transition-colors">
-            {user.username} · <span className="text-zinc-500">{user.role}</span>
+
+        {/* Profile avatar button — always visible when logged in */}
+        {user ? (
+          <Link href="/profile"
+            className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 rounded-lg px-2.5 py-1.5 transition-all group">
+            <div
+              className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+              style={{ backgroundColor: roleColor }}>
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-xs font-mono text-zinc-400 group-hover:text-white transition-colors hidden sm:block">
+              {user.username}
+            </span>
+          </Link>
+        ) : (
+          <Link href="/login" className="text-xs text-zinc-600 hover:text-zinc-300 font-mono transition-colors">
+            LOGIN
           </Link>
         )}
+
         <NotificationBell />
-        <button onClick={handleLogout} className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono">LOGOUT</button>
+        <button onClick={handleLogout}
+          className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono">
+          LOGOUT
+        </button>
       </div>
     </nav>
   );
