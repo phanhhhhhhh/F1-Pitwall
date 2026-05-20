@@ -14,6 +14,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
+const PUBLIC_PATHS = ["/login", "/register", "/oauth2"];
+
+async function fetchUserWithRetry(retries = 2): Promise<User | null> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await authFetch(`${API_URL}/api/auth/me`);
+      if (res.ok) return await res.json();
+      if (res.status === 401) return null;
+    } catch (e) {
+      if (i < retries) await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(() => {
@@ -23,17 +38,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = getAccessToken();
-    if (token) {
-      authFetch(`${API_URL}/api/auth/me`)
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
-        .then((data) => setUser(data))
-        .catch(() => {
-          clearTokens();
-          setUser(null);
-          window.location.href = "/login";
-        })
-        .finally(() => setIsLoading(false));
-    }
+    if (!token) { setIsLoading(false); return; }
+
+    fetchUserWithRetry(2)
+      .then((data) => {
+        if (data) {
+          setUser(data);
+        } else {
+          const path = window.location.pathname;
+          const isPublic = PUBLIC_PATHS.some(p => path.startsWith(p));
+          if (!isPublic) {
+            clearTokens();
+            window.location.href = "/login";
+          } else {
+            clearTokens();
+          }
+        }
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const loginSuccess = (data: AuthResponse) => {
@@ -53,15 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        loginSuccess,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginSuccess, logout }}>
       {children}
     </AuthContext.Provider>
   );
