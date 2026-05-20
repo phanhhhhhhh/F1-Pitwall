@@ -45,6 +45,8 @@ export function clearTokens() {
     if (isBrowser()) {
         sessionStorage.removeItem("pitwall_access");
         sessionStorage.removeItem("pitwall_refresh");
+        sessionStorage.removeItem("pitwall_username");
+        sessionStorage.removeItem("pitwall_role");
         document.cookie = "pitwall_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
 }
@@ -63,6 +65,10 @@ export async function login(username: string, password: string): Promise<AuthRes
 
     const data: AuthResponse = await res.json();
     setTokens(data.accessToken, data.refreshToken);
+    if (isBrowser()) {
+        sessionStorage.setItem("pitwall_username", data.username);
+        sessionStorage.setItem("pitwall_role", data.role);
+    }
     return data;
 }
 
@@ -80,6 +86,10 @@ export async function register(username: string, password: string, email: string
 
     const data: AuthResponse = await res.json();
     setTokens(data.accessToken, data.refreshToken);
+    if (isBrowser()) {
+        sessionStorage.setItem("pitwall_username", data.username);
+        sessionStorage.setItem("pitwall_role", data.role);
+    }
     return data;
 }
 
