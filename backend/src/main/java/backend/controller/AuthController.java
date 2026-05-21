@@ -165,7 +165,7 @@ public class AuthController {
         }
 
         User user = userRepository.findByUsername(username).orElseThrow();
-        
+
         boolean isOAuthUser = user.getPassword() == null || user.getPassword().isEmpty();
         if (!isOAuthUser && !passwordEncoder.matches(currentPassword, user.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
