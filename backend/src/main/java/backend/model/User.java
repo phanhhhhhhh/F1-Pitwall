@@ -31,6 +31,12 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
@@ -41,11 +47,7 @@ public class User {
     @Column(name = "is_active")
     private boolean isActive;
 
-    public enum Role {
-        ADMIN,
-        ENGINEER,
-        VIEWER
-    }
+    public enum Role { ADMIN, ENGINEER, VIEWER }
 
     @PrePersist
     protected void onCreate() {
