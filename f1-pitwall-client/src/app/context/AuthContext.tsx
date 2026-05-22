@@ -27,8 +27,8 @@ async function fetchUserWithRetry(retries = 2): Promise<User | null> {
     }
   }
   if (typeof window !== "undefined") {
-    const username = sessionStorage.getItem("pitwall_username");
-    const role = sessionStorage.getItem("pitwall_role");
+    const username = localStorage.getItem("pitwall_username");
+    const role = localStorage.getItem("pitwall_role");
     if (username) return { id: 0, username, email: "", role: role || "VIEWER", createdAt: "" };
   }
   return null;
@@ -37,9 +37,9 @@ async function fetchUserWithRetry(retries = 2): Promise<User | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window === "undefined") return null;
-    const token = window.sessionStorage.getItem("pitwall_access");
-    const username = window.sessionStorage.getItem("pitwall_username");
-    const role = window.sessionStorage.getItem("pitwall_role");
+    const token = window.localStorage.getItem("pitwall_access");
+    const username = window.localStorage.getItem("pitwall_username");
+    const role = window.localStorage.getItem("pitwall_role");
     if (token && username) {
       return {
         id: 0,
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(() => {
     if (typeof window === "undefined") return true;
-    return Boolean(window.sessionStorage.getItem("pitwall_access"));
+    return Boolean(window.localStorage.getItem("pitwall_access"));
   });
 
   useEffect(() => {
