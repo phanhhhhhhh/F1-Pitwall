@@ -28,14 +28,17 @@ function CallbackHandler() {
             return;
         }
 
+        // Store tokens
         setTokens(accessToken, refreshToken);
 
+        // Store username/role for Navbar — phải lưu trước khi redirect
         if (typeof window !== "undefined") {
             sessionStorage.setItem("pitwall_username", username || "");
             sessionStorage.setItem("pitwall_role", role || "VIEWER");
         }
 
-        router.replace("/");
+        // Delay nhỏ để sessionStorage kịp ghi trước khi redirect
+        setTimeout(() => router.replace("/"), 200);
     }, [searchParams, router]);
 
     if (error) {
