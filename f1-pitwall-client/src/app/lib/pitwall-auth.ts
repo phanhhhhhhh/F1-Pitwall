@@ -26,15 +26,15 @@ export function setTokens(access: string, refresh: string) {
     accessToken = access;
     refreshToken = refresh;
     if (isBrowser()) {
-        sessionStorage.setItem("pitwall_access", access);
-        sessionStorage.setItem("pitwall_refresh", refresh);
+        localStorage.setItem("pitwall_access", access);
+        localStorage.setItem("pitwall_refresh", refresh);
         document.cookie = "pitwall_session=1; path=/; SameSite=Strict";
     }
 }
 
 export function getAccessToken(): string | null {
     if (!accessToken && isBrowser()) {
-        accessToken = sessionStorage.getItem("pitwall_access");
+        accessToken = localStorage.getItem("pitwall_access");
     }
     return accessToken;
 }
@@ -43,10 +43,10 @@ export function clearTokens() {
     accessToken = null;
     refreshToken = null;
     if (isBrowser()) {
-        sessionStorage.removeItem("pitwall_access");
-        sessionStorage.removeItem("pitwall_refresh");
-        sessionStorage.removeItem("pitwall_username");
-        sessionStorage.removeItem("pitwall_role");
+        localStorage.removeItem("pitwall_access");
+        localStorage.removeItem("pitwall_refresh");
+        localStorage.removeItem("pitwall_username");
+        localStorage.removeItem("pitwall_role");
         document.cookie = "pitwall_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
 }
@@ -66,8 +66,8 @@ export async function login(username: string, password: string): Promise<AuthRes
     const data: AuthResponse = await res.json();
     setTokens(data.accessToken, data.refreshToken);
     if (isBrowser()) {
-        sessionStorage.setItem("pitwall_username", data.username);
-        sessionStorage.setItem("pitwall_role", data.role);
+        localStorage.setItem("pitwall_username", data.username);
+        localStorage.setItem("pitwall_role", data.role);
     }
     return data;
 }
@@ -87,8 +87,8 @@ export async function register(username: string, password: string, email: string
     const data: AuthResponse = await res.json();
     setTokens(data.accessToken, data.refreshToken);
     if (isBrowser()) {
-        sessionStorage.setItem("pitwall_username", data.username);
-        sessionStorage.setItem("pitwall_role", data.role);
+        localStorage.setItem("pitwall_username", data.username);
+        localStorage.setItem("pitwall_role", data.role);
     }
     return data;
 }
@@ -105,7 +105,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
         },
     });
 
-    const currentRefresh = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
+    const currentRefresh = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
 
     if (res.status === 401 && currentRefresh) {
         const refreshed = await tryRefreshToken();
@@ -128,7 +128,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
 
 async function doRefresh(): Promise<boolean> {
     try {
-        const stored = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
+        const stored = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
         if (!stored) return false;
 
         const res = await fetch(`${API_URL}/api/auth/refresh`, {
@@ -140,7 +140,7 @@ async function doRefresh(): Promise<boolean> {
         if (res.ok) {
             const data = await res.json();
             accessToken = data.accessToken;
-            if (isBrowser()) sessionStorage.setItem("pitwall_access", data.accessToken);
+            if (isBrowser()) localStorage.setItem("pitwall_access", data.accessToken);
             return true;
         }
     } catch (e) {
