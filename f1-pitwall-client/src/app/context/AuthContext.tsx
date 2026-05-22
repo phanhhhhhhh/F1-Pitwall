@@ -21,10 +21,15 @@ async function fetchUserWithRetry(retries = 2): Promise<User | null> {
     try {
       const res = await authFetch(`${API_URL}/api/auth/me`);
       if (res.ok) return await res.json();
-      if (res.status === 401) return null;
+      if (res.status === 401) return null; // token invalid
     } catch (e) {
       if (i < retries) await new Promise(r => setTimeout(r, 3000));
     }
+  }
+  if (typeof window !== "undefined") {
+    const username = sessionStorage.getItem("pitwall_username");
+    const role = sessionStorage.getItem("pitwall_role");
+    if (username) return { id: 0, username, email: "", role: role || "VIEWER", createdAt: "" };
   }
   return null;
 }
@@ -60,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (data) {
           setUser(data);
         } else {
+          const token = getAccessToken();
+          if (!token) return;
           const path = window.location.pathname;
           const isPublic = PUBLIC_PATHS.some(p => path.startsWith(p));
           if (!isPublic) {
