@@ -287,6 +287,12 @@ export default function RacesPage() {
                                                     QUALI →
                                                 </Link>
                                             )}
+                                            {isSprint && (isCompleted || race.status === "SCHEDULED") && (
+                                                <Link href={`/races/${race.id}/qualifying`}
+                                                    className="text-xs font-mono text-zinc-500 hover:text-orange-400 border border-zinc-700 hover:border-orange-500/50 px-3 py-1.5 rounded-lg transition-all hover:bg-orange-500/5">
+                                                    ⚡ SPRINT QUALI →
+                                                </Link>
+                                            )}
                                             {isCompleted && (
                                                 <Link href={`/races/${race.id}/results`}
                                                     className="text-xs font-mono text-zinc-500 hover:text-red-400 border border-zinc-700 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-all hover:bg-red-500/5">
