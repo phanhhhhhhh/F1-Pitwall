@@ -26,7 +26,6 @@ export default function RacesPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("GP");
     const [raceWinners, setRaceWinners] = useState<Record<string, RaceWinner>>({});
-    const [hoveredId, setHoveredId] = useState<number | null>(null);
 
     useEffect(() => {
         if (!getAccessToken()) { router.push("/login"); return; }
@@ -39,15 +38,15 @@ export default function RacesPage() {
             const racesData = await res.json();
             setRaces(racesData);
             try {
-                const winnersRes = await authFetch(`${API}/api/race-results/winners/2026`);
-                const winnersData = await winnersRes.json();
-                const winnerMap: Record<string, RaceWinner> = {};
-                Object.entries(winnersData).forEach(([raceName, w]: [string, any]) => {
-                    winnerMap[raceName] = { driver: w.driverName, team: w.teamName };
+                const wRes = await authFetch(`${API}/api/race-results/winners/2026`);
+                const wData = await wRes.json();
+                const map: Record<string, RaceWinner> = {};
+                Object.entries(wData).forEach(([name, w]: [string, any]) => {
+                    map[name] = { driver: w.driverName, team: w.teamName };
                 });
-                setRaceWinners(winnerMap);
-            } catch (e) { console.error("Failed to fetch winners", e); }
-        } catch (err) { console.error(err); }
+                setRaceWinners(map);
+            } catch { }
+        } catch { }
         finally { setLoading(false); }
     };
 
@@ -57,213 +56,253 @@ export default function RacesPage() {
     const cancelled = mainRaces.filter(r => r.status === "CANCELLED").length;
     const scheduled = mainRaces.filter(r => r.status === "SCHEDULED").length;
 
-    const allFiltered =
-        filter === "GP" ? mainRaces
-            : filter === "SPRINT" ? sprintRaces
-                : filter === "ALL" ? races
-                    : races.filter(r => r.status === filter && !r.name.toLowerCase().includes("sprint"));
-
-    const filterCounts: Record<string, number> = {
-        GP: mainRaces.length,
-        COMPLETED: completed,
-        SCHEDULED: scheduled,
-        CANCELLED: cancelled,
-        SPRINT: sprintRaces.length,
-        ALL: races.length,
+    // Build display list: for GP filter, interleave sprints under their parent GP
+    const buildGPList = () => {
+        const result: any[] = [];
+        mainRaces.forEach(gp => {
+            result.push({ ...gp, _type: "gp" });
+            // Find matching sprint (same round)
+            const sprint = sprintRaces.find(s => s.roundNumber === gp.roundNumber);
+            if (sprint) result.push({ ...sprint, _type: "sprint" });
+        });
+        return result;
     };
 
+    const displayList =
+        filter === "GP" ? buildGPList()
+            : filter === "SPRINT" ? sprintRaces.map(r => ({ ...r, _type: "sprint" }))
+                : filter === "ALL" ? races.map(r => ({ ...r, _type: r.name.toLowerCase().includes("sprint") ? "sprint" : "gp" }))
+                    : mainRaces.filter(r => r.status === filter).map(r => ({ ...r, _type: "gp" }));
+
     const TABS = [
-        { key: "GP", label: "🏁 GRAND PRIX", color: "border-red-500 text-white bg-red-500/20" },
-        { key: "SPRINT", label: "⚡ SPRINT", color: "border-orange-500 text-orange-400 bg-orange-500/10" },
-        { key: "COMPLETED", label: "COMPLETED", color: "border-green-500 text-green-400 bg-green-500/10" },
-        { key: "SCHEDULED", label: "SCHEDULED", color: "border-blue-500 text-blue-400 bg-blue-500/10" },
-        { key: "CANCELLED", label: "CANCELLED", color: "border-red-500 text-red-400 bg-red-500/10" },
-        { key: "ALL", label: "ALL SESSIONS", color: "border-zinc-500 text-zinc-300 bg-zinc-800/50" },
+        { key: "GP", label: "🏁 Grand Prix", count: mainRaces.length },
+        { key: "SPRINT", label: "⚡ Sprint", count: sprintRaces.length },
+        { key: "COMPLETED", label: "Completed", count: completed },
+        { key: "SCHEDULED", label: "Scheduled", count: scheduled },
+        { key: "CANCELLED", label: "Cancelled", count: cancelled },
+        { key: "ALL", label: "All sessions", count: races.length },
     ];
 
+    const today = new Date().toISOString().split("T")[0];
+    const nextGP = mainRaces.find(r => r.status === "SCHEDULED" && r.date >= today);
+
+    // Countdown to next race
+    const [countdown, setCountdown] = useState("");
+    useEffect(() => {
+        if (!nextGP) return;
+        const update = () => {
+            const diff = new Date(nextGP.date + "T00:00:00Z").getTime() - Date.now();
+            if (diff <= 0) { setCountdown("Race day!"); return; }
+            const d = Math.floor(diff / 86400000);
+            const h = Math.floor((diff % 86400000) / 3600000);
+            setCountdown(`${d}d ${h}h away`);
+        };
+        update();
+        const id = setInterval(update, 60000);
+        return () => clearInterval(id);
+    }, [nextGP]);
+
     return (
-        <div className="min-h-screen bg-zinc-950 relative overflow-x-hidden">
+        <div className="min-h-screen bg-zinc-950">
             <style>{`
-                @keyframes cardIn { from{transform:translateX(-16px);opacity:0} to{transform:translateX(0);opacity:1} }
-                @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(300%)} }
-                @keyframes glowPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
-                .card-in{animation:cardIn 0.4s ease-out both}
-                .animate-shimmer{animation:shimmer 2s ease-in-out infinite}
-                .glow-pulse{animation:glowPulse 2s ease-in-out infinite}
-            `}</style>
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .fade-in{animation:fadeIn .35s ease-out both}
+      `}</style>
 
             <div className="fixed inset-0 z-0">
-                <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-zinc-950 to-red-950/5" />
-                <div className="absolute top-40 left-0 w-[600px] h-[400px] bg-red-500/3 rounded-full blur-[150px]" />
-                <div className="absolute inset-0 opacity-[0.012]" style={{
-                    backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)",
-                    backgroundSize: "60px 60px",
-                }} />
+                <div className="absolute inset-0 bg-zinc-950" />
+                <div className="absolute inset-0 opacity-[0.012]" style={{ backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)", backgroundSize: "60px 60px" }} />
+                <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-red-500/4 rounded-full blur-[150px]" />
             </div>
 
             <Navbar />
 
-            <main className="relative z-10 max-w-7xl mx-auto px-8 py-10">
+            <main className="relative z-10 max-w-4xl mx-auto px-6 py-10">
 
                 {/* Header */}
-                <div className="flex items-end justify-between mb-8 card-in">
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                            <p className="text-red-500/60 font-mono text-xs tracking-[0.3em]">2026 SEASON · {mainRaces.length} GP · {sprintRaces.length} SPRINTS</p>
-                        </div>
-                        <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
-                            RACE<br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">CALENDAR</span>
-                        </h1>
-                    </div>
-
-                    <div className="text-right card-in" style={{ animationDelay: "100ms" }}>
-                        <p className="text-xs text-zinc-600 font-mono mb-3 tracking-widest">SEASON PROGRESS</p>
-                        <div className="relative w-20 h-20 mx-auto mb-2">
-                            <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                                <circle cx="40" cy="40" r="34" fill="none" stroke="#27272a" strokeWidth="6" />
-                                <circle cx="40" cy="40" r="34" fill="none" stroke="#ef4444" strokeWidth="6"
-                                    strokeLinecap="round"
-                                    strokeDasharray={`${2 * Math.PI * 34}`}
-                                    strokeDashoffset={`${2 * Math.PI * 34 * (1 - completed / 22)}`}
-                                    style={{ transition: "stroke-dashoffset 1s ease-out", filter: "drop-shadow(0 0 6px rgba(239,68,68,0.6))" }} />
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-lg font-black text-white">{completed}</span>
-                                <span className="text-zinc-600 text-xs font-mono">/ 22</span>
-                            </div>
-                        </div>
-                        <p className="text-xs text-zinc-500 font-mono">{Math.round((completed / 22) * 100)}% complete</p>
-                    </div>
+                <div className="mb-8 fade-in">
+                    <p className="text-red-500/50 font-mono text-xs tracking-[0.3em] mb-2">2026 SEASON · {mainRaces.length} GP · {sprintRaces.length} SPRINTS</p>
+                    <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
+                        RACE<br />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">CALENDAR</span>
+                    </h1>
                 </div>
 
                 {/* Race Weekend Widget */}
-                <div className="mb-8 card-in" style={{ animationDelay: "150ms" }}>
+                <div className="mb-8 fade-in" style={{ animationDelay: "50ms" }}>
                     <RaceWeekendWidget />
                 </div>
 
                 {/* Filter tabs */}
-                <div className="flex flex-wrap gap-2 mb-8 card-in" style={{ animationDelay: "200ms" }}>
-                    {TABS.map(({ key, label, color }) => (
+                <div className="flex flex-wrap gap-2 mb-8 fade-in" style={{ animationDelay: "100ms" }}>
+                    {TABS.map(({ key, label, count }) => (
                         <button key={key} onClick={() => setFilter(key)}
-                            className={`relative px-5 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 overflow-hidden ${filter === key ? color : "border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300"
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 ${filter === key
+                                    ? key === "GP" ? "border-red-500 bg-red-500/15 text-red-300"
+                                        : key === "SPRINT" ? "border-orange-500 bg-orange-500/15 text-orange-300"
+                                            : key === "COMPLETED" ? "border-green-500 bg-green-500/15 text-green-300"
+                                                : key === "SCHEDULED" ? "border-blue-500 bg-blue-500/15 text-blue-300"
+                                                    : key === "CANCELLED" ? "border-red-400 bg-red-400/10 text-red-400"
+                                                        : "border-zinc-500 bg-zinc-800/50 text-zinc-300"
+                                    : "border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400"
                                 }`}>
-                            {filter === key && <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent" />}
-                            {label}
-                            <span className="ml-1.5 opacity-50 text-xs">{filterCounts[key]}</span>
+                            {label} <span className="opacity-50 ml-1">{count}</span>
                         </button>
                     ))}
                 </div>
 
-                {/* Race list */}
+                {/* Progress bar */}
+                <div className="mb-8 fade-in" style={{ animationDelay: "150ms" }}>
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-mono text-zinc-500 tracking-widest">SEASON PROGRESS</span>
+                        <span className="text-xs font-mono text-zinc-500"><span className="text-white">{completed}</span> / 22 GP</span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${(completed / 22) * 100}%`, background: "linear-gradient(90deg,#ef4444,#f97316)" }} />
+                    </div>
+                    <div className="flex gap-4 mt-2">
+                        <span className="text-xs text-zinc-600 font-mono flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />{completed} done</span>
+                        <span className="text-xs text-zinc-600 font-mono flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />{cancelled} cancelled</span>
+                        <span className="text-xs text-zinc-600 font-mono flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-zinc-600 inline-block" />{scheduled} upcoming</span>
+                    </div>
+                </div>
+
+                {/* Timeline */}
                 {loading ? (
                     <div className="space-y-3">
-                        {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-20 bg-zinc-900/50 rounded-2xl animate-pulse border border-zinc-800/50" style={{ animationDelay: `${i * 100}ms` }} />
-                        ))}
+                        {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 bg-zinc-900/50 rounded-2xl animate-pulse border border-zinc-800/30" />)}
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        {allFiltered.map((race, idx) => {
-                            const winner = raceWinners[race.name];
-                            const isCancelled = race.status === "CANCELLED";
-                            const isCompleted = race.status === "COMPLETED";
-                            const isSprint = race.name.toLowerCase().includes("sprint");
-                            const isHovered = hoveredId === race.id;
+                    <div className="relative">
+                        {/* Timeline line */}
+                        <div className="absolute left-5 top-0 bottom-0 w-px bg-zinc-800" />
 
-                            const statusConfig = ({
-                                COMPLETED: { text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30", label: "✓ DONE" },
-                                CANCELLED: { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", label: "✗ CANCELLED" },
-                                SCHEDULED: { text: "text-zinc-400", bg: "bg-zinc-800/50", border: "border-zinc-700", label: "UPCOMING" },
-                                ONGOING: { text: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30", label: "● LIVE" },
-                            } as any)[race.status] || { text: "text-zinc-500", bg: "bg-zinc-800", border: "border-zinc-700", label: race.status };
+                        <div className="space-y-2">
+                            {displayList.map((race, idx) => {
+                                const isSprint = race._type === "sprint";
+                                const isCompleted = race.status === "COMPLETED";
+                                const isCancelled = race.status === "CANCELLED";
+                                const isNext = nextGP?.id === race.id;
+                                const winner = raceWinners[race.name];
 
-                            return (
-                                <div key={race.id}
-                                    className={`relative group rounded-2xl border transition-all duration-300 overflow-hidden card-in ${isCancelled ? "bg-zinc-900/30 border-zinc-800/30 opacity-50"
-                                        : isSprint ? "bg-orange-950/10 border-orange-900/20 hover:border-orange-500/30"
-                                            : isCompleted ? "bg-zinc-900/70 border-zinc-800/50 hover:border-green-500/20"
-                                                : "bg-zinc-900/60 border-zinc-800/50 hover:border-red-500/20"
-                                        }`}
-                                    style={{ animationDelay: `${idx * 30}ms` }}
-                                    onMouseEnter={() => setHoveredId(race.id)}
-                                    onMouseLeave={() => setHoveredId(null)}>
+                                const dotColor = isCancelled ? "#52525b"
+                                    : isCompleted ? "#22c55e"
+                                        : isSprint ? "#f97316"
+                                            : isNext ? "#ef4444"
+                                                : "#3f3f46";
 
-                                    {isHovered && !isCancelled && <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />}
-                                    {isCompleted && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-green-500/50 group-hover:bg-green-500 transition-colors" />}
-                                    {isSprint && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-orange-500/50 group-hover:bg-orange-500 transition-colors" />}
+                                return (
+                                    <div key={race.id} className={`relative fade-in ${isSprint ? "pl-16" : "pl-12"}`}
+                                        style={{ animationDelay: `${idx * 25}ms` }}>
 
-                                    <div className="flex items-center gap-4 px-5 py-4">
-                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border border-zinc-700/50 bg-zinc-800/50">
-                                            <span className="text-sm font-black text-zinc-500 group-hover:text-zinc-300 transition-colors">
-                                                {isSprint ? "⚡" : race.roundNumber}
-                                            </span>
-                                        </div>
+                                        {/* Dot */}
+                                        <div className="absolute rounded-full border-2 border-zinc-950 z-10"
+                                            style={{
+                                                width: isSprint ? "10px" : "14px",
+                                                height: isSprint ? "10px" : "14px",
+                                                left: isSprint ? "16px" : "13px",
+                                                top: "50%",
+                                                transform: "translateY(-50%)",
+                                                backgroundColor: dotColor,
+                                                boxShadow: isNext ? "0 0 8px rgba(239,68,68,0.6)" : "none",
+                                            }} />
 
-                                        <span className="text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
-                                            {COUNTRY_FLAGS[race.circuit?.country] || "🏁"}
-                                        </span>
+                                        {/* Card */}
+                                        <div className={`flex items-center gap-4 rounded-2xl border px-5 py-3.5 transition-all duration-200 group ${isCancelled ? "bg-zinc-900/20 border-zinc-800/20 opacity-40"
+                                                : isNext ? "bg-red-950/20 border-red-500/30 hover:border-red-500/50"
+                                                    : isCompleted ? "bg-zinc-900/60 border-zinc-800/40 hover:border-green-500/20"
+                                                        : isSprint ? "bg-orange-950/10 border-orange-900/20 hover:border-orange-500/30"
+                                                            : "bg-zinc-900/40 border-zinc-800/30 hover:border-zinc-700"
+                                            }`}
+                                            style={{
+                                                borderLeft: isCompleted && !isSprint ? "3px solid rgba(34,197,94,0.5)"
+                                                    : isNext ? "3px solid rgba(239,68,68,0.6)"
+                                                        : isSprint ? "3px solid rgba(249,115,22,0.4)"
+                                                            : undefined,
+                                                borderRadius: (isCompleted || isNext || isSprint) ? "0 16px 16px 0" : undefined,
+                                            }}>
 
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h2 className={`text-sm font-black transition-colors ${isCancelled ? "text-zinc-600"
-                                                    : isCompleted ? "text-white group-hover:text-green-300"
-                                                        : isSprint ? "text-orange-200 group-hover:text-orange-300"
-                                                            : "text-white group-hover:text-red-300"
-                                                    }`}>{race.name}</h2>
-                                                {isSprint && <span className="text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 px-1.5 py-0.5 rounded font-mono">SPRINT</span>}
+                                            {/* Round */}
+                                            <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black ${isNext ? "bg-red-500/20 text-red-400"
+                                                    : isCompleted ? "bg-green-500/10 text-green-600"
+                                                        : isSprint ? "bg-orange-500/10 text-orange-400"
+                                                            : "bg-zinc-800/60 text-zinc-500"
+                                                }`}>
+                                                {isSprint ? "⚡" : `R${race.roundNumber}`}
                                             </div>
-                                            <p className="text-xs text-zinc-600 font-mono mt-0.5">
-                                                {race.circuit?.name} · <span className="text-zinc-500">{race.date}</span>
-                                            </p>
-                                            {winner && (
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span className="text-xs">🏆</span>
-                                                    <span className="text-xs text-yellow-400 font-bold">{winner.driver}</span>
-                                                    <span className="text-xs text-zinc-600">·</span>
-                                                    <span className="text-xs text-zinc-500">{winner.team}</span>
-                                                </div>
-                                            )}
-                                            {isCancelled && <p className="text-xs text-red-400/60 mt-1">⚠️ Cancelled — Middle East conflict</p>}
-                                        </div>
 
-                                        <div className="flex items-center gap-3 flex-shrink-0">
-                                            {!isSprint && (isCompleted || race.status === "SCHEDULED") && (
-                                                <Link href={`/races/${race.id}/qualifying`}
-                                                    className="text-xs font-mono text-zinc-500 hover:text-yellow-400 border border-zinc-700 hover:border-yellow-500/50 px-3 py-1.5 rounded-lg transition-all hover:bg-yellow-500/5">
-                                                    QUALI →
-                                                </Link>
-                                            )}
-                                            {isSprint && (isCompleted || race.status === "SCHEDULED") && (
-                                                <Link href={`/races/${race.id}/qualifying`}
-                                                    className="text-xs font-mono text-zinc-500 hover:text-orange-400 border border-zinc-700 hover:border-orange-500/50 px-3 py-1.5 rounded-lg transition-all hover:bg-orange-500/5">
-                                                    ⚡ SPRINT QUALI →
-                                                </Link>
-                                            )}
-                                            {isCompleted && (
-                                                <Link href={`/races/${race.id}/results`}
-                                                    className="text-xs font-mono text-zinc-500 hover:text-red-400 border border-zinc-700 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-all hover:bg-red-500/5">
-                                                    RESULTS →
-                                                </Link>
-                                            )}
-                                            <span className={`text-xs px-3 py-1.5 rounded-lg border font-mono font-bold ${statusConfig.text} ${statusConfig.bg} ${statusConfig.border}`}>
-                                                {statusConfig.label}
+                                            {/* Flag */}
+                                            <span className="text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                                                {COUNTRY_FLAGS[race.circuit?.country] || "🏁"}
                                             </span>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`text-sm font-black truncate ${isCancelled ? "text-zinc-600 line-through"
+                                                            : isNext ? "text-red-300"
+                                                                : isCompleted ? "text-white"
+                                                                    : isSprint ? "text-orange-200"
+                                                                        : "text-zinc-300"
+                                                        }`}>{race.name}</span>
+                                                    {isSprint && <span className="text-xs bg-orange-500/15 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded font-mono">SPRINT</span>}
+                                                    {isNext && countdown && <span className="text-xs text-red-400/70 font-mono">{countdown}</span>}
+                                                </div>
+                                                <p className="text-xs text-zinc-600 font-mono mt-0.5 truncate">
+                                                    {race.circuit?.name} · {race.date}
+                                                </p>
+                                                {winner && (
+                                                    <p className="text-xs text-zinc-500 mt-1">
+                                                        🏆 <span className="text-yellow-400 font-bold">{winner.driver}</span>
+                                                        <span className="text-zinc-700 mx-1">·</span>
+                                                        <span>{winner.team}</span>
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                {!isSprint && (isCompleted || race.status === "SCHEDULED") && (
+                                                    <Link href={`/races/${race.id}/qualifying`}
+                                                        className="text-xs font-mono text-zinc-600 hover:text-yellow-400 border border-zinc-800 hover:border-yellow-500/40 px-3 py-1.5 rounded-lg transition-all hover:bg-yellow-500/5">
+                                                        Quali →
+                                                    </Link>
+                                                )}
+                                                {isSprint && (isCompleted || race.status === "SCHEDULED") && (
+                                                    <Link href={`/races/${race.id}/qualifying`}
+                                                        className="text-xs font-mono text-zinc-600 hover:text-orange-400 border border-zinc-800 hover:border-orange-500/40 px-3 py-1.5 rounded-lg transition-all hover:bg-orange-500/5">
+                                                        ⚡ S-Quali →
+                                                    </Link>
+                                                )}
+                                                {isCompleted && (
+                                                    <Link href={`/races/${race.id}/results`}
+                                                        className="text-xs font-mono text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-500/40 px-3 py-1.5 rounded-lg transition-all hover:bg-red-500/5">
+                                                        Results →
+                                                    </Link>
+                                                )}
+                                                {/* Status badge */}
+                                                <span className={`text-xs px-2.5 py-1 rounded-lg border font-mono font-bold ${isCompleted ? "text-green-400 bg-green-500/10 border-green-500/20"
+                                                        : isCancelled ? "text-zinc-500 bg-zinc-800/40 border-zinc-700/30"
+                                                            : isNext ? "text-red-400 bg-red-500/10 border-red-500/20"
+                                                                : isSprint ? "text-orange-400 bg-orange-500/10 border-orange-500/20"
+                                                                    : "text-zinc-500 bg-zinc-800/30 border-zinc-700/20"
+                                                    }`}>
+                                                    {isCompleted ? "✓" : isCancelled ? "✗" : isNext ? "Next" : "—"}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 
-                {!loading && allFiltered.length > 0 && (
+                {!loading && (
                     <div className="mt-8 text-center">
                         <p className="text-zinc-700 text-xs font-mono">
-                            {filter === "GP" && `${completed} GP completed · ${22 - completed - cancelled} remaining · ${cancelled} cancelled`}
-                            {filter === "SPRINT" && `${sprintRaces.filter(r => r.status === "COMPLETED").length} sprints completed`}
-                            {filter === "ALL" && `${races.length} total sessions · ${completed} GP + ${sprintRaces.filter(r => r.status === "COMPLETED").length} sprint completed`}
+                            {completed} completed · {scheduled} remaining · {cancelled} cancelled
                         </p>
                     </div>
                 )}
