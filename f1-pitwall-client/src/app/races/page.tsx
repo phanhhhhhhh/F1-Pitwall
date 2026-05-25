@@ -56,20 +56,9 @@ export default function RacesPage() {
     const cancelled = mainRaces.filter(r => r.status === "CANCELLED").length;
     const scheduled = mainRaces.filter(r => r.status === "SCHEDULED").length;
 
-    // Build display list: for GP filter, interleave sprints under their parent GP
-    const buildGPList = () => {
-        const result: any[] = [];
-        mainRaces.forEach(gp => {
-            result.push({ ...gp, _type: "gp" });
-            // Find matching sprint (same round)
-            const sprint = sprintRaces.find(s => s.roundNumber === gp.roundNumber);
-            if (sprint) result.push({ ...sprint, _type: "sprint" });
-        });
-        return result;
-    };
 
     const displayList =
-        filter === "GP" ? buildGPList()
+        filter === "GP" ? mainRaces.map(r => ({ ...r, _type: "gp" }))
             : filter === "SPRINT" ? sprintRaces.map(r => ({ ...r, _type: "sprint" }))
                 : filter === "ALL" ? races.map(r => ({ ...r, _type: r.name.toLowerCase().includes("sprint") ? "sprint" : "gp" }))
                     : mainRaces.filter(r => r.status === filter).map(r => ({ ...r, _type: "gp" }));
@@ -138,13 +127,13 @@ export default function RacesPage() {
                     {TABS.map(({ key, label, count }) => (
                         <button key={key} onClick={() => setFilter(key)}
                             className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 ${filter === key
-                                    ? key === "GP" ? "border-red-500 bg-red-500/15 text-red-300"
-                                        : key === "SPRINT" ? "border-orange-500 bg-orange-500/15 text-orange-300"
-                                            : key === "COMPLETED" ? "border-green-500 bg-green-500/15 text-green-300"
-                                                : key === "SCHEDULED" ? "border-blue-500 bg-blue-500/15 text-blue-300"
-                                                    : key === "CANCELLED" ? "border-red-400 bg-red-400/10 text-red-400"
-                                                        : "border-zinc-500 bg-zinc-800/50 text-zinc-300"
-                                    : "border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400"
+                                ? key === "GP" ? "border-red-500 bg-red-500/15 text-red-300"
+                                    : key === "SPRINT" ? "border-orange-500 bg-orange-500/15 text-orange-300"
+                                        : key === "COMPLETED" ? "border-green-500 bg-green-500/15 text-green-300"
+                                            : key === "SCHEDULED" ? "border-blue-500 bg-blue-500/15 text-blue-300"
+                                                : key === "CANCELLED" ? "border-red-400 bg-red-400/10 text-red-400"
+                                                    : "border-zinc-500 bg-zinc-800/50 text-zinc-300"
+                                : "border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400"
                                 }`}>
                             {label} <span className="opacity-50 ml-1">{count}</span>
                         </button>
@@ -210,10 +199,10 @@ export default function RacesPage() {
 
                                         {/* Card */}
                                         <div className={`flex items-center gap-4 rounded-2xl border px-5 py-3.5 transition-all duration-200 group ${isCancelled ? "bg-zinc-900/20 border-zinc-800/20 opacity-40"
-                                                : isNext ? "bg-red-950/20 border-red-500/30 hover:border-red-500/50"
-                                                    : isCompleted ? "bg-zinc-900/60 border-zinc-800/40 hover:border-green-500/20"
-                                                        : isSprint ? "bg-orange-950/10 border-orange-900/20 hover:border-orange-500/30"
-                                                            : "bg-zinc-900/40 border-zinc-800/30 hover:border-zinc-700"
+                                            : isNext ? "bg-red-950/20 border-red-500/30 hover:border-red-500/50"
+                                                : isCompleted ? "bg-zinc-900/60 border-zinc-800/40 hover:border-green-500/20"
+                                                    : isSprint ? "bg-orange-950/10 border-orange-900/20 hover:border-orange-500/30"
+                                                        : "bg-zinc-900/40 border-zinc-800/30 hover:border-zinc-700"
                                             }`}
                                             style={{
                                                 borderLeft: isCompleted && !isSprint ? "3px solid rgba(34,197,94,0.5)"
@@ -225,9 +214,9 @@ export default function RacesPage() {
 
                                             {/* Round */}
                                             <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black ${isNext ? "bg-red-500/20 text-red-400"
-                                                    : isCompleted ? "bg-green-500/10 text-green-600"
-                                                        : isSprint ? "bg-orange-500/10 text-orange-400"
-                                                            : "bg-zinc-800/60 text-zinc-500"
+                                                : isCompleted ? "bg-green-500/10 text-green-600"
+                                                    : isSprint ? "bg-orange-500/10 text-orange-400"
+                                                        : "bg-zinc-800/60 text-zinc-500"
                                                 }`}>
                                                 {isSprint ? "⚡" : `R${race.roundNumber}`}
                                             </div>
@@ -241,10 +230,10 @@ export default function RacesPage() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className={`text-sm font-black truncate ${isCancelled ? "text-zinc-600 line-through"
-                                                            : isNext ? "text-red-300"
-                                                                : isCompleted ? "text-white"
-                                                                    : isSprint ? "text-orange-200"
-                                                                        : "text-zinc-300"
+                                                        : isNext ? "text-red-300"
+                                                            : isCompleted ? "text-white"
+                                                                : isSprint ? "text-orange-200"
+                                                                    : "text-zinc-300"
                                                         }`}>{race.name}</span>
                                                     {isSprint && <span className="text-xs bg-orange-500/15 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded font-mono">SPRINT</span>}
                                                     {isNext && countdown && <span className="text-xs text-red-400/70 font-mono">{countdown}</span>}
@@ -283,10 +272,10 @@ export default function RacesPage() {
                                                 )}
                                                 {/* Status badge */}
                                                 <span className={`text-xs px-2.5 py-1 rounded-lg border font-mono font-bold ${isCompleted ? "text-green-400 bg-green-500/10 border-green-500/20"
-                                                        : isCancelled ? "text-zinc-500 bg-zinc-800/40 border-zinc-700/30"
-                                                            : isNext ? "text-red-400 bg-red-500/10 border-red-500/20"
-                                                                : isSprint ? "text-orange-400 bg-orange-500/10 border-orange-500/20"
-                                                                    : "text-zinc-500 bg-zinc-800/30 border-zinc-700/20"
+                                                    : isCancelled ? "text-zinc-500 bg-zinc-800/40 border-zinc-700/30"
+                                                        : isNext ? "text-red-400 bg-red-500/10 border-red-500/20"
+                                                            : isSprint ? "text-orange-400 bg-orange-500/10 border-orange-500/20"
+                                                                : "text-zinc-500 bg-zinc-800/30 border-zinc-700/20"
                                                     }`}>
                                                     {isCompleted ? "✓" : isCancelled ? "✗" : isNext ? "Next" : "—"}
                                                 </span>
