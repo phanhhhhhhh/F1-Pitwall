@@ -14,6 +14,8 @@ export interface User {
     email: string;
     role: string;
     createdAt: string;
+    displayName?: string;
+    avatarUrl?: string;
 }
 
 let accessToken: string | null = null;
@@ -47,6 +49,8 @@ export function clearTokens() {
         localStorage.removeItem("pitwall_refresh");
         localStorage.removeItem("pitwall_username");
         localStorage.removeItem("pitwall_role");
+        localStorage.removeItem("pitwall_avatar");
+        localStorage.removeItem("pitwall_displayname");
         document.cookie = "pitwall_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
 }
@@ -57,12 +61,10 @@ export async function login(username: string, password: string): Promise<AuthRes
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
     });
-
     if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Login failed");
     }
-
     const data: AuthResponse = await res.json();
     setTokens(data.accessToken, data.refreshToken);
     if (isBrowser()) {
@@ -78,12 +80,10 @@ export async function register(username: string, password: string, email: string
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, email }),
     });
-
     if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Registration failed");
     }
-
     const data: AuthResponse = await res.json();
     setTokens(data.accessToken, data.refreshToken);
     if (isBrowser()) {
@@ -95,7 +95,6 @@ export async function register(username: string, password: string, email: string
 
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const token = getAccessToken();
-
     const res = await fetch(url, {
         ...options,
         headers: {
@@ -104,25 +103,19 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
     });
-
     const currentRefresh = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
-
     if (res.status === 401 && currentRefresh) {
         const refreshed = await tryRefreshToken();
         if (refreshed) {
             return fetch(url, {
                 ...options,
-                headers: {
-                    ...options.headers,
-                    Authorization: `Bearer ${getAccessToken()}`,
-                },
+                headers: { ...options.headers, Authorization: `Bearer ${getAccessToken()}` },
             });
         } else {
             clearTokens();
             if (isBrowser()) window.location.href = "/login";
         }
     }
-
     return res;
 }
 
@@ -130,22 +123,18 @@ async function doRefresh(): Promise<boolean> {
     try {
         const stored = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
         if (!stored) return false;
-
         const res = await fetch(`${API_URL}/api/auth/refresh`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ refreshToken: stored }),
         });
-
         if (res.ok) {
             const data = await res.json();
             accessToken = data.accessToken;
             if (isBrowser()) localStorage.setItem("pitwall_access", data.accessToken);
             return true;
         }
-    } catch (e) {
-        console.warn("Token refresh failed:", e);
-    }
+    } catch (e) { console.warn("Token refresh failed:", e); }
     return false;
 }
 
