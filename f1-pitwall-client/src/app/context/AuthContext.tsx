@@ -13,23 +13,33 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
 const PUBLIC_PATHS = ["/login", "/register", "/oauth2"];
 
 async function fetchUserWithRetry(retries = 2): Promise<User | null> {
   for (let i = 0; i <= retries; i++) {
     try {
       const res = await authFetch(`${API_URL}/api/auth/me`);
-      if (res.ok) return await res.json();
-      if (res.status === 401) return null; // token invalid
+      if (res.ok) {
+        const data = await res.json();
+        // Cache avatar + displayName in localStorage
+        if (typeof window !== "undefined") {
+          if (data.avatarUrl) localStorage.setItem("pitwall_avatar", data.avatarUrl);
+          if (data.displayName) localStorage.setItem("pitwall_displayname", data.displayName);
+        }
+        return data;
+      }
+      if (res.status === 401) return null;
     } catch (e) {
       if (i < retries) await new Promise(r => setTimeout(r, 3000));
     }
   }
+  // Fallback to localStorage when backend sleeping
   if (typeof window !== "undefined") {
     const username = localStorage.getItem("pitwall_username");
     const role = localStorage.getItem("pitwall_role");
-    if (username) return { id: 0, username, email: "", role: role || "VIEWER", createdAt: "" };
+    const avatarUrl = localStorage.getItem("pitwall_avatar") || "";
+    const displayName = localStorage.getItem("pitwall_displayname") || "";
+    if (username) return { id: 0, username, email: "", role: role || "VIEWER", createdAt: "", avatarUrl, displayName };
   }
   return null;
 }
@@ -37,23 +47,20 @@ async function fetchUserWithRetry(retries = 2): Promise<User | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window === "undefined") return null;
-    const token = window.localStorage.getItem("pitwall_access");
-    const username = window.localStorage.getItem("pitwall_username");
-    const role = window.localStorage.getItem("pitwall_role");
+    const token = localStorage.getItem("pitwall_access");
+    const username = localStorage.getItem("pitwall_username");
+    const role = localStorage.getItem("pitwall_role");
+    const avatarUrl = localStorage.getItem("pitwall_avatar") || "";
+    const displayName = localStorage.getItem("pitwall_displayname") || "";
     if (token && username) {
-      return {
-        id: 0,
-        username,
-        email: "",
-        role: role || "VIEWER",
-        createdAt: "",
-      };
+      return { id: 0, username, email: "", role: role || "VIEWER", createdAt: "", avatarUrl, displayName };
     }
     return null;
   });
+
   const [isLoading, setIsLoading] = useState(() => {
     if (typeof window === "undefined") return true;
-    return Boolean(window.localStorage.getItem("pitwall_access"));
+    return Boolean(localStorage.getItem("pitwall_access"));
   });
 
   useEffect(() => {
@@ -65,36 +72,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (data) {
           setUser(data);
         } else {
-          const token = getAccessToken();
-          if (!token) return;
+          if (!getAccessToken()) return;
           const path = window.location.pathname;
           const isPublic = PUBLIC_PATHS.some(p => path.startsWith(p));
-          if (!isPublic) {
-            clearTokens();
-            window.location.href = "/login";
-          } else {
-            clearTokens();
-          }
+          if (!isPublic) { clearTokens(); window.location.href = "/login"; }
+          else { clearTokens(); }
         }
       })
       .finally(() => setIsLoading(false));
   }, []);
 
   const loginSuccess = (data: AuthResponse) => {
-    setUser({
-      id: 0,
-      username: data.username,
-      email: "",
-      role: data.role,
-      createdAt: new Date().toISOString(),
-    });
+    setUser({ id: 0, username: data.username, email: "", role: data.role, createdAt: new Date().toISOString() });
   };
 
-  const logout = () => {
-    clearTokens();
-    setUser(null);
-    window.location.href = "/login";
-  };
+  const logout = () => { clearTokens(); setUser(null); window.location.href = "/login"; };
 
   return (
     <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginSuccess, logout }}>
