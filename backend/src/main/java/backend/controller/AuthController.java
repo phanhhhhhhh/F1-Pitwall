@@ -18,6 +18,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -40,9 +42,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         try {
-            authManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-            );
+            authManager.authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
             User user = userRepository.findByUsername(request.getUsername()).orElseThrow();
             String accessToken = jwtService.generateAccessToken(userDetails, user.getRole().name());
@@ -52,8 +52,7 @@ public class AuthController {
                     .username(user.getUsername()).role(user.getRole().name())
                     .expiresIn(accessTokenExpiration / 1000).build());
         } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid username or password"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid username or password"));
         }
     }
 
@@ -63,7 +62,6 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Username '" + request.getUsername() + "' already exists"));
         if (userRepository.existsByEmail(request.getEmail()))
             return ResponseEntity.badRequest().body(Map.of("error", "Email is already in use"));
-
         User newUser = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -71,7 +69,6 @@ public class AuthController {
                 .role(User.Role.VIEWER)
                 .build();
         userRepository.save(newUser);
-
         UserDetails userDetails = userDetailsService.loadUserByUsername(newUser.getUsername());
         String accessToken = jwtService.generateAccessToken(userDetails, newUser.getRole().name());
         String refreshToken = jwtService.generateRefreshToken(userDetails);
@@ -104,15 +101,7 @@ public class AuthController {
     public ResponseEntity<?> getCurrentUser() {
         String username = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
         User user = userRepository.findByUsername(username).orElseThrow();
-        return ResponseEntity.ok(Map.of(
-                "id",          user.getId(),
-                "username",    user.getUsername(),
-                "email",       user.getEmail() != null ? user.getEmail() : "",
-                "displayName", user.getDisplayName() != null ? user.getDisplayName() : "",
-                "avatarUrl",   user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
-                "role",        user.getRole().name(),
-                "createdAt",   user.getCreatedAt().toString()
-        ));
+        return ResponseEntity.ok(buildUserResponse(user));
     }
 
     @PatchMapping("/profile")
@@ -121,36 +110,45 @@ public class AuthController {
         User user = userRepository.findByUsername(username).orElseThrow();
 
         if (body.containsKey("displayName")) {
-            String dn = body.get("displayName").trim();
-            user.setDisplayName(dn.isEmpty() ? null : dn);
+            String v = body.get("displayName").trim();
+            user.setDisplayName(v.isEmpty() ? null : v);
         }
-
         if (body.containsKey("email")) {
-            String newEmail = body.get("email").trim();
-            if (!newEmail.equals(user.getEmail())) {
-                if (userRepository.existsByEmail(newEmail))
+            String v = body.get("email").trim();
+            if (!v.equals(user.getEmail())) {
+                if (userRepository.existsByEmail(v))
                     return ResponseEntity.badRequest().body(Map.of("error", "Email is already in use"));
-                user.setEmail(newEmail);
+                user.setEmail(v);
             }
         }
-
         if (body.containsKey("avatarUrl")) {
-            String url = body.get("avatarUrl").trim();
-            user.setAvatarUrl(url.isEmpty() ? null : url);
+            String v = body.get("avatarUrl").trim();
+            user.setAvatarUrl(v.isEmpty() ? null : v);
+        }
+        if (body.containsKey("phone")) {
+            String v = body.get("phone").trim();
+            user.setPhone(v.isEmpty() ? null : v);
+        }
+        if (body.containsKey("bio")) {
+            String v = body.get("bio").trim();
+            user.setBio(v.isEmpty() ? null : v);
+        }
+        if (body.containsKey("location")) {
+            String v = body.get("location").trim();
+            user.setLocation(v.isEmpty() ? null : v);
+        }
+        if (body.containsKey("dateOfBirth")) {
+            String v = body.get("dateOfBirth").trim();
+            try {
+                user.setDateOfBirth(v.isEmpty() ? null : LocalDate.parse(v));
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid date format. Use YYYY-MM-DD"));
+            }
         }
 
         userRepository.save(user);
         log.info("[Auth] Profile updated for user: {}", username);
-
-        return ResponseEntity.ok(Map.of(
-                "id",          user.getId(),
-                "username",    user.getUsername(),
-                "email",       user.getEmail() != null ? user.getEmail() : "",
-                "displayName", user.getDisplayName() != null ? user.getDisplayName() : "",
-                "avatarUrl",   user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
-                "role",        user.getRole().name(),
-                "createdAt",   user.getCreatedAt().toString()
-        ));
+        return ResponseEntity.ok(buildUserResponse(user));
     }
 
     @PostMapping("/change-password")
@@ -158,20 +156,33 @@ public class AuthController {
         String username = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
         String currentPassword = body.get("currentPassword");
         String newPassword     = body.get("newPassword");
-
         if (currentPassword == null || newPassword == null)
             return ResponseEntity.badRequest().body(Map.of("error", "currentPassword and newPassword are required"));
         if (newPassword.length() < 6)
             return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 6 characters"));
-
         User user = userRepository.findByUsername(username).orElseThrow();
         boolean isOAuthUser = user.getPassword() == null || user.getPassword().isEmpty();
         if (!isOAuthUser && !passwordEncoder.matches(currentPassword, user.getPassword()))
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Current password is incorrect"));
-
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         log.info("[Auth] Password changed for user: {}", username);
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
+
+    private Map<String, Object> buildUserResponse(User user) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id",          user.getId());
+        map.put("username",    user.getUsername());
+        map.put("email",       user.getEmail() != null ? user.getEmail() : "");
+        map.put("displayName", user.getDisplayName() != null ? user.getDisplayName() : "");
+        map.put("avatarUrl",   user.getAvatarUrl() != null ? user.getAvatarUrl() : "");
+        map.put("phone",       user.getPhone() != null ? user.getPhone() : "");
+        map.put("bio",         user.getBio() != null ? user.getBio() : "");
+        map.put("location",    user.getLocation() != null ? user.getLocation() : "");
+        map.put("dateOfBirth", user.getDateOfBirth() != null ? user.getDateOfBirth().toString() : "");
+        map.put("role",        user.getRole().name());
+        map.put("createdAt",   user.getCreatedAt().toString());
+        return map;
     }
 }
