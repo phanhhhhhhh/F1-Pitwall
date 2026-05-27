@@ -100,63 +100,137 @@ export default function Navbar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const [imgError, setImgError] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileRef = useRef<HTMLDivElement>(null);
+
   const handleLogout = () => { clearTokens(); window.location.href = "/login"; };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (mobileRef.current && !mobileRef.current.contains(e.target as Node)) {
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   const visibleGroups = navGroups.filter(group => !user || group.roles.includes(user.role));
   const roleColor = user?.role === "ADMIN" ? "#ef4444" : user?.role === "ENGINEER" ? "#3b82f6" : "#52525b";
   const avatarUrl = (user as any)?.avatarUrl;
   const showAvatar = avatarUrl && !imgError;
+  const displayName = (user as any)?.displayName || user?.username || "";
+
+  const allItems = visibleGroups.flatMap(g => g.items.map(item => ({ ...item, group: g.label })));
 
   return (
-    <nav className="bg-zinc-950 border-b border-zinc-800 px-6 py-0 flex items-center justify-between sticky top-0 z-50">
-      <Link href="/" className="flex items-center gap-3 py-4 mr-2 flex-shrink-0">
-        <div className="w-2 h-6 bg-red-500" />
-        <span className="text-white font-black tracking-widest text-lg">
-          <span className="text-red-500">PIT</span>WALL
-        </span>
-        <span className="text-zinc-600 text-xs font-mono tracking-widest hidden lg:block">F1 · 2026</span>
-      </Link>
+    <nav className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-50" ref={mobileRef}>
+      <div className="px-4 sm:px-6 py-0 flex items-center justify-between h-14">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="w-1.5 h-6 bg-red-500 rounded-full" />
+          <span className="text-white font-black tracking-widest text-base sm:text-lg">
+            <span className="text-red-500">PIT</span>WALL
+          </span>
+          <span className="text-zinc-600 text-xs font-mono tracking-widest hidden lg:block">F1 · 2026</span>
+        </Link>
 
-      <div className="flex items-center flex-1">
-        {visibleGroups.map(group => (
-          <NavDropdown key={group.label} group={group} pathname={pathname} />
-        ))}
-      </div>
-
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <div className="hidden sm:flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-zinc-500 text-xs font-mono">LIVE</span>
+        {/* Desktop nav */}
+        <div className="hidden md:flex items-center flex-1 ml-2">
+          {visibleGroups.map(group => (
+            <NavDropdown key={group.label} group={group} pathname={pathname} />
+          ))}
         </div>
 
-        {user ? (
-          <Link href="/profile"
-            className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 rounded-lg px-2 py-1.5 transition-all group">
-            {/* Avatar — show image if available, else colored initial */}
-            <div className="w-6 h-6 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-black text-white"
-              style={{ backgroundColor: showAvatar ? "transparent" : roleColor }}>
-              {showAvatar ? (
-                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover"
-                  onError={() => setImgError(true)} />
-              ) : (
-                user.username.charAt(0).toUpperCase()
-              )}
-            </div>
-            <span className="text-xs font-mono text-zinc-400 group-hover:text-white transition-colors hidden sm:block">
-              {(user as any).displayName || user.username}
-            </span>
-          </Link>
-        ) : (
-          <Link href="/login" className="text-xs text-zinc-600 hover:text-zinc-300 font-mono transition-colors">
-            LOGIN
-          </Link>
-        )}
+        {/* Right side */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Live indicator — desktop only */}
+          <div className="hidden sm:flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-zinc-500 text-xs font-mono">LIVE</span>
+          </div>
 
-        <NotificationBell />
-        <button onClick={handleLogout} className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono">
-          LOGOUT
-        </button>
+          {/* Profile avatar */}
+          {user ? (
+            <Link href="/profile"
+              className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-600 rounded-lg px-2 py-1.5 transition-all group">
+              <div className="w-6 h-6 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-black text-white"
+                style={{ backgroundColor: showAvatar ? "transparent" : roleColor }}>
+                {showAvatar ? (
+                  <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" onError={() => setImgError(true)} />
+                ) : (
+                  displayName.charAt(0).toUpperCase()
+                )}
+              </div>
+              <span className="text-xs font-mono text-zinc-400 group-hover:text-white transition-colors hidden lg:block">
+                {displayName}
+              </span>
+            </Link>
+          ) : (
+            <Link href="/login" className="text-xs text-zinc-600 hover:text-zinc-300 font-mono transition-colors">
+              LOGIN
+            </Link>
+          )}
+
+          <NotificationBell />
+
+          {/* Logout — desktop only */}
+          <button onClick={handleLogout}
+            className="hidden sm:block text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono">
+            LOGOUT
+          </button>
+
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMobileOpen(p => !p)}
+            className="md:hidden flex flex-col justify-center items-center w-8 h-8 gap-1.5 rounded-lg hover:bg-zinc-800 transition-colors"
+            aria-label="Menu">
+            <span className={`block w-5 h-0.5 bg-zinc-400 transition-all duration-300 ${mobileOpen ? "rotate-45 translate-y-2" : ""}`} />
+            <span className={`block w-5 h-0.5 bg-zinc-400 transition-all duration-300 ${mobileOpen ? "opacity-0" : ""}`} />
+            <span className={`block w-5 h-0.5 bg-zinc-400 transition-all duration-300 ${mobileOpen ? "-rotate-45 -translate-y-2" : ""}`} />
+          </button>
+        </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden bg-zinc-950 border-t border-zinc-800/50 px-4 py-4 space-y-1">
+          {/* Nav items grouped */}
+          {visibleGroups.map(group => (
+            <div key={group.label} className="mb-3">
+              <p className="text-zinc-600 text-xs font-mono tracking-widest mb-1.5 px-2">{group.label}</p>
+              {group.items.map(item => (
+                <Link key={item.href} href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-colors ${pathname === item.href || pathname.startsWith(item.href + "/")
+                    ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                    }`}>
+                  {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          ))}
+
+          {/* Divider */}
+          <div className="h-px bg-zinc-800/50 my-3" />
+
+          {/* Bottom actions */}
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-zinc-500 text-xs font-mono">LIVE</span>
+            </div>
+            <button onClick={() => { setMobileOpen(false); handleLogout(); }}
+              className="text-xs text-red-500/70 hover:text-red-400 font-mono transition-colors border border-red-500/20 hover:border-red-500/40 px-3 py-1.5 rounded-lg">
+              LOGOUT
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
