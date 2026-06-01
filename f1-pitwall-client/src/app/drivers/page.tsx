@@ -15,164 +15,64 @@ const NATIONALITY_FLAGS: Record<string, string> = {
 };
 
 interface Driver {
-  id: number;
-  name: string;
-  carNumber: number;
-  nationality: string;
-  careerPoints: number;
-  careerWins: number;
-  careerPoles: number;
+  id: number; name: string; carNumber: number; nationality: string;
+  careerPoints: number; careerWins: number; careerPoles: number;
   team: { id: number; name: string; colorHex: string };
 }
 
 function useCountUp(target: number, delay = 0) {
-  const [value, setValue] = useState(0);
+  const [v, setV] = useState(0);
   useEffect(() => {
     if (!target) return;
-    let raf: number;
+    let raf = 0;
     const t = setTimeout(() => {
-      let start: number | null = null;
-      const step = (ts: number) => {
-        if (!start) start = ts;
-        const p = Math.min((ts - start) / 800, 1);
-        setValue(Math.round((1 - Math.pow(1 - p, 3)) * target));
-        if (p < 1) raf = requestAnimationFrame(step);
-      };
+      let s: number | null = null;
+      const step = (ts: number) => { if (!s) s = ts; const p = Math.min((ts - s) / 800, 1); setV(Math.round((1 - Math.pow(1 - p, 3)) * target)); if (p < 1) raf = requestAnimationFrame(step); };
       raf = requestAnimationFrame(step);
     }, delay);
     return () => { clearTimeout(t); cancelAnimationFrame(raf); };
   }, [target, delay]);
-  return value;
+  return v;
 }
 
 function DriverCard({ driver, idx }: { driver: Driver; idx: number }) {
-  const [hovered, setHovered] = useState(false);
-  const isChampion = driver.carNumber === 1;
-  const color = driver.team?.colorHex || "#666";
+  const [hov, setHov] = useState(false);
+  const isChamp = driver.carNumber === 1;
+  const col = driver.team?.colorHex || "#666";
   const flag = NATIONALITY_FLAGS[driver.nationality] || "🏁";
-  const firstName = driver.name.split(" ")[0];
-  const lastName = driver.name.split(" ").slice(1).join(" ");
-
+  const first = driver.name.split(" ")[0];
+  const last = driver.name.split(" ").slice(1).join(" ");
   const wins = useCountUp(driver.careerWins, idx * 40);
   const poles = useCountUp(driver.careerPoles, idx * 40 + 100);
   const pts = useCountUp(driver.careerPoints, idx * 40 + 200);
 
   return (
-    <div
-      className="group relative rounded-2xl overflow-hidden cursor-default card-enter"
-      style={{ animationDelay: `${idx * 40}ms` }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {/* Card border glow */}
-      <div
-        className="absolute inset-0 rounded-2xl transition-opacity duration-500"
-        style={{
-          opacity: hovered ? 1 : 0,
-          boxShadow: `0 0 30px ${color}30, inset 0 0 30px ${color}05`,
-        }}
-      />
-
-      {/* Main card */}
-      <div
-        className={`relative h-full border rounded-2xl overflow-hidden transition-all duration-300 ${isChampion
-            ? "border-yellow-500/40 bg-gradient-to-br from-yellow-950/20 via-zinc-900 to-zinc-900"
-            : "border-zinc-800/60 bg-zinc-900/80"
-          } ${hovered ? "border-opacity-80 -translate-y-1" : ""}`}
-        style={{
-          borderColor: hovered ? `${color}50` : undefined,
-          transform: hovered ? "translateY(-4px)" : "translateY(0)",
-        }}
-      >
-        {/* Top color bar with glow */}
-        <div
-          className="absolute top-0 left-0 right-0 h-0.5 transition-all duration-300"
-          style={{
-            backgroundColor: color,
-            boxShadow: hovered ? `0 0 12px ${color}` : "none",
-          }}
-        />
-
-        {/* Champion shimmer */}
-        {isChampion && (
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-transparent pointer-events-none" />
-        )}
-
-        {/* Background car number */}
-        <div
-          className="absolute -bottom-2 -right-2 font-black select-none pointer-events-none transition-all duration-500"
-          style={{
-            fontSize: "7rem",
-            lineHeight: 1,
-            color: color,
-            opacity: hovered ? 0.12 : 0.06,
-            transform: hovered ? "scale(1.1) rotate(-5deg)" : "scale(1) rotate(0deg)",
-          }}
-        >
-          {driver.carNumber}
-        </div>
-
+    <div className="group relative rise" style={{ animationDelay: `${idx * 40}ms` }} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}>
+      <div className="absolute inset-0 rounded-2xl transition-opacity duration-500 pointer-events-none" style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 36px ${col}28` }} />
+      <div className="relative border rounded-2xl overflow-hidden transition-all duration-300 chamfer"
+        style={{ borderColor: hov ? `${col}50` : isChamp ? "rgba(255,210,63,.35)" : "rgba(255,255,255,.06)", transform: hov ? "translateY(-4px)" : "none", background: isChamp ? "linear-gradient(155deg,rgba(255,210,63,.07),rgba(15,15,18,.9))" : "rgba(18,18,21,.78)" }}>
+        <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: col, boxShadow: hov ? `0 0 12px ${col}` : "none" }} />
+        <div className="absolute -bottom-3 -right-2 f-cond font-black select-none pointer-events-none transition-all duration-500"
+          style={{ fontSize: "8rem", lineHeight: .8, color: col, opacity: hov ? 0.14 : 0.07, transform: hov ? "scale(1.08) rotate(-5deg)" : "none" }}>{driver.carNumber}</div>
         <div className="relative z-10 p-5">
-          {/* Header row */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-xl">{flag}</span>
-              <div
-                className="text-xs font-mono px-2 py-0.5 rounded border"
-                style={{ color, borderColor: `${color}40`, backgroundColor: `${color}10` }}
-              >
-                #{driver.carNumber}
-              </div>
+              <span className="f-mono text-[11px] px-2 py-0.5 rounded border" style={{ color: col, borderColor: `${col}40`, background: `${col}10` }}>#{driver.carNumber}</span>
             </div>
-            {isChampion && (
-              <div className="flex items-center gap-1 bg-yellow-500/15 border border-yellow-500/30 rounded-lg px-2 py-1">
-                <span className="text-xs">👑</span>
-                <span className="text-xs text-yellow-400 font-black tracking-wider">CHAMP</span>
-              </div>
-            )}
+            {isChamp && <span className="f-mono text-[10px] text-[#FFD23F] bg-[#FFD23F]/10 border border-[#FFD23F]/30 rounded-lg px-2 py-1 font-bold tracking-wider">👑 CHAMP</span>}
           </div>
-
-          {/* Driver name */}
           <div className="mb-4">
-            <p className="text-xs text-zinc-500 font-medium leading-none mb-0.5">{firstName}</p>
-            <h2
-              className="text-2xl font-black leading-none transition-colors duration-200"
-              style={{ color: hovered ? color : "white" }}
-            >
-              {lastName || firstName}
-            </h2>
-            <p
-              className="text-xs font-bold tracking-widest mt-2 uppercase"
-              style={{ color }}
-            >
-              {driver.team?.name}
-            </p>
+            <p className="f-mono text-[11px] text-zinc-500 leading-none mb-1">{first}</p>
+            <h2 className="f-cond font-black text-3xl leading-none uppercase tracking-tight transition-colors" style={{ color: hov ? col : "#fff" }}>{last || first}</h2>
+            <p className="f-mono text-[11px] font-bold tracking-widest mt-2 uppercase" style={{ color: col }}>{driver.team?.name}</p>
           </div>
-
-          {/* Divider */}
-          <div
-            className="h-px mb-4 transition-all duration-300"
-            style={{
-              background: `linear-gradient(90deg, ${color}40, transparent)`,
-              opacity: hovered ? 1 : 0.5,
-            }}
-          />
-
-          {/* Stats */}
+          <div className="h-px mb-4" style={{ background: `linear-gradient(90deg,${col}50,transparent)`, opacity: hov ? 1 : 0.4 }} />
           <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "WINS", value: wins, highlight: driver.careerWins > 10 },
-              { label: "POLES", value: poles, highlight: false },
-              { label: "PTS", value: pts, highlight: false },
-            ].map(({ label, value, highlight }) => (
-              <div key={label} className="text-center">
-                <p
-                  className={`text-xl font-black tabular-nums transition-colors duration-200 ${highlight ? "text-yellow-400" : hovered ? "text-white" : "text-zinc-200"
-                    }`}
-                >
-                  {value.toLocaleString()}
-                </p>
-                <p className="text-xs text-zinc-600 font-mono tracking-widest">{label}</p>
+            {[{ l: "WINS", v: wins, hl: driver.careerWins > 10 }, { l: "POLES", v: poles, hl: false }, { l: "PTS", v: pts, hl: false }].map(s => (
+              <div key={s.l} className="text-center">
+                <p className={`f-cond font-black text-2xl tabular-nums ${s.hl ? "text-[#FFD23F]" : hov ? "text-white" : "text-zinc-200"}`}>{s.v.toLocaleString()}</p>
+                <p className="f-mono text-[9px] text-zinc-600 tracking-widest">{s.l}</p>
               </div>
             ))}
           </div>
@@ -192,158 +92,88 @@ export default function DriversPage() {
 
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
-    authFetch(`${API}/api/drivers`)
-      .then(r => r.json()).then(setDrivers)
-      .catch(console.error).finally(() => setLoading(false));
+    authFetch(`${API}/api/drivers`).then(r => r.json()).then(setDrivers).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const teams = ["ALL", ...Array.from(new Set(drivers.map(d => d.team?.name).filter(Boolean)))];
-
   const filtered = drivers
     .filter(d => {
-      const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) ||
-        d.team?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        d.nationality?.toLowerCase().includes(search.toLowerCase());
-      const matchTeam = filterTeam === "ALL" || d.team?.name === filterTeam;
-      return matchSearch && matchTeam;
+      const ms = d.name.toLowerCase().includes(search.toLowerCase()) || d.team?.name?.toLowerCase().includes(search.toLowerCase()) || d.nationality?.toLowerCase().includes(search.toLowerCase());
+      return ms && (filterTeam === "ALL" || d.team?.name === filterTeam);
     })
-    .sort((a, b) => {
-      if (sortBy === "wins") return b.careerWins - a.careerWins;
-      if (sortBy === "points") return b.careerPoints - a.careerPoints;
-      return a.carNumber - b.carNumber;
-    });
+    .sort((a, b) => sortBy === "wins" ? b.careerWins - a.careerWins : sortBy === "points" ? b.careerPoints - a.careerPoints : a.carNumber - b.carNumber);
 
   return (
-    <div className="min-h-screen bg-zinc-950 relative overflow-x-hidden">
+    <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
       <style>{`
-        @keyframes cardEnter {
-          from { transform: translateY(20px) scale(0.97); opacity: 0; }
-          to { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        .card-enter { animation: cardEnter 0.4s ease-out both; }
-        @keyframes headerEnter {
-          from { transform: translateY(-10px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .header-enter { animation: headerEnter 0.4s ease-out both; }
+        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
+        .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
+        .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
+        @keyframes grid-pan{from{background-position:0 0}to{background-position:0 80px}}
+        @keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes streak{0%{transform:translateX(-100%);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translateX(60vw);opacity:0}}
+        .rise{animation:rise .45s cubic-bezier(.16,1,.3,1) both}
+        .chamfer{clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
       `}</style>
 
-      {/* Background */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-zinc-950" />
-        <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-red-500/3 rounded-full blur-[150px]" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[300px] bg-red-900/5 rounded-full blur-[100px]" />
-        <div className="absolute inset-0 opacity-[0.012]" style={{
-          backgroundImage: "linear-gradient(#ef4444 1px, transparent 1px), linear-gradient(90deg, #ef4444 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-        }} />
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0" style={{ background: "radial-gradient(120% 80% at 80% -10%, rgba(225,6,0,.10), transparent 55%)" }} />
+        <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px)", backgroundSize: "80px 80px", animation: "grid-pan 6s linear infinite", maskImage: "radial-gradient(circle at 50% 20%,black,transparent 80%)" }} />
+        <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px)" }} />
+        <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 220px 60px rgba(0,0,0,.9)" }} />
+        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="absolute h-px" style={{ width: `${120 + i * 50}px`, top: `${18 + i * 20}%`, left: "-10%", background: "linear-gradient(90deg,transparent,rgba(225,6,0,.5),transparent)", animation: `streak ${5 + i * 1.4}s linear infinite`, animationDelay: `${i * 1.3}s` }} />)}
       </div>
 
       <Navbar />
 
-      <main className="relative z-10 max-w-7xl mx-auto px-8 py-10">
-
-        {/* Header */}
-        <div className="flex items-end justify-between mb-8 flex-wrap gap-4 header-enter">
+      <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+        <div className="flex items-end justify-between mb-8 flex-wrap gap-4 rise">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <p className="text-red-500/60 font-mono text-xs tracking-[0.3em]">2026 SEASON · {drivers.length} DRIVERS</p>
+              <span className="inline-block w-8 h-[3px] bg-[#E10600]" />
+              <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">2026 SEASON · {drivers.length} DRIVERS</span>
             </div>
-            <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
-              DRIVER<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">ROSTER</span>
+            <h1 className="f-cond font-black tracking-tight leading-[0.82]" style={{ fontSize: "clamp(48px,7vw,84px)" }}>
+              <span className="block text-white">DRIVER</span>
+              <span className="block text-transparent bg-clip-text" style={{ backgroundImage: "linear-gradient(90deg,#E10600,#ff5a3c)" }}>ROSTER</span>
             </h1>
           </div>
-
-          {/* Search + Sort */}
           <div className="flex flex-col gap-2 items-end">
             <div className="relative">
-              <input
-                type="text"
-                placeholder="Search driver, team, nationality..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="bg-zinc-900/80 backdrop-blur border border-zinc-700/50 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-red-500/50 w-72 transition-colors"
-              />
-              {search && (
-                <button onClick={() => setSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white transition-colors text-xs">
-                  ✕
-                </button>
-              )}
+              <input type="text" placeholder="Search driver, team, nationality..." value={search} onChange={e => setSearch(e.target.value)}
+                className="bg-zinc-900/70 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-[#E10600]/50 w-72 transition-colors f-mono" />
+              {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white text-xs">✕</button>}
             </div>
-            {/* Sort */}
             <div className="flex gap-1.5">
               {(["number", "wins", "points"] as const).map(s => (
-                <button key={s} onClick={() => setSortBy(s)}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono border transition-all ${sortBy === s
-                      ? "border-red-500/50 text-red-400 bg-red-500/10"
-                      : "border-zinc-700 text-zinc-600 hover:text-zinc-400"
-                    }`}>
-                  {s === "number" ? "#NO" : s.toUpperCase()}
-                </button>
+                <button key={s} onClick={() => setSortBy(s)} className={`px-3 py-1 rounded-lg f-mono text-[11px] border transition-all ${sortBy === s ? "border-[#E10600]/50 text-[#ff6a52] bg-[#E10600]/10" : "border-white/10 text-zinc-600 hover:text-zinc-400"}`}>{s === "number" ? "#NO" : s.toUpperCase()}</button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Team filter */}
-        <div className="flex gap-2 flex-wrap mb-8 header-enter" style={{ animationDelay: "100ms" }}>
+        <div className="flex gap-2 flex-wrap mb-8 rise" style={{ animationDelay: "80ms" }}>
           {teams.map(team => {
-            const teamData = drivers.find(d => d.team?.name === team)?.team;
-            const color = teamData?.colorHex;
-            const isActive = filterTeam === team;
+            const col = drivers.find(d => d.team?.name === team)?.team?.colorHex;
+            const active = filterTeam === team;
             return (
-              <button
-                key={team}
-                onClick={() => setFilterTeam(team)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 ${isActive ? "" : "border-zinc-700/50 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300"
-                  }`}
-                style={isActive && color ? {
-                  borderColor: `${color}60`,
-                  color: color,
-                  backgroundColor: `${color}15`,
-                  boxShadow: `0 0 10px ${color}20`,
-                } : isActive ? {
-                  borderColor: "#ef4444",
-                  color: "white",
-                  backgroundColor: "rgba(239,68,68,0.15)",
-                } : {}}
-              >
+              <button key={team} onClick={() => setFilterTeam(team)}
+                className={`px-4 py-1.5 rounded-full f-cond text-xs font-bold tracking-wide border transition-all ${active ? "" : "border-white/10 text-zinc-500 hover:border-white/25 hover:text-zinc-300"}`}
+                style={active && col ? { borderColor: `${col}60`, color: col, background: `${col}15` } : active ? { borderColor: "#E10600", color: "#fff", background: "rgba(225,6,0,.15)" } : {}}>
                 {team === "ALL" ? "ALL DRIVERS" : team}
               </button>
             );
           })}
         </div>
 
-        {/* Driver grid */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-52 bg-zinc-900/50 rounded-2xl animate-pulse border border-zinc-800/50"
-                style={{ animationDelay: `${i * 50}ms` }} />
-            ))}
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-52 bg-white/[0.03] rounded-2xl animate-pulse border border-white/5" />)}</div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-zinc-500 text-lg mb-2">No drivers found</p>
-            <p className="text-zinc-700 text-sm font-mono">Try adjusting your search or filter</p>
-          </div>
+          <div className="text-center py-20"><p className="f-cond text-zinc-500 text-xl mb-1">No drivers found</p><p className="f-mono text-zinc-700 text-xs">Try adjusting your search</p></div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((driver, idx) => (
-              <DriverCard key={driver.id} driver={driver} idx={idx} />
-            ))}
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{filtered.map((d, i) => <DriverCard key={d.id} driver={d} idx={i} />)}</div>
         )}
-
-        {/* Footer count */}
-        {!loading && (
-          <p className="text-center text-zinc-700 text-xs font-mono mt-8">
-            Showing {filtered.length} of {drivers.length} drivers
-          </p>
-        )}
+        {!loading && <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">SHOWING {filtered.length} OF {drivers.length} DRIVERS</p>}
       </main>
     </div>
   );
