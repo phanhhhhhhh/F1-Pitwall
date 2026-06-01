@@ -41,9 +41,7 @@ export default function RacesPage() {
                 const wRes = await authFetch(`${API}/api/race-results/winners/2026`);
                 const wData = await wRes.json();
                 const map: Record<string, RaceWinner> = {};
-                Object.entries(wData).forEach(([name, w]: [string, any]) => {
-                    map[name] = { driver: w.driverName, team: w.teamName };
-                });
+                Object.entries(wData).forEach(([name, w]: [string, any]) => { map[name] = { driver: w.driverName, team: w.teamName }; });
                 setRaceWinners(map);
             } catch { }
         } catch { }
@@ -55,7 +53,7 @@ export default function RacesPage() {
     const completed = mainRaces.filter(r => r.status === "COMPLETED").length;
     const cancelled = mainRaces.filter(r => r.status === "CANCELLED").length;
     const scheduled = mainRaces.filter(r => r.status === "SCHEDULED").length;
-
+    const totalGP = mainRaces.length || 22;
 
     const displayList =
         filter === "GP" ? mainRaces.map(r => ({ ...r, _type: "gp" }))
@@ -75,7 +73,6 @@ export default function RacesPage() {
     const today = new Date().toISOString().split("T")[0];
     const nextGP = mainRaces.find(r => r.status === "SCHEDULED" && r.date >= today);
 
-    // Countdown to next race
     const [countdown, setCountdown] = useState("");
     useEffect(() => {
         if (!nextGP) return;
@@ -91,82 +88,85 @@ export default function RacesPage() {
         return () => clearInterval(id);
     }, [nextGP]);
 
+    const TAB_ACTIVE: Record<string, string> = {
+        GP: "border-[#E10600] bg-[#E10600]/15 text-[#ff6a52]",
+        SPRINT: "border-[#F97316] bg-[#F97316]/15 text-orange-300",
+        COMPLETED: "border-[#00E676] bg-[#00E676]/15 text-emerald-300",
+        SCHEDULED: "border-[#3B82F6] bg-[#3B82F6]/15 text-blue-300",
+        CANCELLED: "border-zinc-500 bg-zinc-700/30 text-zinc-300",
+        ALL: "border-white/40 bg-white/10 text-white",
+    };
+
     return (
-        <div className="min-h-screen bg-zinc-950">
+        <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
             <style>{`
-        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        .fade-in{animation:fadeIn .35s ease-out both}
+        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
+        .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
+        .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
+        @keyframes grid-pan{from{background-position:0 0}to{background-position:0 80px}}
+        @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes streak{0%{transform:translateX(-100%);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translateX(60vw);opacity:0}}
+        @keyframes livedot{0%,100%{box-shadow:0 0 0 0 rgba(225,6,0,.6)}70%{box-shadow:0 0 0 6px rgba(225,6,0,0)}}
+        .rise{animation:rise .4s cubic-bezier(.16,1,.3,1) both}
       `}</style>
 
-            <div className="fixed inset-0 z-0">
-                <div className="absolute inset-0 bg-zinc-950" />
-                <div className="absolute inset-0 opacity-[0.012]" style={{ backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)", backgroundSize: "60px 60px" }} />
-                <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-red-500/4 rounded-full blur-[150px]" />
+            <div className="fixed inset-0 z-0 pointer-events-none">
+                <div className="absolute inset-0" style={{ background: "radial-gradient(110% 70% at 40% -10%, rgba(225,6,0,.10), transparent 55%)" }} />
+                <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px)", backgroundSize: "80px 80px", animation: "grid-pan 6s linear infinite", maskImage: "radial-gradient(circle at 50% 15%,black,transparent 80%)" }} />
+                <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px)" }} />
+                <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 220px 60px rgba(0,0,0,.9)" }} />
+                {Array.from({ length: 4 }).map((_, i) => <div key={i} className="absolute h-px" style={{ width: `${120 + i * 50}px`, top: `${15 + i * 22}%`, left: "-10%", background: "linear-gradient(90deg,transparent,rgba(225,6,0,.5),transparent)", animation: `streak ${5 + i * 1.4}s linear infinite`, animationDelay: `${i * 1.3}s` }} />)}
             </div>
 
             <Navbar />
 
-            <main className="relative z-10 max-w-4xl mx-auto px-6 py-10">
+            <main className="relative z-10 max-w-4xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
 
-                {/* Header */}
-                <div className="mb-8 fade-in">
-                    <p className="text-red-500/50 font-mono text-xs tracking-[0.3em] mb-2">2026 SEASON · {mainRaces.length} GP · {sprintRaces.length} SPRINTS</p>
-                    <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
-                        RACE<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">CALENDAR</span>
+                <div className="mb-8 rise">
+                    <div className="flex items-center gap-2 mb-3">
+                        <span className="inline-block w-8 h-[3px] bg-[#E10600]" />
+                        <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">2026 SEASON · {mainRaces.length} GP · {sprintRaces.length} SPRINTS</span>
+                    </div>
+                    <h1 className="f-cond font-black tracking-tight leading-[0.82]" style={{ fontSize: "clamp(48px,8vw,84px)" }}>
+                        <span className="block text-white">RACE</span>
+                        <span className="block text-transparent bg-clip-text" style={{ backgroundImage: "linear-gradient(90deg,#E10600,#ff5a3c)" }}>CALENDAR</span>
                     </h1>
                 </div>
 
-                {/* Race Weekend Widget */}
-                <div className="mb-8 fade-in" style={{ animationDelay: "50ms" }}>
-                    <RaceWeekendWidget />
-                </div>
+                <div className="mb-8 rise" style={{ animationDelay: "50ms" }}><RaceWeekendWidget /></div>
 
-                {/* Filter tabs */}
-                <div className="flex flex-wrap gap-2 mb-8 fade-in" style={{ animationDelay: "100ms" }}>
+                <div className="flex flex-wrap gap-2 mb-8 rise" style={{ animationDelay: "100ms" }}>
                     {TABS.map(({ key, label, count }) => (
                         <button key={key} onClick={() => setFilter(key)}
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 ${filter === key
-                                ? key === "GP" ? "border-red-500 bg-red-500/15 text-red-300"
-                                    : key === "SPRINT" ? "border-orange-500 bg-orange-500/15 text-orange-300"
-                                        : key === "COMPLETED" ? "border-green-500 bg-green-500/15 text-green-300"
-                                            : key === "SCHEDULED" ? "border-blue-500 bg-blue-500/15 text-blue-300"
-                                                : key === "CANCELLED" ? "border-red-400 bg-red-400/10 text-red-400"
-                                                    : "border-zinc-500 bg-zinc-800/50 text-zinc-300"
-                                : "border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400"
-                                }`}>
+                            className={`px-4 py-1.5 rounded-full f-cond text-xs font-bold tracking-wide border transition-all ${filter === key ? TAB_ACTIVE[key] : "border-white/10 text-zinc-600 hover:border-white/25 hover:text-zinc-400"}`}>
                             {label} <span className="opacity-50 ml-1">{count}</span>
                         </button>
                     ))}
                 </div>
 
-                {/* Progress bar */}
-                <div className="mb-8 fade-in" style={{ animationDelay: "150ms" }}>
+                {/* Progress — checkered flag */}
+                <div className="mb-8 rise" style={{ animationDelay: "150ms" }}>
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-mono text-zinc-500 tracking-widest">SEASON PROGRESS</span>
-                        <span className="text-xs font-mono text-zinc-500"><span className="text-white">{completed}</span> / 22 GP</span>
+                        <span className="f-mono text-[10px] text-zinc-500 tracking-widest">SEASON PROGRESS</span>
+                        <span className="f-mono text-[10px] text-zinc-500"><span className="text-white">{completed}</span> / {totalGP} GP</span>
                     </div>
-                    <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-1000"
-                            style={{ width: `${(completed / 22) * 100}%`, background: "linear-gradient(90deg,#ef4444,#f97316)" }} />
+                    <div className="relative h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,.06)" }}>
+                        <div className="h-full rounded-full transition-all duration-1000 relative" style={{ width: `${(completed / totalGP) * 100}%`, background: "linear-gradient(90deg,#E10600,#ff5a3c)" }}>
+                            <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "repeating-linear-gradient(45deg,#000 0 4px,transparent 4px 8px)" }} />
+                        </div>
                     </div>
-                    <div className="flex gap-4 mt-2">
-                        <span className="text-xs text-zinc-600 font-mono flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />{completed} done</span>
-                        <span className="text-xs text-zinc-600 font-mono flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />{cancelled} cancelled</span>
-                        <span className="text-xs text-zinc-600 font-mono flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-zinc-600 inline-block" />{scheduled} upcoming</span>
+                    <div className="flex gap-4 mt-2 flex-wrap">
+                        <span className="f-mono text-[10px] text-zinc-600 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00E676] inline-block" />{completed} done</span>
+                        <span className="f-mono text-[10px] text-zinc-600 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#E10600] inline-block" />{cancelled} cancelled</span>
+                        <span className="f-mono text-[10px] text-zinc-600 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-zinc-600 inline-block" />{scheduled} upcoming</span>
                     </div>
                 </div>
 
-                {/* Timeline */}
                 {loading ? (
-                    <div className="space-y-3">
-                        {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 bg-zinc-900/50 rounded-2xl animate-pulse border border-zinc-800/30" />)}
-                    </div>
+                    <div className="space-y-3">{[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 bg-white/[0.03] rounded-2xl animate-pulse border border-white/5" />)}</div>
                 ) : (
                     <div className="relative">
-                        {/* Timeline line */}
-                        <div className="absolute left-5 top-0 bottom-0 w-px bg-zinc-800" />
-
+                        <div className="absolute left-5 top-0 bottom-0 w-px" style={{ background: "rgba(255,255,255,.08)" }} />
                         <div className="space-y-2">
                             {displayList.map((race, idx) => {
                                 const isSprint = race._type === "sprint";
@@ -174,110 +174,59 @@ export default function RacesPage() {
                                 const isCancelled = race.status === "CANCELLED";
                                 const isNext = nextGP?.id === race.id;
                                 const winner = raceWinners[race.name];
-
-                                const dotColor = isCancelled ? "#52525b"
-                                    : isCompleted ? "#22c55e"
-                                        : isSprint ? "#f97316"
-                                            : isNext ? "#ef4444"
-                                                : "#3f3f46";
+                                const dotColor = isCancelled ? "#52525b" : isCompleted ? "#00E676" : isSprint ? "#F97316" : isNext ? "#E10600" : "#3f3f46";
 
                                 return (
-                                    <div key={race.id} className={`relative fade-in ${isSprint ? "pl-16" : "pl-12"}`}
-                                        style={{ animationDelay: `${idx * 25}ms` }}>
-
-                                        {/* Dot */}
-                                        <div className="absolute rounded-full border-2 border-zinc-950 z-10"
+                                    <div key={race.id} className={`relative rise ${isSprint ? "pl-16" : "pl-12"}`} style={{ animationDelay: `${idx * 25}ms` }}>
+                                        <div className="absolute rounded-full border-2 z-10" style={{
+                                            width: isSprint ? "10px" : "14px", height: isSprint ? "10px" : "14px",
+                                            left: isSprint ? "16px" : "13px", top: "50%", transform: "translateY(-50%)",
+                                            borderColor: "#0a0a0c", backgroundColor: dotColor,
+                                            animation: isNext ? "livedot 1.6s infinite" : "none",
+                                        }} />
+                                        <div className="flex items-center gap-3 sm:gap-4 rounded-2xl border px-4 sm:px-5 py-3.5 transition-all group"
                                             style={{
-                                                width: isSprint ? "10px" : "14px",
-                                                height: isSprint ? "10px" : "14px",
-                                                left: isSprint ? "16px" : "13px",
-                                                top: "50%",
-                                                transform: "translateY(-50%)",
-                                                backgroundColor: dotColor,
-                                                boxShadow: isNext ? "0 0 8px rgba(239,68,68,0.6)" : "none",
-                                            }} />
-
-                                        {/* Card */}
-                                        <div className={`flex items-center gap-4 rounded-2xl border px-5 py-3.5 transition-all duration-200 group ${isCancelled ? "bg-zinc-900/20 border-zinc-800/20 opacity-40"
-                                            : isNext ? "bg-red-950/20 border-red-500/30 hover:border-red-500/50"
-                                                : isCompleted ? "bg-zinc-900/60 border-zinc-800/40 hover:border-green-500/20"
-                                                    : isSprint ? "bg-orange-950/10 border-orange-900/20 hover:border-orange-500/30"
-                                                        : "bg-zinc-900/40 border-zinc-800/30 hover:border-zinc-700"
-                                            }`}
-                                            style={{
-                                                borderLeft: isCompleted && !isSprint ? "3px solid rgba(34,197,94,0.5)"
-                                                    : isNext ? "3px solid rgba(239,68,68,0.6)"
-                                                        : isSprint ? "3px solid rgba(249,115,22,0.4)"
-                                                            : undefined,
+                                                background: isCancelled ? "rgba(255,255,255,.015)" : isNext ? "rgba(225,6,0,.08)" : isCompleted ? "rgba(18,18,21,.7)" : isSprint ? "rgba(249,115,22,.06)" : "rgba(255,255,255,.02)",
+                                                borderColor: isCancelled ? "rgba(255,255,255,.04)" : isNext ? "rgba(225,6,0,.35)" : "rgba(255,255,255,.07)",
+                                                opacity: isCancelled ? 0.45 : 1,
+                                                borderLeft: isCompleted && !isSprint ? "3px solid rgba(0,230,118,.5)" : isNext ? "3px solid #E10600" : isSprint ? "3px solid rgba(249,115,22,.5)" : undefined,
                                                 borderRadius: (isCompleted || isNext || isSprint) ? "0 16px 16px 0" : undefined,
                                             }}>
-
-                                            {/* Round */}
-                                            <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black ${isNext ? "bg-red-500/20 text-red-400"
-                                                : isCompleted ? "bg-green-500/10 text-green-600"
-                                                    : isSprint ? "bg-orange-500/10 text-orange-400"
-                                                        : "bg-zinc-800/60 text-zinc-500"
-                                                }`}>
+                                            <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center f-cond font-black text-sm"
+                                                style={{
+                                                    background: isNext ? "rgba(225,6,0,.2)" : isCompleted ? "rgba(0,230,118,.1)" : isSprint ? "rgba(249,115,22,.12)" : "rgba(255,255,255,.04)",
+                                                    color: isNext ? "#ff6a52" : isCompleted ? "#00E676" : isSprint ? "#F97316" : "#71717a",
+                                                }}>
                                                 {isSprint ? "⚡" : `R${race.roundNumber}`}
                                             </div>
-
-                                            {/* Flag */}
-                                            <span className="text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                                                {COUNTRY_FLAGS[race.circuit?.country] || "🏁"}
-                                            </span>
-
-                                            {/* Info */}
+                                            <span className="text-xl flex-shrink-0 group-hover:scale-110 transition-transform">{COUNTRY_FLAGS[race.circuit?.country] || "🏁"}</span>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className={`text-sm font-black truncate ${isCancelled ? "text-zinc-600 line-through"
-                                                        : isNext ? "text-red-300"
-                                                            : isCompleted ? "text-white"
-                                                                : isSprint ? "text-orange-200"
-                                                                    : "text-zinc-300"
-                                                        }`}>{race.name}</span>
-                                                    {isSprint && <span className="text-xs bg-orange-500/15 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded font-mono">SPRINT</span>}
-                                                    {isNext && countdown && <span className="text-xs text-red-400/70 font-mono">{countdown}</span>}
+                                                    <span className={`f-cond font-bold text-base sm:text-lg uppercase tracking-wide truncate ${isCancelled ? "text-zinc-600 line-through" : isNext ? "text-[#ff6a52]" : "text-white"}`}>{race.name}</span>
+                                                    {isSprint && <span className="f-mono text-[9px] bg-[#F97316]/15 text-[#F97316] border border-[#F97316]/25 px-1.5 py-0.5 rounded">SPRINT</span>}
+                                                    {isNext && countdown && <span className="f-mono text-[10px] text-[#E10600]/80">{countdown}</span>}
                                                 </div>
-                                                <p className="text-xs text-zinc-600 font-mono mt-0.5 truncate">
-                                                    {race.circuit?.name} · {race.date}
-                                                </p>
-                                                {winner && (
-                                                    <p className="text-xs text-zinc-500 mt-1">
-                                                        🏆 <span className="text-yellow-400 font-bold">{winner.driver}</span>
-                                                        <span className="text-zinc-700 mx-1">·</span>
-                                                        <span>{winner.team}</span>
-                                                    </p>
-                                                )}
+                                                <p className="f-mono text-[11px] text-zinc-600 mt-0.5 truncate">{race.circuit?.name} · {race.date}</p>
+                                                {winner && <p className="f-mono text-[11px] text-zinc-500 mt-1">🏆 <span className="text-[#FFD23F] font-bold">{winner.driver}</span> <span className="text-zinc-700 mx-1">·</span> {winner.team}</p>}
                                             </div>
-
-                                            {/* Actions */}
                                             <div className="flex items-center gap-2 flex-shrink-0">
-                                                {!isSprint && (isCompleted || race.status === "SCHEDULED") && (
+                                                {(isCompleted || race.status === "SCHEDULED") && (
                                                     <Link href={`/races/${race.id}/qualifying`}
-                                                        className="text-xs font-mono text-zinc-600 hover:text-yellow-400 border border-zinc-800 hover:border-yellow-500/40 px-3 py-1.5 rounded-lg transition-all hover:bg-yellow-500/5">
-                                                        Quali →
-                                                    </Link>
-                                                )}
-                                                {isSprint && (isCompleted || race.status === "SCHEDULED") && (
-                                                    <Link href={`/races/${race.id}/qualifying`}
-                                                        className="text-xs font-mono text-zinc-600 hover:text-orange-400 border border-zinc-800 hover:border-orange-500/40 px-3 py-1.5 rounded-lg transition-all hover:bg-orange-500/5">
-                                                        ⚡ S-Quali →
+                                                        className={`f-mono text-[11px] border px-3 py-1.5 rounded-lg transition-all ${isSprint ? "text-zinc-500 hover:text-[#F97316] border-white/10 hover:border-[#F97316]/40" : "text-zinc-500 hover:text-[#FFD23F] border-white/10 hover:border-[#FFD23F]/40"}`}>
+                                                        {isSprint ? "⚡ S-Quali →" : "Quali →"}
                                                     </Link>
                                                 )}
                                                 {isCompleted && (
                                                     <Link href={`/races/${race.id}/results`}
-                                                        className="text-xs font-mono text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-500/40 px-3 py-1.5 rounded-lg transition-all hover:bg-red-500/5">
-                                                        Results →
-                                                    </Link>
+                                                        className="f-mono text-[11px] text-zinc-500 hover:text-[#ff6a52] border border-white/10 hover:border-[#E10600]/40 px-3 py-1.5 rounded-lg transition-all">Results →</Link>
                                                 )}
-                                                {/* Status badge */}
-                                                <span className={`text-xs px-2.5 py-1 rounded-lg border font-mono font-bold ${isCompleted ? "text-green-400 bg-green-500/10 border-green-500/20"
-                                                    : isCancelled ? "text-zinc-500 bg-zinc-800/40 border-zinc-700/30"
-                                                        : isNext ? "text-red-400 bg-red-500/10 border-red-500/20"
-                                                            : isSprint ? "text-orange-400 bg-orange-500/10 border-orange-500/20"
-                                                                : "text-zinc-500 bg-zinc-800/30 border-zinc-700/20"
-                                                    }`}>
-                                                    {isCompleted ? "✓" : isCancelled ? "✗" : isNext ? "Next" : "—"}
+                                                <span className="f-mono text-[10px] px-2.5 py-1 rounded-lg border font-bold"
+                                                    style={{
+                                                        color: isCompleted ? "#00E676" : isCancelled ? "#71717a" : isNext ? "#ff6a52" : isSprint ? "#F97316" : "#71717a",
+                                                        background: isCompleted ? "rgba(0,230,118,.1)" : isNext ? "rgba(225,6,0,.1)" : isSprint ? "rgba(249,115,22,.1)" : "rgba(255,255,255,.03)",
+                                                        borderColor: isCompleted ? "rgba(0,230,118,.2)" : isNext ? "rgba(225,6,0,.2)" : isSprint ? "rgba(249,115,22,.2)" : "rgba(255,255,255,.06)",
+                                                    }}>
+                                                    {isCompleted ? "✓" : isCancelled ? "✗" : isNext ? "NEXT" : "—"}
                                                 </span>
                                             </div>
                                         </div>
@@ -287,14 +236,7 @@ export default function RacesPage() {
                         </div>
                     </div>
                 )}
-
-                {!loading && (
-                    <div className="mt-8 text-center">
-                        <p className="text-zinc-700 text-xs font-mono">
-                            {completed} completed · {scheduled} remaining · {cancelled} cancelled
-                        </p>
-                    </div>
-                )}
+                {!loading && <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">{completed} COMPLETED · {scheduled} REMAINING · {cancelled} CANCELLED</p>}
             </main>
         </div>
     );
