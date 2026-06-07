@@ -130,8 +130,8 @@ export default function RaceWeekendWidget() {
         const start = s.dateStart ? new Date(s.dateStart).getTime() : 0;
         const end = s.dateEnd ? new Date(s.dateEnd).getTime() : start + 3600000;
         let status: "LIVE" | "UPCOMING" | "COMPLETED" = s.status;
-        let startsIn = Math.floor((start - now) / 1000);
-        let endsIn = Math.floor((end - now) / 1000);
+        const startsIn = Math.floor((start - now) / 1000);
+        const endsIn = Math.floor((end - now) / 1000);
 
         if (now > end) status = "COMPLETED";
         else if (now >= start && now <= end) status = "LIVE";

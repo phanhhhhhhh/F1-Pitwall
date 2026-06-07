@@ -65,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = getAccessToken();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!token) { setIsLoading(false); return; }
 
     fetchUserWithRetry(2)

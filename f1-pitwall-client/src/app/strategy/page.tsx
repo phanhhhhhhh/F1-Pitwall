@@ -136,7 +136,7 @@ export default function StrategyPage() {
     }));
   };
 
-  const updateStint = (stratId: string, stintId: string, field: keyof Stint, value: any) => {
+  const updateStint = (stratId: string, stintId: string, field: keyof Stint, value: Stint[keyof Stint]) => {
     setStrategies(prev => prev.map(s => s.id !== stratId ? s :
       { ...s, stints: s.stints.map(st => st.id === stintId ? { ...st, [field]: value } : st) }));
   };

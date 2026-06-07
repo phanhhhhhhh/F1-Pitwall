@@ -51,17 +51,16 @@ export default function ProfilePage() {
 
     useEffect(() => {
         if (user) {
-            const u = user as any;
             setProfile({
-                displayName: u.displayName || "",
-                email: u.email || "",
-                avatarUrl: u.avatarUrl || "",
-                phone: u.phone || "",
-                bio: u.bio || "",
-                location: u.location || "",
-                dateOfBirth: u.dateOfBirth || "",
+                displayName: user.displayName || "",
+                email: user.email || "",
+                avatarUrl: user.avatarUrl || "",
+                phone: user.phone || "",
+                bio: user.bio || "",
+                location: user.location || "",
+                dateOfBirth: user.dateOfBirth || "",
             });
-            setAvatarPreview(u.avatarUrl || "");
+            setAvatarPreview(user.avatarUrl || "");
         }
     }, [user]);
 
@@ -89,9 +88,9 @@ export default function ProfilePage() {
             setProfile(p => ({ ...p, avatarUrl: urlData.publicUrl }));
             setAvatarPreview(urlData.publicUrl);
             showFeedback("✓ Avatar uploaded — save to apply");
-        } catch (err: any) {
+        } catch (err: unknown) {
             setAvatarPreview(profile.avatarUrl);
-            showFeedback("Upload failed: " + (err.message || "Unknown error"), false);
+            showFeedback("Upload failed: " + ((err as Error).message || "Unknown error"), false);
         } finally { setUploadLoading(false); }
     };
 
@@ -141,7 +140,7 @@ export default function ProfilePage() {
 
     const role = user?.role as keyof typeof ROLE_CONFIG;
     const roleCfg = ROLE_CONFIG[role] || ROLE_CONFIG.VIEWER;
-    const displayedName = (user as any)?.displayName || user?.username || "";
+    const displayedName = user?.displayName || user?.username || "";
     const initials = displayedName.slice(0, 2).toUpperCase();
 
     const strength = newPwd.length === 0 ? 0 : newPwd.length < 6 ? 1 : newPwd.length < 10 ? 2 : /[A-Z]/.test(newPwd) && /[0-9]/.test(newPwd) ? 4 : 3;
@@ -219,7 +218,7 @@ export default function ProfilePage() {
                     <div className="flex items-end justify-between flex-wrap gap-3">
                         <div>
                             <h1 className="text-2xl font-black text-white">{displayedName}</h1>
-                            {(user as any)?.displayName && <p className="text-zinc-500 font-mono text-sm">@{user?.username}</p>}
+                            {user?.displayName && <p className="text-zinc-500 font-mono text-sm">@{user?.username}</p>}
                             <p className="text-zinc-500 text-sm mt-0.5">{user?.email}</p>
                             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                                 <span className="text-xs text-zinc-600 font-mono">ID <span className="text-zinc-400">#{user?.id}</span></span>

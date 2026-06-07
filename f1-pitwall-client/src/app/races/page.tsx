@@ -22,6 +22,7 @@ interface RaceWinner { driver: string; team: string; }
 
 export default function RacesPage() {
     const router = useRouter();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [races, setRaces] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("GP");
@@ -41,6 +42,7 @@ export default function RacesPage() {
                 const wRes = await authFetch(`${API}/api/race-results/winners/2026`);
                 const wData = await wRes.json();
                 const map: Record<string, RaceWinner> = {};
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 Object.entries(wData).forEach(([name, w]: [string, any]) => { map[name] = { driver: w.driverName, team: w.teamName }; });
                 setRaceWinners(map);
             } catch (e) {

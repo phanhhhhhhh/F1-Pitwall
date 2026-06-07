@@ -264,6 +264,7 @@ export default function TelemetryPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkLiveStatus();
     const id = setInterval(checkLiveStatus, 15000);
     return () => clearInterval(id);

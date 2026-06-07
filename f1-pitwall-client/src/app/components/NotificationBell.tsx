@@ -53,6 +53,7 @@ export default function NotificationBell() {
     if (!getAccessToken()) return;
 
     const loadAndConnect = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (typeof window !== "undefined" && (window as any).Stomp) {
         connectWs();
         return;
@@ -72,6 +73,7 @@ export default function NotificationBell() {
     };
 
     const connectWs = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const w = window as any;
       const factory = w.Stomp ?? w.StompJs?.Stomp;
       if (!factory) return;
@@ -79,6 +81,7 @@ export default function NotificationBell() {
       const client = factory.over(() => new w.SockJS(wsUrl));
       client.debug = () => { };
       client.connect({}, () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         client.subscribe("/topic/notifications", (msg: any) => {
           const notif: Notification = JSON.parse(msg.body);
           setNotifications(prev => [notif, ...prev].slice(0, 50));
