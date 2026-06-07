@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
+import { SkeletonCard } from "../components/LoadingSkeleton";
 
 const NATIONALITY_FLAGS: Record<string, string> = {
   "British": "🇬🇧", "Australian": "🇦🇺", "Dutch": "🇳🇱", "French": "🇫🇷",
@@ -150,7 +151,7 @@ export default function TeamsPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-56 bg-white/[0.03] rounded-2xl animate-pulse border border-white/5" />)}</div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}</div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{teams.map((t, i) => <TeamCard key={t.id} team={t} drivers={drivers} idx={i} />)}</div>
         )}

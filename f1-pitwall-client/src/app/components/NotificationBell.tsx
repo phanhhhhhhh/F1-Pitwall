@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import { BASE_URL as API } from "../lib/api-client";
 
 interface Notification {
   id: number;
@@ -76,7 +75,7 @@ export default function NotificationBell() {
       const w = window as any;
       const factory = w.Stomp ?? w.StompJs?.Stomp;
       if (!factory) return;
-      const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/ws";
+      const wsUrl = API + "/ws";
       const client = factory.over(() => new w.SockJS(wsUrl));
       client.debug = () => { };
       client.connect({}, () => {
@@ -101,7 +100,9 @@ export default function NotificationBell() {
       const res = await authFetch(`${API}/api/notifications/count`);
       const data = await res.json();
       setUnreadCount(data.count);
-    } catch (e) { }
+    } catch (e) {
+      console.warn("[NotificationBell] Failed to fetch count:", e);
+    }
   };
 
   const fetchNotifications = async () => {
@@ -110,7 +111,9 @@ export default function NotificationBell() {
       const res = await authFetch(`${API}/api/notifications`);
       const data = await res.json();
       setNotifications(data);
-    } catch (e) { } finally {
+    } catch (e) {
+      console.warn("[NotificationBell] Failed to fetch notifications:", e);
+    } finally {
       setLoading(false);
     }
   };
