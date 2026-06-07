@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 interface Circuit {
   id: number; name: string; country: string; city: string; type: string;

@@ -3,6 +3,8 @@ package backend.service;
 import backend.model.Circuit;
 import backend.repository.CircuitRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -12,6 +14,8 @@ public class CircuitService {
     private final CircuitRepository repository;
 
     public List<Circuit> getAll() { return repository.findAll(); }
+
+    public Page<Circuit> getPaged(Pageable pageable) { return repository.findAll(pageable); }
 
     public Circuit getById(Long id) {
         return repository.findById(id)

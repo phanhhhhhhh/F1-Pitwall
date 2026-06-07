@@ -15,8 +15,12 @@ public interface RaceResultRepository extends JpaRepository<RaceResult, Long> {
 
     List<RaceResult> findByRaceIdOrderByFinishPosition(Long raceId);
 
-    @Query("SELECT r FROM RaceResult r JOIN FETCH r.driver d JOIN FETCH d.team t JOIN FETCH r.race rc WHERE rc.season = :season AND rc.status = :status")
+    @Query("SELECT r FROM RaceResult r JOIN FETCH r.driver d LEFT JOIN FETCH d.team t JOIN FETCH r.race rc WHERE rc.season = :season AND rc.status = :status")
     List<RaceResult> findByRaceSeasonAndRaceStatus(int season, RaceStatus status);
+
+    /** Returns only race winners (P1, no DNF) for a season — used by getSeasonWinners to avoid loading all results */
+    @Query("SELECT r FROM RaceResult r JOIN FETCH r.driver d LEFT JOIN FETCH d.team t JOIN FETCH r.race rc WHERE rc.season = :season AND rc.status = :status AND r.finishPosition = 1 AND r.dnfReason IS NULL")
+    List<RaceResult> findSeasonWinners(int season, RaceStatus status);
 
     @Modifying
     @Transactional

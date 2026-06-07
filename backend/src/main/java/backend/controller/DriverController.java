@@ -4,6 +4,9 @@ import backend.model.Driver;
 import backend.service.DriverService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +23,16 @@ public class DriverController {
 
     @GetMapping
     public List<Driver> getAll() { return driverService.getAll(); }
+
+    /**
+     * Paginated driver list.
+     * GET /api/drivers/paged?page=0&size=20&sort=carNumber,asc
+     */
+    @GetMapping("/paged")
+    public Page<Driver> getPaged(
+            @PageableDefault(size = 20, sort = "carNumber") Pageable pageable) {
+        return driverService.getPaged(pageable);
+    }
 
     @GetMapping("/{id}")
     public Driver getById(@PathVariable Long id) { return driverService.getById(id); }

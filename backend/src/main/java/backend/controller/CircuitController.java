@@ -3,6 +3,9 @@ package backend.controller;
 import backend.model.Circuit;
 import backend.service.CircuitService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +22,16 @@ public class CircuitController {
 
     @GetMapping
     public List<Circuit> getAll() { return service.getAll(); }
+
+    /**
+     * Paginated circuit list.
+     * GET /api/circuits/paged?page=0&size=20&sort=name,asc
+     */
+    @GetMapping("/paged")
+    public Page<Circuit> getPaged(
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return service.getPaged(pageable);
+    }
 
     @GetMapping("/{id}")
     public Circuit getById(@PathVariable Long id) { return service.getById(id); }
