@@ -18,7 +18,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
   "France": "🇫🇷", "United States": "🇺🇸", "Switzerland": "🇨🇭",
 };
 
-interface Driver { id: number; name: string; carNumber: number; nationality: string; }
+interface Driver { id: number; name: string; carNumber: number; nationality: string; team?: { name: string }; }
 interface Team { id: number; name: string; country: string; colorHex: string; championships: number; annualBudgetM: number; base: string; foundedYear: number; }
 
 function useCountUp(target: number, delay = 0) {
@@ -35,7 +35,7 @@ function useCountUp(target: number, delay = 0) {
 function TeamCard({ team, drivers, idx }: { team: Team; drivers: Driver[]; idx: number }) {
   const [hov, setHov] = useState(false);
   const col = team.colorHex || "#666";
-  const td = drivers.filter((d: any) => d.team?.name === team.name);
+  const td = drivers.filter((d) => d.team?.name === team.name);
   const titles = useCountUp(team.championships, idx * 80);
   const budget = useCountUp(team.annualBudgetM, idx * 80 + 150);
 
@@ -63,7 +63,7 @@ function TeamCard({ team, drivers, idx }: { team: Team; drivers: Driver[]; idx: 
           </div>
           {td.length > 0 && (
             <div className="flex gap-2 mb-5">
-              {td.map((d: any) => (
+              {td.map((d) => (
                 <div key={d.id} className="flex items-center gap-2.5 flex-1 rounded-xl px-3 py-2.5 border transition-all" style={{ background: hov ? `${col}08` : "rgba(255,255,255,.02)", borderColor: hov ? `${col}30` : "rgba(255,255,255,.06)" }}>
                   <span className="text-base flex-shrink-0">{NATIONALITY_FLAGS[d.nationality] || "🏴"}</span>
                   <div className="min-w-0">

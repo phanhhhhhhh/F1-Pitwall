@@ -136,7 +136,7 @@ export default function AdminPage() {
         {/* Tabs */}
         <div className="flex gap-1.5 bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-xl p-1 w-fit mb-8 slide-up" style={{ animationDelay: "100ms" }}>
           {[{ key: "stats", label: "📊 DASHBOARD" }, { key: "users", label: "👥 USERS" }, { key: "data", label: "🔄 DATA SYNC" }].map(t => (
-            <button key={t.key} onClick={() => setTab(t.key as any)}
+            <button key={t.key} onClick={() => setTab(t.key as "stats" | "users" | "data")}
               className={`px-5 py-2.5 rounded-lg text-xs font-black border transition-all ${tab === t.key ? "bg-red-500/10 border-red-500/50 text-red-400" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}>
               {t.label}
             </button>
@@ -312,7 +312,7 @@ export default function AdminPage() {
                 {[{ label: "USERNAME", key: "username", type: "text", ph: "e.g. engineer1" }, { label: "EMAIL", key: "email", type: "email", ph: "user@pitwall.f1" }, { label: "PASSWORD", key: "password", type: "password", ph: "min 6 chars" }].map(f => (
                   <div key={f.key}>
                     <label className="text-xs font-mono text-zinc-500 tracking-widest block mb-1.5">{f.label}</label>
-                    <input type={f.type} placeholder={f.ph} value={(newUser as any)[f.key]} onChange={e => setNewUser(p => ({ ...p, [f.key]: e.target.value }))}
+                    <input type={f.type} placeholder={f.ph} value={newUser[f.key as keyof typeof newUser]} onChange={e => setNewUser(p => ({ ...p, [f.key]: e.target.value }))}
                       className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-red-500/50 transition-colors" />
                   </div>
                 ))}

@@ -24,6 +24,7 @@ export default function RaceResultsPage() {
   const params = useParams();
   const raceId = params.raceId as string;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [race, setRace] = useState<any>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [rows, setRows] = useState<ResultRow[]>([]);
@@ -63,7 +64,7 @@ export default function RaceResultsPage() {
     })));
   };
 
-  const updateRow = (index: number, field: keyof ResultRow, value: any) => {
+  const updateRow = (index: number, field: keyof ResultRow, value: ResultRow[keyof ResultRow]) => {
     setRows(prev => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };

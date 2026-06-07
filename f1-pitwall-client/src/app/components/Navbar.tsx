@@ -7,7 +7,9 @@ import { clearTokens } from "../lib/pitwall-auth";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 
-const navGroups = [
+interface NavItem { href: string; label: string; live?: boolean; }
+
+const navGroups: { label: string; items: NavItem[]; roles: string[] }[] = [
   {
     label: "SEASON",
     items: [
@@ -62,7 +64,7 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
           ? "border-red-500 text-white"
           : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-600"
           }`}>
-        {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+        {item.live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
         {item.label.toUpperCase()}
       </Link>
     );
@@ -86,7 +88,7 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
                 ? "border-red-500 text-white bg-zinc-800"
                 : "border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-600"
                 }`}>
-              {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+              {item.live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
               {item.label}
             </Link>
           ))}
@@ -115,15 +117,14 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   const visibleGroups = navGroups.filter(group => !user || group.roles.includes(user.role));
   const roleColor = user?.role === "ADMIN" ? "#ef4444" : user?.role === "ENGINEER" ? "#3b82f6" : "#52525b";
-  const avatarUrl = (user as any)?.avatarUrl;
+  const avatarUrl = user?.avatarUrl;
   const showAvatar = avatarUrl && !imgError;
-  const displayName = (user as any)?.displayName || user?.username || "";
-
-  const allItems = visibleGroups.flatMap(g => g.items.map(item => ({ ...item, group: g.label })));
+  const displayName = user?.displayName || user?.username || "";
 
   return (
     <nav className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-50" ref={mobileRef}>
@@ -208,7 +209,7 @@ export default function Navbar() {
                     ? "bg-red-500/10 text-red-400 border border-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
                     }`}>
-                  {(item as any).live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
+                  {item.live && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
                   {item.label}
                 </Link>
               ))}
