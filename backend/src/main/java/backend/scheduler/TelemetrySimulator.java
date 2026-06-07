@@ -1,5 +1,7 @@
 package backend.scheduler;
 
+import backend.model.Driver;
+import backend.repository.DriverRepository;
 import backend.websocket.TelemetryPayload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Component
 @EnableScheduling
@@ -17,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TelemetrySimulator {
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final DriverRepository driverRepository;
 
     private final Map<String, DriverState> driverStates = new LinkedHashMap<>();
 
@@ -24,21 +28,26 @@ public class TelemetrySimulator {
     private final AtomicInteger globalLap = new AtomicInteger(1);
     private final AtomicInteger tickCount = new AtomicInteger(0);
 
-    private static final Object[][] DRIVERS = {
-            { "Lando Norris",     "McLaren",           "#FF8000", 1 },
-            { "George Russell",   "Mercedes",           "#27F4D2", 63 },
-            { "Kimi Antonelli",   "Mercedes",           "#27F4D2", 12 },
-            { "Max Verstappen",   "Red Bull Racing",    "#3671C6", 3 },
-            { "Oscar Piastri",    "McLaren",            "#FF8000", 81 },
-            { "Charles Leclerc",  "Ferrari",            "#E8002D", 16 },
-            { "Lewis Hamilton",   "Ferrari",            "#E8002D", 44 },
-            { "Carlos Sainz",     "Williams",           "#005AFF", 55 },
-            { "Fernando Alonso",  "Aston Martin",       "#358C75", 14 },
-            { "Isack Hadjar",     "Red Bull Racing",    "#3671C6", 6  },
-    };
+    /** Cached driver list loaded from DB on first initialization (max 10 entries). */
+    private List<DriverInfo> cachedDrivers = null;
 
     private static final String[] TYRE_TYPES = { "SOFT", "MEDIUM", "HARD" };
     private static final Random RNG = new Random();
+
+    /** Lightweight value holder for driver data read from the DB. */
+    private static class DriverInfo {
+        final String name;
+        final String team;
+        final String color;
+        final int carNumber;
+
+        DriverInfo(String name, String team, String color, int carNumber) {
+            this.name = name;
+            this.team = team;
+            this.color = color;
+            this.carNumber = carNumber;
+        }
+    }
 
     private static class DriverState {
         String name, team, color;
@@ -51,17 +60,39 @@ public class TelemetrySimulator {
         boolean inCorner;
     }
 
+    /**
+     * Loads up to 10 drivers from the database, sorted by car number.
+     * Results are cached in {@code cachedDrivers} so the DB is only queried once.
+     */
+    private List<DriverInfo> loadDriversFromDb() {
+        if (cachedDrivers != null) return cachedDrivers;
+        List<Driver> dbDrivers = driverRepository.findAll()
+                .stream()
+                .sorted(Comparator.comparingInt(Driver::getCarNumber))
+                .limit(10)
+                .collect(Collectors.toList());
+
+        cachedDrivers = dbDrivers.stream().map(d -> {
+            String teamName  = d.getTeam() != null ? d.getTeam().getName()     : "Unknown";
+            String teamColor = d.getTeam() != null ? d.getTeam().getColorHex() : "#FFFFFF";
+            return new DriverInfo(d.getName(), teamName, teamColor, d.getCarNumber());
+        }).collect(Collectors.toList());
+
+        return cachedDrivers;
+    }
+
     private synchronized void initialize() {
         if (initialized.get()) return;
+        List<DriverInfo> drivers = loadDriversFromDb();
         driverStates.clear();
         double gap = 0;
-        for (int i = 0; i < DRIVERS.length; i++) {
-            Object[] d = DRIVERS[i];
+        for (int i = 0; i < drivers.size(); i++) {
+            DriverInfo d = drivers.get(i);
             DriverState s = new DriverState();
-            s.name = (String) d[0];
-            s.team = (String) d[1];
-            s.color = (String) d[2];
-            s.carNumber = (int) d[3];
+            s.name = d.name;
+            s.team = d.team;
+            s.color = d.color;
+            s.carNumber = d.carNumber;
             s.position = i + 1;
             s.lap = 1;
             s.fuelLoad = 110 - (i * 0.3);

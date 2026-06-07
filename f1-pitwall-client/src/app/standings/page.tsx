@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { BASE_URL as API } from "../lib/api-client";
 import {
   downloadDriverStandingsCsv,
   downloadConstructorStandingsCsv,
@@ -11,8 +12,7 @@ import {
 import Navbar from "../components/Navbar";
 import ExportButton from "../components/ExportButton";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import { SkeletonTable } from "../components/LoadingSkeleton";
 
 interface DriverStanding {
   position: number; driverId: number; driverName: string; carNumber: number;
@@ -53,6 +53,7 @@ export default function StandingsPage() {
   const [drivers, setDrivers] = useState<DriverStanding[]>([]);
   const [constructors, setConstructors] = useState<ConstructorStanding[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
 
   useEffect(() => {
@@ -65,8 +66,10 @@ export default function StandingsPage() {
         ]);
         setDrivers(await d.json());
         setConstructors(await c.json());
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error(e);
+        setError(e instanceof Error ? e.message : "Failed to load standings data.");
+      } finally { setLoading(false); }
     })();
   }, []);
 
@@ -140,14 +143,15 @@ export default function StandingsPage() {
           ))}
         </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 gap-4">
-            <div className="relative w-14 h-14">
-              <div className="absolute inset-0 border-2 border-[#E10600]/20 rounded-full" />
-              <div className="absolute inset-0 border-2 border-[#E10600] rounded-full border-t-transparent animate-spin" />
-            </div>
-            <p className="f-mono text-[11px] text-[#E10600]/70 tracking-widest animate-pulse">LOADING TELEMETRY...</p>
+        {error && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-800/60 px-5 py-4" style={{ background: "rgba(225,6,0,.08)" }}>
+            <span className="f-mono text-[11px] text-[#E10600] font-bold tracking-widest mt-0.5 shrink-0">ERROR</span>
+            <p className="f-mono text-sm text-red-300">{error}</p>
           </div>
+        )}
+
+        {loading ? (
+          <SkeletonTable rows={10} cols={6} />
         ) : tab === "drivers" ? (
           <>
             {/* Podium top 3 */}

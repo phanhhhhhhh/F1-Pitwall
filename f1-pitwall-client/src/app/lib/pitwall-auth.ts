@@ -93,16 +93,46 @@ export async function register(username: string, password: string, email: string
     return data;
 }
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
+export class ApiError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+    }
+}
+
+export function isApiError(err: unknown): err is ApiError {
+    return err instanceof ApiError;
+}
+
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const token = getAccessToken();
-    const res = await fetch(url, {
-        ...options,
-        headers: {
-            ...options.headers,
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+                ...options.headers,
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+    } catch (err: unknown) {
+        clearTimeout(timeoutId);
+        if (err instanceof Error && err.name === "AbortError") {
+            throw new ApiError(408, `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+        }
+        throw err;
+    }
+    clearTimeout(timeoutId);
+
     const currentRefresh = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
     if (res.status === 401 && currentRefresh) {
         const refreshed = await tryRefreshToken();
@@ -116,6 +146,19 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
             if (isBrowser()) window.location.href = "/login";
         }
     }
+
+    if (!res.ok && res.status !== 401) {
+        let message = `HTTP ${res.status}`;
+        try {
+            const body = await res.clone().json();
+            if (body?.error) message = body.error;
+            else if (body?.message) message = body.message;
+        } catch {
+            // ignore JSON parse failure; keep default message
+        }
+        throw new ApiError(res.status, message);
+    }
+
     return res;
 }
 

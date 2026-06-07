@@ -4,6 +4,7 @@ import backend.model.Team;
 import backend.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -25,6 +26,7 @@ public class TeamService {
         return teamRepository.save(team);
     }
 
+    @Transactional
     public Team update(Long id, Team updated) {
         Team existing = getById(id);
         existing.setName(updated.getName());

@@ -90,37 +90,27 @@ public class RaceResultService {
      * Response: { "Australian Grand Prix": { driverName, teamName, ... }, ... }
      */
     public Map<String, RaceWinnerResponse> getSeasonWinners(int season) {
-        List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
-
-        // Group by race, pick P1 non-DNF
-        Map<Long, List<RaceResult>> byRace = allResults.stream()
-                .collect(Collectors.groupingBy(r -> r.getRace().getId()));
+        // Fetch only P1 non-DNF results directly from DB instead of loading all race results
+        List<RaceResult> winnerResults = raceResultRepo.findSeasonWinners(season, RaceStatus.COMPLETED);
 
         Map<String, RaceWinnerResponse> winners = new LinkedHashMap<>();
-        for (List<RaceResult> raceResults : byRace.values()) {
-            if (raceResults.isEmpty()) continue;
-            String raceName = raceResults.get(0).getRace().getName();
-            Long raceId = raceResults.get(0).getRace().getId();
-
-            raceResults.stream()
-                    .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)
-                    .findFirst()
-                    .ifPresent(w -> {
-                        Driver d = w.getDriver();
-                        String lastName = d.getName().contains(" ")
-                                ? d.getName().substring(d.getName().lastIndexOf(" ") + 1)
-                                : d.getName();
-                        winners.put(raceName, RaceWinnerResponse.builder()
-                                .raceName(raceName)
-                                .raceId(raceId)
-                                .driverName(d.getName())
-                                .driverLastName(lastName)
-                                .teamName(d.getTeam() != null ? d.getTeam().getName() : "")
-                                .teamColor(d.getTeam() != null ? d.getTeam().getColorHex() : "#666")
-                                .points(w.getPoints())
-                                .hasFastestLap(w.isHasFastestLap())
-                                .build());
-                    });
+        for (RaceResult w : winnerResults) {
+            String raceName = w.getRace().getName();
+            Long raceId = w.getRace().getId();
+            Driver d = w.getDriver();
+            String lastName = d.getName().contains(" ")
+                    ? d.getName().substring(d.getName().lastIndexOf(" ") + 1)
+                    : d.getName();
+            winners.put(raceName, RaceWinnerResponse.builder()
+                    .raceName(raceName)
+                    .raceId(raceId)
+                    .driverName(d.getName())
+                    .driverLastName(lastName)
+                    .teamName(d.getTeam() != null ? d.getTeam().getName() : "")
+                    .teamColor(d.getTeam() != null ? d.getTeam().getColorHex() : "#666")
+                    .points(w.getPoints())
+                    .hasFastestLap(w.isHasFastestLap())
+                    .build());
         }
         return winners;
     }

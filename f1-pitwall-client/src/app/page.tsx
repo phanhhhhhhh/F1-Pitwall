@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "./lib/pitwall-auth";
+import { BASE_URL as API } from "./lib/api-client";
 import Navbar from "./components/Navbar";
 import RaceWeekendWidget from "./components/RaceWeekendWidget";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 const COUNTRY_FLAGS: Record<string, string> = {
   "Australia": "🇦🇺", "China": "🇨🇳", "Japan": "🇯🇵", "Bahrain": "🇧🇭", "Saudi Arabia": "🇸🇦",
