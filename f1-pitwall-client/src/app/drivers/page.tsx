@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import { SkeletonCard } from "../components/LoadingSkeleton";
 
 const NATIONALITY_FLAGS: Record<string, string> = {
   "British": "🇬🇧", "Australian": "🇦🇺", "Dutch": "🇳🇱", "French": "🇫🇷",
@@ -86,13 +86,21 @@ export default function DriversPage() {
   const router = useRouter();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterTeam, setFilterTeam] = useState("ALL");
   const [sortBy, setSortBy] = useState<"number" | "wins" | "points">("number");
 
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
-    authFetch(`${API}/api/drivers`).then(r => r.json()).then(setDrivers).catch(console.error).finally(() => setLoading(false));
+    authFetch(`${API}/api/drivers`)
+      .then(r => r.json())
+      .then(setDrivers)
+      .catch((e: unknown) => {
+        console.error(e);
+        setError(e instanceof Error ? e.message : "Failed to load drivers data.");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const teams = ["ALL", ...Array.from(new Set(drivers.map(d => d.team?.name).filter(Boolean)))];
@@ -166,8 +174,15 @@ export default function DriversPage() {
           })}
         </div>
 
+        {error && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-800/60 px-5 py-4" style={{ background: "rgba(225,6,0,.08)" }}>
+            <span className="f-mono text-[11px] text-[#E10600] font-bold tracking-widest mt-0.5 shrink-0">ERROR</span>
+            <p className="f-mono text-sm text-red-300">{error}</p>
+          </div>
+        )}
+
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-52 bg-white/[0.03] rounded-2xl animate-pulse border border-white/5" />)}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20"><p className="f-cond text-zinc-500 text-xl mb-1">No drivers found</p><p className="f-mono text-zinc-700 text-xs">Try adjusting your search</p></div>
         ) : (

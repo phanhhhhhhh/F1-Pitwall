@@ -5,7 +5,10 @@ import backend.model.Team;
 import backend.repository.DriverRepository;
 import backend.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -16,6 +19,8 @@ public class DriverService {
     private final TeamRepository teamRepository;
 
     public List<Driver> getAll() { return driverRepository.findAll(); }
+
+    public Page<Driver> getPaged(Pageable pageable) { return driverRepository.findAll(pageable); }
     public List<Driver> getByTeam(Long teamId) { return driverRepository.findByTeamId(teamId); }
     public List<Driver> getLeaderboard() { return driverRepository.findAllOrderByCareerPoints(); }
 
@@ -33,6 +38,7 @@ public class DriverService {
         return driverRepository.save(driver);
     }
 
+    @Transactional
     public Driver update(Long id, Driver updated, Long teamId) {
         Driver existing = getById(id);
         existing.setName(updated.getName());
