@@ -16,6 +16,10 @@ export interface User {
     createdAt: string;
     displayName?: string;
     avatarUrl?: string;
+    phone?: string;
+    bio?: string;
+    location?: string;
+    dateOfBirth?: string;
 }
 
 let accessToken: string | null = null;

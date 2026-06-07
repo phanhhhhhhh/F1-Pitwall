@@ -17,6 +17,7 @@ function CallbackHandler() {
         const err = searchParams.get("error");
 
         if (err) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setError("Google login failed. Please try again.");
             setTimeout(() => router.push("/login"), 3000);
             return;

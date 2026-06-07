@@ -40,11 +40,13 @@ export default function Home() {
   const [stats, setStats] = useState({ drivers: 0, teams: 0, circuits: 0 });
   const [sprintCount, setSprintCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   const [allRaces, setAllRaces] = useState<any[]>([]);
   const [calendar, setCalendar] = useState<any[]>([]);
   const [standings, setStandings] = useState<any[]>([]);
   const [winners, setWinners] = useState<Record<string, { driver: string; team: string }>>({});
   const [nextRace, setNextRace] = useState<any>(null);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   const [cd, setCd] = useState({ d: 0, h: 0, m: 0, s: 0, raceDay: false });
 
   useEffect(() => {
@@ -78,18 +80,19 @@ export default function Home() {
         authFetch(`${API}/api/races/season/2026`), authFetch(`${API}/api/circuits`),
       ]);
       const [drivers, teams, races, circuits] = await Promise.all([d.json(), t.json(), r.json(), c.json()]);
-      const gp = races.filter((x: any) => !x.name.toLowerCase().includes("sprint"));
-      const sp = races.filter((x: any) => x.name.toLowerCase().includes("sprint"));
+      const gp = races.filter((x) => !x.name.toLowerCase().includes("sprint"));
+      const sp = races.filter((x) => x.name.toLowerCase().includes("sprint"));
       setStats({ drivers: drivers.length, teams: teams.length, circuits: circuits.length });
       setSprintCount(sp.length);
       setAllRaces(races);
       setCalendar(gp.slice(0, 6));
       const today = new Date().toISOString().split("T")[0];
-      const up = gp.filter((x: any) => x.status === "SCHEDULED" && x.date >= today).sort((a: any, b: any) => a.date.localeCompare(b.date));
+      const up = gp.filter((x) => x.status === "SCHEDULED" && x.date >= today).sort((a, b) => a.date.localeCompare(b.date));
       if (up.length) setNextRace(up[0]);
       try {
         const w = await (await authFetch(`${API}/api/race-results/winners/2026`)).json();
         const m: Record<string, { driver: string; team: string }> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Object.entries(w).forEach(([n, v]: [string, any]) => { m[n] = { driver: v.driverLastName || v.driverName, team: v.teamName }; });
         setWinners(m);
       } catch { }
@@ -153,7 +156,7 @@ export default function Home() {
           <div className="flex items-center gap-2.5">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#E10600]" style={{ animation: "live 1.6s infinite" }} />
             <span className="text-[#E10600] font-bold">LIVE FEED</span>
-            <span className="text-zinc-700">//</span>
+            <span className="text-zinc-700">{"//"}</span>
             <span className="text-zinc-500">FORMULA 1 · SEASON 2026</span>
           </div>
           <div className="hidden sm:flex items-center gap-4 text-zinc-600">
