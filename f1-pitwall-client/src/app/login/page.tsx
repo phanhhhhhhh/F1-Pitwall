@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "../lib/pitwall-auth";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import { BASE_URL as API } from "../lib/api-client";
 
 export default function LoginPage() {
     const [username, setUsername] = useState("");
@@ -20,6 +19,8 @@ export default function LoginPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+        if (!username.trim()) { setError("Callsign is required"); return; }
+        if (!password) { setError("Access code is required"); return; }
         setIsLoading(true);
         try {
             await login(username, password);

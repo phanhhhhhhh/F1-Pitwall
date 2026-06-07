@@ -6,8 +6,8 @@ import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import Navbar from "../components/Navbar";
 import RaceWeekendWidget from "../components/RaceWeekendWidget";
 import Link from "next/link";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import { BASE_URL as API } from "../lib/api-client";
+import { SkeletonTable } from "../components/LoadingSkeleton";
 
 const COUNTRY_FLAGS: Record<string, string> = {
     "Australia": "🇦🇺", "China": "🇨🇳", "Japan": "🇯🇵", "Bahrain": "🇧🇭",
@@ -43,9 +43,12 @@ export default function RacesPage() {
                 const map: Record<string, RaceWinner> = {};
                 Object.entries(wData).forEach(([name, w]: [string, any]) => { map[name] = { driver: w.driverName, team: w.teamName }; });
                 setRaceWinners(map);
-            } catch { }
-        } catch { }
-        finally { setLoading(false); }
+            } catch (e) {
+                console.warn("[RacesPage] Failed to fetch race winners:", e);
+            }
+        } catch (e) {
+            console.error("[RacesPage] Failed to fetch races:", e);
+        } finally { setLoading(false); }
     };
 
     const mainRaces = races.filter(r => !r.name.toLowerCase().includes("sprint"));
@@ -163,7 +166,7 @@ export default function RacesPage() {
                 </div>
 
                 {loading ? (
-                    <div className="space-y-3">{[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 bg-white/[0.03] rounded-2xl animate-pulse border border-white/5" />)}</div>
+                    <div className="space-y-3"><SkeletonTable rows={8} cols={4} /></div>
                 ) : (
                     <div className="relative">
                         <div className="absolute left-5 top-0 bottom-0 w-px" style={{ background: "rgba(255,255,255,.08)" }} />

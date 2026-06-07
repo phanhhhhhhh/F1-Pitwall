@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
+import { SkeletonTable } from "../components/LoadingSkeleton";
 
 interface Circuit {
   id: number; name: string; country: string; city: string; type: string;
@@ -147,7 +148,7 @@ export default function CircuitsPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-48 bg-white/[0.03] rounded-2xl animate-pulse border border-white/5" />)}</div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><SkeletonTable rows={8} cols={5} /></div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20"><p className="f-cond text-zinc-500 text-xl mb-1">No circuits found</p><p className="f-mono text-zinc-700 text-xs">Try adjusting your search</p></div>
         ) : (

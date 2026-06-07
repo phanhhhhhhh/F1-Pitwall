@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { register } from "../lib/pitwall-auth";
+import { BASE_URL as API } from "../lib/api-client";
 
 export default function RegisterPage() {
     const [username, setUsername] = useState("");
@@ -21,6 +22,8 @@ export default function RegisterPage() {
         e.preventDefault();
         setError("");
 
+        if (!username.trim() || username.trim().length < 3) { setError("Callsign must be at least 3 characters"); return; }
+        if (!email.trim() || !email.includes("@") || !email.includes(".")) { setError("Please enter a valid email address"); return; }
         if (password !== confirm) { setError("Passwords do not match"); return; }
         if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
 
@@ -106,7 +109,7 @@ export default function RegisterPage() {
                         )}
 
                         { }
-                        <a href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/oauth2/authorize/google`}
+                        <a href={`${API}/oauth2/authorize/google`}
                             className="flex items-center justify-center gap-3 w-full py-3 rounded-xl border border-zinc-700/50 bg-zinc-800/40 hover:bg-zinc-800 hover:border-zinc-600 transition-all duration-200 text-sm font-bold text-white fade-up">
                             <svg width="18" height="18" viewBox="0 0 18 18">
                                 <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z" />
