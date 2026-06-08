@@ -1,22 +1,42 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { login } from "../lib/pitwall-auth";
+import { useRouter, useSearchParams } from "next/navigation";
+import { login, sendLoginOtp, verifyLoginOtp } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+type LoginMode = "password" | "otp";
+type OtpStep = "email" | "code";
+
+function LoginForm() {
+    const [mode, setMode] = useState<LoginMode>("password");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [otpEmail, setOtpEmail] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [otpStep, setOtpStep] = useState<OtpStep>("email");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [focused, setFocused] = useState<"user" | "pass" | null>(null);
+    const [focused, setFocused] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
 
-    useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
+    useEffect(() => {
+        setTimeout(() => setMounted(true), 50);
+        const err = searchParams.get("error");
+        if (err === "oauth_failed") setError("Google login failed. Please try again.");
+        if (err === "otp_failed") setError("Failed to send 2FA code. Please try again.");
+        if (err === "no_email") setError("Google account has no email.");
+    }, [searchParams]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const inputStyle = (field: string) => ({
+        borderColor: focused === field ? "#ef4444" : "rgba(63,63,70,0.5)",
+        boxShadow: focused === field ? "0 0 20px rgba(239,68,68,0.15)" : "none",
+    });
+
+    const handlePasswordLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         if (!username.trim()) { setError("Callsign is required"); return; }
@@ -25,12 +45,44 @@ export default function LoginPage() {
         try {
             await login(username, password);
             router.push("/");
-        } catch (error) {
-            setError(error instanceof Error ? error.message : "Authentication failed");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Authentication failed");
         } finally {
             setIsLoading(false);
         }
     };
+
+    const handleSendOtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        if (!otpEmail.trim()) { setError("Email is required"); return; }
+        setIsLoading(true);
+        try {
+            await sendLoginOtp(otpEmail.trim());
+            setOtpStep("code");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to send OTP");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        if (otpCode.length !== 6) { setError("Enter the 6-digit code"); return; }
+        setIsLoading(true);
+        try {
+            await verifyLoginOtp(otpEmail.trim(), otpCode.trim());
+            router.push("/");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "OTP verification failed");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const switchMode = (m: LoginMode) => { setMode(m); setError(""); setOtpStep("email"); setOtpCode(""); };
 
     return (
         <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4 relative overflow-hidden">
@@ -116,43 +168,104 @@ export default function LoginPage() {
                             <div className="flex-1 h-px bg-zinc-800" />
                         </div>
 
-                        {/* Form */}
-                        <form onSubmit={handleSubmit} className="space-y-5">
-                            <div className="fade-up" style={{ animationDelay: "150ms" }}>
-                                <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Callsign</label>
-                                <div className="relative">
-                                    <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-                                        onFocus={() => setFocused("user")} onBlur={() => setFocused(null)}
-                                        className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
-                                        style={{ borderColor: focused === "user" ? "#ef4444" : "rgba(63,63,70,0.5)", boxShadow: focused === "user" ? "0 0 20px rgba(239,68,68,0.15)" : "none" }}
-                                        placeholder="admin" required autoComplete="username" />
-                                    {focused === "user" && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
-                                </div>
-                            </div>
-
-                            <div className="fade-up" style={{ animationDelay: "200ms" }}>
-                                <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Access Code</label>
-                                <div className="relative">
-                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                                        onFocus={() => setFocused("pass")} onBlur={() => setFocused(null)}
-                                        className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
-                                        style={{ borderColor: focused === "pass" ? "#ef4444" : "rgba(63,63,70,0.5)", boxShadow: focused === "pass" ? "0 0 20px rgba(239,68,68,0.15)" : "none" }}
-                                        placeholder="••••••••" required autoComplete="current-password" />
-                                    {focused === "pass" && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
-                                </div>
-                            </div>
-
-                            <div className="fade-up" style={{ animationDelay: "250ms" }}>
-                                <button type="submit" disabled={isLoading}
-                                    className="relative w-full py-4 rounded-xl font-black tracking-widest text-sm overflow-hidden transition-all duration-300 disabled:opacity-50"
-                                    style={{ background: isLoading ? "rgba(39,39,42,0.8)" : "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: isLoading ? "none" : "0 0 30px rgba(239,68,68,0.3)" }}>
-                                    {!isLoading && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-700" />}
-                                    <span className="relative flex items-center justify-center gap-2 text-white">
-                                        {isLoading ? (<><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />AUTHENTICATING...</>) : <>ENTER PITWALL →</>}
-                                    </span>
+                        {/* Mode tabs */}
+                        <div className="flex gap-1 mb-5 p-1 bg-zinc-950/60 rounded-xl border border-zinc-800/50 fade-up" style={{ animationDelay: "110ms" }}>
+                            {(["password", "otp"] as LoginMode[]).map(m => (
+                                <button key={m} onClick={() => switchMode(m)} type="button"
+                                    className={`flex-1 py-2 rounded-lg text-xs font-black tracking-widest transition-all duration-200 ${mode === m ? "bg-red-500/20 text-red-400 border border-red-500/30" : "text-zinc-600 hover:text-zinc-400"}`}>
+                                    {m === "password" ? "PASSWORD" : "OTP LOGIN"}
                                 </button>
+                            ))}
+                        </div>
+
+                        {/* Password form */}
+                        {mode === "password" && (
+                            <form onSubmit={handlePasswordLogin} className="space-y-5">
+                                <div className="fade-up" style={{ animationDelay: "150ms" }}>
+                                    <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Callsign</label>
+                                    <div className="relative">
+                                        <input type="text" value={username} onChange={e => setUsername(e.target.value)}
+                                            onFocus={() => setFocused("user")} onBlur={() => setFocused(null)}
+                                            className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
+                                            style={inputStyle("user")}
+                                            placeholder="admin" required autoComplete="username" />
+                                        {focused === "user" && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
+                                    </div>
+                                </div>
+
+                                <div className="fade-up" style={{ animationDelay: "200ms" }}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] font-mono">Access Code</label>
+                                        <a href="/forgot-password" className="text-zinc-600 hover:text-red-500 text-xs font-mono transition-colors">Forgot password?</a>
+                                    </div>
+                                    <div className="relative">
+                                        <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                                            onFocus={() => setFocused("pass")} onBlur={() => setFocused(null)}
+                                            className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
+                                            style={inputStyle("pass")}
+                                            placeholder="••••••••" required autoComplete="current-password" />
+                                        {focused === "pass" && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
+                                    </div>
+                                </div>
+
+                                <div className="fade-up" style={{ animationDelay: "250ms" }}>
+                                    <button type="submit" disabled={isLoading}
+                                        className="relative w-full py-4 rounded-xl font-black tracking-widest text-sm overflow-hidden transition-all duration-300 disabled:opacity-50"
+                                        style={{ background: isLoading ? "rgba(39,39,42,0.8)" : "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: isLoading ? "none" : "0 0 30px rgba(239,68,68,0.3)" }}>
+                                        {!isLoading && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-700" />}
+                                        <span className="relative flex items-center justify-center gap-2 text-white">
+                                            {isLoading ? (<><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />AUTHENTICATING...</>) : <>ENTER PITWALL →</>}
+                                        </span>
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* OTP login form */}
+                        {mode === "otp" && (
+                            <div className="space-y-5 fade-up" style={{ animationDelay: "150ms" }}>
+                                {otpStep === "email" ? (
+                                    <form onSubmit={handleSendOtp} className="space-y-5">
+                                        <div>
+                                            <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Email Address</label>
+                                            <input type="email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)}
+                                                onFocus={() => setFocused("otp-email")} onBlur={() => setFocused(null)}
+                                                className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
+                                                style={inputStyle("otp-email")}
+                                                placeholder="you@example.com" required autoComplete="email" />
+                                        </div>
+                                        <button type="submit" disabled={isLoading}
+                                            className="relative w-full py-4 rounded-xl font-black tracking-widest text-sm text-white overflow-hidden transition-all duration-300 disabled:opacity-50"
+                                            style={{ background: isLoading ? "rgba(39,39,42,0.8)" : "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: isLoading ? "none" : "0 0 30px rgba(239,68,68,0.3)" }}>
+                                            {isLoading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />SENDING...</span> : "SEND OTP →"}
+                                        </button>
+                                    </form>
+                                ) : (
+                                    <form onSubmit={handleVerifyOtp} className="space-y-5">
+                                        <div>
+                                            <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Verification Code</label>
+                                            <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                                onFocus={() => setFocused("otp-code")} onBlur={() => setFocused(null)}
+                                                className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono text-center text-2xl tracking-[0.5em]"
+                                                style={inputStyle("otp-code")}
+                                                placeholder="——————" required autoComplete="one-time-code" inputMode="numeric" maxLength={6} autoFocus />
+                                            <p className="text-zinc-600 text-xs font-mono mt-1.5">Sent to {otpEmail} · expires in 5 min</p>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button type="button" onClick={() => { setOtpStep("email"); setOtpCode(""); setError(""); }}
+                                                className="flex-1 py-3.5 rounded-xl font-bold text-sm text-zinc-400 border border-zinc-700/50 hover:border-zinc-500 transition-all">
+                                                ← BACK
+                                            </button>
+                                            <button type="submit" disabled={isLoading}
+                                                className="flex-[2] py-3.5 rounded-xl font-black tracking-widest text-sm text-white transition-all duration-300 disabled:opacity-50"
+                                                style={{ background: isLoading ? "rgba(39,39,42,0.8)" : "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: isLoading ? "none" : "0 0 30px rgba(239,68,68,0.3)" }}>
+                                                {isLoading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />VERIFYING...</span> : "ENTER PITWALL →"}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
                             </div>
-                        </form>
+                        )}
 
                         {/* Footer */}
                         <div className="mt-6 pt-5 border-t border-zinc-800/50 text-center fade-up" style={{ animationDelay: "300ms" }}>
@@ -171,5 +284,17 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                <div className="w-12 h-12 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     );
 }

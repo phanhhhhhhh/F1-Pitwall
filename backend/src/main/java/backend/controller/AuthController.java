@@ -1,9 +1,11 @@
 package backend.controller;
 
 import backend.dto.*;
+import backend.model.OtpToken;
 import backend.model.User;
 import backend.repository.UserRepository;
 import backend.security.JwtService;
+import backend.service.OtpService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -35,6 +37,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OtpService otpService;
 
     @Value("${app.jwt.access-token-expiration}")
     private long accessTokenExpiration;
@@ -168,6 +171,118 @@ public class AuthController {
         userRepository.save(user);
         log.info("[Auth] Password changed for user: {}", username);
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
+
+    // ── Forgot password ──────────────────────────────────────────────────────
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        // Only send if email exists — do NOT reveal whether it exists to the caller
+        userRepository.findByEmail(email.trim()).ifPresent(user -> {
+            try {
+                otpService.sendOtp(email.trim(), OtpToken.OtpType.FORGOT_PASSWORD);
+            } catch (Exception e) {
+                log.warn("[Auth] Forgot-password OTP send failed for {}: {}", email, e.getMessage());
+            }
+        });
+        return ResponseEntity.ok(Map.of("message", "If this email is registered, an OTP has been sent"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        String email       = body.get("email");
+        String code        = body.get("otp");
+        String newPassword = body.get("newPassword");
+        if (email == null || code == null || newPassword == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "email, otp, and newPassword are required"));
+        if (newPassword.length() < 6)
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters"));
+        if (!otpService.verifyOtp(email.trim(), code.trim(), OtpToken.OtpType.FORGOT_PASSWORD))
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
+        User user = userRepository.findByEmail(email.trim()).orElse(null);
+        if (user == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        log.info("[Auth] Password reset via OTP for email: {}", email);
+        return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+    }
+
+    // ── OTP login (passwordless) ─────────────────────────────────────────────
+
+    @PostMapping("/otp/send")
+    public ResponseEntity<?> sendLoginOtp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        if (!userRepository.existsByEmail(email.trim()))
+            return ResponseEntity.badRequest().body(Map.of("error", "No account found with this email"));
+        try {
+            otpService.sendOtp(email.trim(), OtpToken.OtpType.LOGIN_OTP);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+        return ResponseEntity.ok(Map.of("message", "OTP sent to your email"));
+    }
+
+    @PostMapping("/otp/verify")
+    public ResponseEntity<?> verifyLoginOtp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String code  = body.get("otp");
+        if (email == null || code == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "email and otp are required"));
+        if (!otpService.verifyOtp(email.trim(), code.trim(), OtpToken.OtpType.LOGIN_OTP))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired OTP"));
+        User user = userRepository.findByEmail(email.trim()).orElse(null);
+        if (user == null)
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
+        return ResponseEntity.ok(buildAuthResponse(user));
+    }
+
+    // ── OAuth2 2FA ───────────────────────────────────────────────────────────
+
+    @PostMapping("/oauth2/resend-otp")
+    public ResponseEntity<?> resendOauth2Otp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        if (!userRepository.existsByEmail(email.trim()))
+            return ResponseEntity.ok(Map.of("message", "OTP sent"));
+        try {
+            otpService.sendOtp(email.trim(), OtpToken.OtpType.OAUTH_2FA);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+        return ResponseEntity.ok(Map.of("message", "OTP sent"));
+    }
+
+    @PostMapping("/oauth2/verify-otp")
+    public ResponseEntity<?> verifyOauth2Otp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String code  = body.get("otp");
+        if (email == null || code == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "email and otp are required"));
+        if (!otpService.verifyOtp(email.trim(), code.trim(), OtpToken.OtpType.OAUTH_2FA))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired OTP"));
+        User user = userRepository.findByEmail(email.trim()).orElse(null);
+        if (user == null)
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
+        return ResponseEntity.ok(buildAuthResponse(user));
+    }
+
+    private AuthResponse buildAuthResponse(User user) {
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+        String accessToken  = jwtService.generateAccessToken(userDetails, user.getRole().name());
+        String refreshToken = jwtService.generateRefreshToken(userDetails);
+        return AuthResponse.builder()
+                .accessToken(accessToken).refreshToken(refreshToken)
+                .username(user.getUsername()).role(user.getRole().name())
+                .expiresIn(accessTokenExpiration / 1000).build();
     }
 
     private Map<String, Object> buildUserResponse(User user) {
