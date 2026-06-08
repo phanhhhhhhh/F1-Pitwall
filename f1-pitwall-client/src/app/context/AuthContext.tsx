@@ -13,7 +13,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-const PUBLIC_PATHS = ["/login", "/register", "/oauth2"];
+const PUBLIC_PATHS = ["/login", "/register", "/oauth2", "/forgot-password"];
 
 async function fetchUserWithRetry(retries = 2): Promise<User | null> {
   for (let i = 0; i <= retries; i++) {
