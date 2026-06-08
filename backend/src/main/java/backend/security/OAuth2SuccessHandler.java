@@ -1,15 +1,15 @@
 package backend.security;
 
+import backend.model.OtpToken;
 import backend.model.User;
 import backend.repository.UserRepository;
-import backend.service.CustomUserDetailsService;
+import backend.service.OtpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -24,23 +24,17 @@ import java.nio.charset.StandardCharsets;
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final UserRepository userRepository;
-    private final JwtService jwtService;
-    private final CustomUserDetailsService userDetailsService;
+    private final OtpService otpService;
 
     @Value("${allowed.origins:http://localhost:3000}")
     private String allowedOrigins;
-
-    @Value("${app.jwt.access-token-expiration:900000}")
-    private long accessTokenExpiration;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
 
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-
         String email = oAuth2User.getAttribute("email");
-        String name  = oAuth2User.getAttribute("name");
 
         if (email == null) {
             log.warn("[OAuth2] Google account has no email");
@@ -48,42 +42,31 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             return;
         }
 
-        User user = userRepository.findByEmail(email).orElseGet(() -> {
+        // Create user if first time
+        userRepository.findByEmail(email).orElseGet(() -> {
             String baseUsername = email.split("@")[0].replaceAll("[^a-zA-Z0-9_]", "");
             String username = baseUsername;
             int suffix = 1;
-            while (userRepository.existsByUsername(username)) {
-                username = baseUsername + suffix++;
-            }
-
+            while (userRepository.existsByUsername(username)) username = baseUsername + suffix++;
             User newUser = User.builder()
-                    .username(username)
-                    .email(email)
-                    .password("")
-                    .role(User.Role.VIEWER)
+                    .username(username).email(email).password("").role(User.Role.VIEWER)
                     .build();
-
             log.info("[OAuth2] Created new user from Google: {} ({})", username, email);
             return userRepository.save(newUser);
         });
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
-        String accessToken  = jwtService.generateAccessToken(userDetails, user.getRole().name());
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
+        // Send 2FA OTP then redirect to pending page
+        try {
+            otpService.sendOtp(email, OtpToken.OtpType.OAUTH_2FA);
+            log.info("[OAuth2] 2FA OTP sent for {}", email);
+        } catch (Exception e) {
+            log.error("[OAuth2] Failed to send 2FA OTP to {}: {}", email, e.getMessage());
+            response.sendRedirect(getFrontendUrl() + "/login?error=otp_failed");
+            return;
+        }
 
-        log.info("[OAuth2] Google login success: {}", user.getUsername());
-
-        String frontendUrl = getFrontendUrl();
-        String redirectUrl = String.format(
-                "%s/oauth2/callback?accessToken=%s&refreshToken=%s&username=%s&role=%s&expiresIn=%d",
-                frontendUrl,
-                URLEncoder.encode(accessToken,  StandardCharsets.UTF_8),
-                URLEncoder.encode(refreshToken, StandardCharsets.UTF_8),
-                URLEncoder.encode(user.getUsername(), StandardCharsets.UTF_8),
-                URLEncoder.encode(user.getRole().name(), StandardCharsets.UTF_8),
-                accessTokenExpiration / 1000
-        );
-
+        String redirectUrl = getFrontendUrl() + "/oauth2/pending?email="
+                + URLEncoder.encode(email, StandardCharsets.UTF_8);
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 

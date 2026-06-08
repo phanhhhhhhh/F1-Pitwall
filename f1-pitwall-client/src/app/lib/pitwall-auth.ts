@@ -190,3 +190,95 @@ async function tryRefreshToken(): Promise<boolean> {
     refreshPromise = doRefresh().finally(() => { refreshPromise = null; });
     return refreshPromise;
 }
+
+// ── Forgot password ────────────────────────────────────────────────────────
+
+export async function sendForgotPasswordOtp(email: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to send reset code");
+    }
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp, newPassword }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Password reset failed");
+    }
+}
+
+// ── OTP login (passwordless) ───────────────────────────────────────────────
+
+export async function sendLoginOtp(email: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/auth/otp/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to send OTP");
+    }
+}
+
+export async function verifyLoginOtp(email: string, otp: string): Promise<AuthResponse> {
+    const res = await fetch(`${API_URL}/api/auth/otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "OTP verification failed");
+    }
+    const data: AuthResponse = await res.json();
+    setTokens(data.accessToken, data.refreshToken);
+    if (isBrowser()) {
+        localStorage.setItem("pitwall_username", data.username);
+        localStorage.setItem("pitwall_role", data.role);
+    }
+    return data;
+}
+
+// ── OAuth2 2FA ─────────────────────────────────────────────────────────────
+
+export async function verifyOauth2Otp(email: string, otp: string): Promise<AuthResponse> {
+    const res = await fetch(`${API_URL}/api/auth/oauth2/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "OTP verification failed");
+    }
+    const data: AuthResponse = await res.json();
+    setTokens(data.accessToken, data.refreshToken);
+    if (isBrowser()) {
+        localStorage.setItem("pitwall_username", data.username);
+        localStorage.setItem("pitwall_role", data.role);
+    }
+    return data;
+}
+
+export async function sendOauth2Otp(email: string): Promise<void> {
+    const res = await fetch(`${API_URL}/api/auth/oauth2/resend-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to resend OTP");
+    }
+}
