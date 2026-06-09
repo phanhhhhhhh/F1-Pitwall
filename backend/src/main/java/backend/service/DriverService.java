@@ -18,7 +18,7 @@ public class DriverService {
     private final DriverRepository driverRepository;
     private final TeamRepository teamRepository;
 
-    public List<Driver> getAll() { return driverRepository.findAll(); }
+    public List<Driver> getAll() { return driverRepository.findAllWithTeam(); }
 
     public Page<Driver> getPaged(Pageable pageable) { return driverRepository.findAll(pageable); }
     public List<Driver> getByTeam(Long teamId) { return driverRepository.findByTeamId(teamId); }
