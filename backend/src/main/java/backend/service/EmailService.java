@@ -1,30 +1,45 @@
 package backend.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${resend.api-key:}")
+    private String apiKey;
 
-    @Value("${spring.mail.username}")
+    @Value("${resend.from:onboarding@resend.dev}")
     private String fromAddress;
 
+    private final RestClient restClient = RestClient.create();
+
     public void sendOtpEmail(String to, String code, String purpose) {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.error("[Email] RESEND_API_KEY not configured");
+            throw new RuntimeException("Email service not configured. Contact administrator.");
+        }
         try {
-            SimpleMailMessage msg = new SimpleMailMessage();
-            msg.setFrom(fromAddress);
-            msg.setTo(to);
-            msg.setSubject(subject(purpose));
-            msg.setText(body(code, purpose));
-            mailSender.send(msg);
+            Map<String, Object> payload = Map.of(
+                "from", fromAddress,
+                "to", List.of(to),
+                "subject", subject(purpose),
+                "text", body(code, purpose)
+            );
+            restClient.post()
+                .uri("https://api.resend.com/emails")
+                .header("Authorization", "Bearer " + apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(payload)
+                .retrieve()
+                .toBodilessEntity();
             log.info("[Email] OTP sent to {} for {}", to, purpose);
         } catch (Exception e) {
             log.error("[Email] Failed to send OTP to {}: {}", to, e.getMessage());
