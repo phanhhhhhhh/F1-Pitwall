@@ -17,7 +17,7 @@ public class RaceService {
     private final CircuitRepository circuitRepository;
 
     public List<Race> getAll() { return raceRepository.findAll(); }
-    public List<Race> getBySeason(int season) { return raceRepository.findBySeasonOrderByRoundNumber(season); }
+    public List<Race> getBySeason(int season) { return raceRepository.findBySeasonWithCircuit(season); }
     public List<Race> getByStatus(RaceStatus status) { return raceRepository.findByStatus(status); }
 
     public Race getById(Long id) {
