@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 
@@ -25,13 +26,21 @@ function timeAgo(dateStr: string): string {
   return "just now";
 }
 
+const TYPE_ACCENT: Record<string, string> = {
+  RACE_RESULT:   "#FFD200",
+  DNF:           "#E10600",
+  STATUS_CHANGE: "#3b82f6",
+  SYSTEM:        "#71717a",
+};
+
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [unreadCount,   setUnreadCount]   = useState(0);
+  const [open,          setOpen]          = useState(false);
+  const [loading,       setLoading]       = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  /* ── click-outside ─────────────────────────────────────────────────────── */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -42,6 +51,7 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  /* ── poll unread count ─────────────────────────────────────────────────── */
   useEffect(() => {
     if (!getAccessToken()) return;
     fetchCount();
@@ -49,6 +59,7 @@ export default function NotificationBell() {
     return () => clearInterval(interval);
   }, []);
 
+  /* ── WebSocket live notifications ──────────────────────────────────────── */
   useEffect(() => {
     if (!getAccessToken()) return;
 
@@ -98,6 +109,7 @@ export default function NotificationBell() {
     loadAndConnect();
   }, []);
 
+  /* ── data helpers ──────────────────────────────────────────────────────── */
   const fetchCount = async () => {
     try {
       const res = await authFetch(`${API}/api/notifications/count`);
@@ -143,90 +155,140 @@ export default function NotificationBell() {
     setNotifications(prev => prev.filter(n => !n.read));
   };
 
-  const typeColor: Record<string, string> = {
-    RACE_RESULT: "border-l-yellow-500",
-    DNF: "border-l-red-500",
-    STATUS_CHANGE: "border-l-blue-500",
-    SYSTEM: "border-l-zinc-500",
-  };
-
   return (
     <div className="relative" ref={dropdownRef}>
-      <button onClick={handleOpen}
-        className="relative p-2 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-zinc-800">
+      {/* ── Bell button ────────────────────────────────────────────────────── */}
+      <button
+        onClick={handleOpen}
+        className="relative p-2 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-zinc-800/60 border border-transparent hover:border-[rgba(255,255,255,0.06)]"
+        aria-label="Notifications"
+      >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
             d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+          <span
+            className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#E10600] text-white f-mono text-[10px] font-black rounded-full flex items-center justify-center px-1 leading-none"
+            style={{ boxShadow: "0 0 8px rgba(225,6,0,0.6)" }}
+          >
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">Notifications</span>
-              {unreadCount > 0 && (
-                <span className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-mono">
-                  {unreadCount} new
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {unreadCount > 0 && (
-                <button onClick={markAllRead}
-                  className="text-xs text-zinc-500 hover:text-white transition-colors font-mono">
-                  Mark all read
-                </button>
-              )}
-              {notifications.some(n => n.read) && (
-                <button onClick={clearRead}
-                  className="text-xs text-zinc-600 hover:text-red-400 transition-colors font-mono">
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="max-h-80 overflow-y-auto">
-            {loading ? (
-              <div className="text-center py-8 text-zinc-600 text-sm font-mono">Loading...</div>
-            ) : notifications.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-zinc-600 text-sm">No notifications</p>
+      {/* ── Dropdown panel ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="notif-panel"
+            initial={{ opacity: 0, scale: 0.96, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -8 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            className="absolute right-0 top-full mt-2 w-80 z-50 overflow-hidden rounded-xl"
+            style={{
+              background: "rgba(14,14,16,0.96)",
+              border: "1px solid rgba(255,255,255,0.07)",
+              backdropFilter: "blur(24px)",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(225,6,0,0.08)",
+            }}
+          >
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
+              <div className="flex items-center gap-2">
+                <span className="f-cond text-sm font-black text-white tracking-wide">NOTIFICATIONS</span>
+                {unreadCount > 0 && (
+                  <span
+                    className="f-mono text-[10px] font-black bg-[#E10600]/20 text-[#E10600] border border-[#E10600]/30 px-1.5 py-0.5 rounded leading-none"
+                  >
+                    {unreadCount} NEW
+                  </span>
+                )}
               </div>
-            ) : (
-              notifications.map(n => (
-                <div key={n.id}
-                  onClick={() => !n.read && markRead(n.id)}
-                  className={`flex gap-3 px-4 py-3 border-b border-zinc-800/50 border-l-2 cursor-pointer transition-colors
-                    ${n.read ? "opacity-50" : "hover:bg-zinc-800/50"}
-                    ${typeColor[n.type] || "border-l-zinc-700"}`}>
-                  <span className="text-lg flex-shrink-0">{n.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-white">{n.title}</p>
-                    <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">{n.message}</p>
-                    <p className="text-xs text-zinc-600 mt-1 font-mono">{timeAgo(n.createdAt)}</p>
-                  </div>
-                  {!n.read && (
-                    <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 mt-1" />
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-
-          {notifications.length > 0 && (
-            <div className="px-4 py-2 border-t border-zinc-800 text-center">
-              <p className="text-xs text-zinc-600 font-mono">{notifications.length} total notifications</p>
+              <div className="flex gap-2.5">
+                {unreadCount > 0 && (
+                  <button onClick={markAllRead} className="f-mono text-[11px] text-zinc-500 hover:text-white transition-colors">
+                    Mark all read
+                  </button>
+                )}
+                {notifications.some(n => n.read) && (
+                  <button onClick={clearRead} className="f-mono text-[11px] text-zinc-600 hover:text-[#E10600] transition-colors">
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Notification list */}
+            <div className="max-h-80 overflow-y-auto">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <div className="w-5 h-5 border-2 border-zinc-700 border-t-[#E10600] rounded-full animate-spin" />
+                  <p className="f-mono text-zinc-600 text-xs">Loading...</p>
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-2xl mb-2">🔔</p>
+                  <p className="f-mono text-zinc-600 text-xs tracking-widest">NO NOTIFICATIONS</p>
+                </div>
+              ) : (
+                <motion.div
+                  initial="hidden"
+                  animate="visible"
+                  variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
+                >
+                  {notifications.map(n => {
+                    const accent = TYPE_ACCENT[n.type] || "#71717a";
+                    return (
+                      <motion.div
+                        key={n.id}
+                        variants={{
+                          hidden:  { opacity: 0, x: -10 },
+                          visible: { opacity: 1, x: 0 },
+                        }}
+                        onClick={() => !n.read && markRead(n.id)}
+                        className={`relative flex gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.04)] cursor-pointer transition-colors ${
+                          n.read ? "opacity-45" : "hover:bg-zinc-800/40"
+                        }`}
+                        style={{ borderLeft: `3px solid ${accent}` }}
+                      >
+                        {/* Unread glow strip */}
+                        {!n.read && (
+                          <div
+                            className="absolute inset-0 pointer-events-none"
+                            style={{ background: `linear-gradient(90deg, ${accent}08, transparent 60%)` }}
+                          />
+                        )}
+
+                        <span className="text-base flex-shrink-0 relative z-10">{n.icon}</span>
+                        <div className="flex-1 min-w-0 relative z-10">
+                          <p className="f-mono text-xs font-bold text-white leading-snug">{n.title}</p>
+                          <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">{n.message}</p>
+                          <p className="f-mono text-[10px] text-zinc-600 mt-1">{timeAgo(n.createdAt)}</p>
+                        </div>
+                        {!n.read && (
+                          <div
+                            className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 relative z-10"
+                            style={{ backgroundColor: "#E10600", boxShadow: "0 0 5px rgba(225,6,0,0.7)" }}
+                          />
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {notifications.length > 0 && (
+              <div className="px-4 py-2 border-t border-[rgba(255,255,255,0.05)] text-center">
+                <p className="f-mono text-[10px] text-zinc-700 tracking-widest">{notifications.length} TOTAL</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

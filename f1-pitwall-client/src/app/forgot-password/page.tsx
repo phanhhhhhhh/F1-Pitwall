@@ -3,9 +3,92 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { sendForgotPasswordOtp, resetPassword } from "../lib/pitwall-auth";
+import { motion, AnimatePresence } from "framer-motion";
+import PitwallBackground from "../components/PitwallBackground";
+import { F1 } from "../lib/f1-theme";
 
 type Step = "email" | "reset" | "done";
 
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+
+function RedLine() {
+    return (
+        <div className="h-px w-full" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
+    );
+}
+
+function Spinner() {
+    return <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />;
+}
+
+function ErrorBanner({ msg }: { msg: string }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-5 p-3 rounded-lg f-mono text-xs text-red-400 text-center flex items-center gap-2 justify-center chamfer-sm"
+            style={{ background: "rgba(225,6,0,0.08)", border: `1px solid rgba(225,6,0,0.28)` }}
+        >
+            <span className="text-base">⚠</span> {msg}
+        </motion.div>
+    );
+}
+
+const STRENGTH_COLORS = ["", "#ef4444", "#f97316", "#eab308", "#22c55e"];
+const STRENGTH_LABELS = ["", "Weak", "Fair", "Good", "Strong"];
+
+function strengthScore(p: string): number {
+    if (!p) return 0;
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9]/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
+}
+
+/* ── Step indicator ──────────────────────────────────────────────────────── */
+const STEPS: Step[] = ["email", "reset", "done"];
+const STEP_LABELS = ["Email", "Reset", "Done"];
+
+function StepIndicator({ current }: { current: Step }) {
+    const ci = STEPS.indexOf(current);
+    return (
+        <div className="flex items-center gap-2 mb-7">
+            {STEPS.map((s, i) => {
+                const done = ci > i;
+                const active = ci === i;
+                return (
+                    <div key={s} className="flex items-center gap-2 flex-1">
+                        <div className="flex flex-col items-center gap-1">
+                            <div
+                                className="w-7 h-7 rounded-full flex items-center justify-center f-mono text-[10px] font-black transition-all duration-300"
+                                style={{
+                                    background: done ? "rgba(225,6,0,0.30)" : active ? F1.red : "rgba(39,39,42,0.8)",
+                                    border: done || active ? `1px solid rgba(225,6,0,0.5)` : `1px solid ${F1.hairline}`,
+                                    color: done || active ? "#fff" : "#52525b",
+                                    boxShadow: active ? `0 0 12px rgba(225,6,0,0.35)` : "none",
+                                }}
+                            >
+                                {done ? "✓" : i + 1}
+                            </div>
+                            <span className="f-mono text-[9px] uppercase tracking-wider" style={{ color: active ? F1.red : done ? "rgba(225,6,0,0.6)" : "#52525b" }}>
+                                {STEP_LABELS[i]}
+                            </span>
+                        </div>
+                        {i < 2 && (
+                            <div
+                                className="flex-1 h-px mb-3 transition-all duration-500"
+                                style={{ background: done ? `rgba(225,6,0,0.4)` : F1.hairline }}
+                            />
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ── Page ────────────────────────────────────────────────────────────────── */
 export default function ForgotPasswordPage() {
     const router = useRouter();
     const [step, setStep] = useState<Step>("email");
@@ -17,18 +100,7 @@ export default function ForgotPasswordPage() {
     const [loading, setLoading] = useState(false);
     const [focused, setFocused] = useState<string | null>(null);
 
-    const strength = (p: string) => {
-        if (!p) return 0;
-        let s = 0;
-        if (p.length >= 8) s++;
-        if (/[A-Z]/.test(p)) s++;
-        if (/[0-9]/.test(p)) s++;
-        if (/[^A-Za-z0-9]/.test(p)) s++;
-        return s;
-    };
-    const strengthLabel = ["", "Weak", "Fair", "Good", "Strong"];
-    const strengthColor = ["", "#ef4444", "#f97316", "#eab308", "#22c55e"];
-    const pw = strength(newPassword);
+    const pw = strengthScore(newPassword);
 
     async function handleSendOtp(e: React.FormEvent) {
         e.preventDefault();
@@ -63,166 +135,299 @@ export default function ForgotPasswordPage() {
     }
 
     const inputStyle = (field: string) => ({
-        borderColor: focused === field ? "#ef4444" : "rgba(63,63,70,0.5)",
-        boxShadow: focused === field ? "0 0 20px rgba(239,68,68,0.15)" : "none",
+        borderColor: focused === field ? F1.red : F1.hairline,
+        boxShadow: focused === field ? `0 0 18px rgba(225,6,0,0.18)` : "none",
+        background: "rgba(10,10,12,0.82)",
     });
 
-    return (
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4 relative overflow-hidden">
-            <style>{`
-                @keyframes fadeUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
-                @keyframes glow { 0%,100%{opacity:.3} 50%{opacity:.8} }
-                .fade-up { animation: fadeUp .5s ease-out both; }
-                .glow-pulse { animation: glow 3s ease-in-out infinite; }
-            `}</style>
-            <div className="absolute inset-0">
-                <div className="absolute inset-0 opacity-[0.03]" style={{
-                    backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)",
-                    backgroundSize: "40px 40px",
-                }} />
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/8 rounded-full blur-[120px] glow-pulse" />
-            </div>
+    const labelEl = (txt: string) => (
+        <label className="f-mono block text-zinc-500 text-[10px] uppercase tracking-[0.25em] mb-1.5">{txt}</label>
+    );
 
-            <div className="relative w-full max-w-md">
-                <div className="absolute inset-0 rounded-3xl bg-red-500/5 blur-xl" />
-                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-3xl overflow-hidden shadow-2xl">
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-red-500 to-transparent" />
-                    <div className="p-8">
+    const primaryBtn = (label: React.ReactNode, disabled = false) => (
+        <button
+            type="submit"
+            disabled={disabled}
+            className="relative w-full py-3.5 rounded-lg f-mono font-bold text-xs tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 disabled:opacity-50 text-white chamfer-sm"
+            style={{
+                background: disabled ? "rgba(39,39,42,0.8)" : `linear-gradient(135deg,${F1.red},#dc2626)`,
+                boxShadow: disabled ? "none" : `0 0 28px rgba(225,6,0,0.30)`,
+            }}
+        >
+            {!disabled && <span className="shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{ width: "60%" }} />}
+            <span className="relative flex items-center justify-center gap-2">{label}</span>
+        </button>
+    );
+
+    const stepTitles: Record<Step, [string, string]> = {
+        email: ["RESET", " ACCESS"],
+        reset: ["ENTER", " CODE"],
+        done:  ["ACCESS", " UPDATED"],
+    };
+    const [red, white] = stepTitles[step];
+
+    return (
+        <div
+            className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden"
+            style={{ background: F1.bg }}
+        >
+            <PitwallBackground glow="top-center" streaks={3} />
+
+            <motion.div
+                initial={{ opacity: 0, y: 28 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+                className="relative z-10 w-full max-w-md"
+            >
+                <div
+                    className="absolute -inset-4 rounded-2xl blur-2xl pointer-events-none"
+                    style={{ background: "radial-gradient(ellipse at 50% 40%,rgba(225,6,0,0.07),transparent 70%)" }}
+                />
+
+                <div
+                    className="relative rounded-xl overflow-hidden shadow-2xl"
+                    style={{
+                        background: F1.card,
+                        border: `1px solid ${F1.hairline}`,
+                        backdropFilter: "blur(24px)",
+                        WebkitBackdropFilter: "blur(24px)",
+                    }}
+                >
+                    <RedLine />
+
+                    <div className="p-7 sm:p-8">
                         {/* Header */}
-                        <div className="text-center mb-8 fade-up">
-                            <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
-                                <span className="text-2xl">🔑</span>
+                        <div className="text-center mb-7">
+                            <div className="relative inline-flex items-center justify-center mb-4">
+                                <svg
+                                    className="absolute" width="60" height="60" viewBox="0 0 60 60"
+                                    style={{ animation: "spin-slow 9s linear infinite" }}
+                                >
+                                    <circle cx="30" cy="30" r="28" fill="none" stroke={F1.red} strokeWidth="1" strokeDasharray="6 5" opacity="0.35" />
+                                </svg>
+                                <div
+                                    className="relative w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                                    style={{
+                                        background: "rgba(225,6,0,0.10)",
+                                        border: `1px solid rgba(225,6,0,0.22)`,
+                                        boxShadow: "0 0 22px rgba(225,6,0,0.15)",
+                                    }}
+                                >
+                                    🔑
+                                </div>
                             </div>
-                            <h1 className="text-3xl font-black tracking-tighter text-white">
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">RESET</span> ACCESS
+                            <h1 className="f-cond font-black tracking-tight leading-none"
+                                style={{ fontSize: "clamp(1.9rem,5vw,2.4rem)" }}>
+                                <span style={{ color: F1.red }}>{red}</span>
+                                <span className="text-white">{white}</span>
                             </h1>
-                            <p className="text-zinc-500 text-xs tracking-[0.3em] uppercase mt-2 font-mono">
+                            <div className="mt-1 mx-auto h-px w-12" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
+                            <p className="f-mono text-zinc-500 text-[10px] tracking-[0.35em] uppercase mt-1.5">
                                 {step === "email" && "Enter your registered email"}
                                 {step === "reset" && "Check your inbox for the code"}
-                                {step === "done" && "Access code updated"}
+                                {step === "done"  && "Access code updated successfully"}
                             </p>
                         </div>
 
-                        {/* Step indicator */}
-                        <div className="flex items-center gap-2 mb-6 fade-up" style={{ animationDelay: "50ms" }}>
-                            {(["email", "reset", "done"] as Step[]).map((s, i) => (
-                                <div key={s} className="flex items-center gap-2 flex-1">
-                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black transition-all ${step === s ? "bg-red-500 text-white" : (["email","reset","done"].indexOf(step) > i ? "bg-red-500/30 text-red-400" : "bg-zinc-800 text-zinc-600")}`}>
-                                        {["email","reset","done"].indexOf(step) > i ? "✓" : i + 1}
-                                    </div>
-                                    {i < 2 && <div className={`flex-1 h-px ${["email","reset","done"].indexOf(step) > i ? "bg-red-500/50" : "bg-zinc-800"}`} />}
-                                </div>
-                            ))}
-                        </div>
+                        <StepIndicator current={step} />
 
-                        {/* Error */}
-                        {error && (
-                            <div className="mb-5 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm text-center fade-up flex items-center gap-2 justify-center">
-                                <span>⚠️</span> {error}
-                            </div>
-                        )}
+                        <AnimatePresence>
+                            {error && <ErrorBanner msg={error} />}
+                        </AnimatePresence>
 
-                        {/* Step 1: Email */}
-                        {step === "email" && (
-                            <form onSubmit={handleSendOtp} className="space-y-5 fade-up" style={{ animationDelay: "100ms" }}>
-                                <div>
-                                    <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Email Address</label>
-                                    <input
-                                        type="email" value={email} onChange={e => setEmail(e.target.value)}
-                                        onFocus={() => setFocused("email")} onBlur={() => setFocused(null)}
-                                        className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
-                                        style={inputStyle("email")}
-                                        placeholder="you@example.com" required autoComplete="email" />
-                                </div>
-                                <button type="submit" disabled={loading}
-                                    className="w-full py-4 rounded-xl font-black tracking-widest text-sm text-white transition-all duration-300 disabled:opacity-50"
-                                    style={{ background: loading ? "rgba(39,39,42,0.8)" : "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: loading ? "none" : "0 0 30px rgba(239,68,68,0.3)" }}>
-                                    {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />SENDING...</span> : "SEND RESET CODE →"}
-                                </button>
-                            </form>
-                        )}
-
-                        {/* Step 2: OTP + new password */}
-                        {step === "reset" && (
-                            <form onSubmit={handleReset} className="space-y-5 fade-up" style={{ animationDelay: "100ms" }}>
-                                <div>
-                                    <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Verification Code</label>
-                                    <input
-                                        type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                        onFocus={() => setFocused("otp")} onBlur={() => setFocused(null)}
-                                        className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono text-center text-2xl tracking-[0.5em]"
-                                        style={inputStyle("otp")}
-                                        placeholder="——————" required autoComplete="one-time-code" inputMode="numeric" maxLength={6} />
-                                    <p className="text-zinc-600 text-xs font-mono mt-1.5">Sent to {email} · expires in 5 min</p>
-                                </div>
-                                <div>
-                                    <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">New Access Code</label>
-                                    <input
-                                        type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                                        onFocus={() => setFocused("newpw")} onBlur={() => setFocused(null)}
-                                        className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
-                                        style={inputStyle("newpw")}
-                                        placeholder="••••••••" required autoComplete="new-password" />
-                                    {newPassword && (
-                                        <div className="flex items-center gap-2 mt-1.5">
-                                            <div className="flex gap-1 flex-1">
-                                                {[1,2,3,4].map(i => (
-                                                    <div key={i} className="h-1 flex-1 rounded-full transition-all duration-300"
-                                                        style={{ background: i <= pw ? strengthColor[pw] : "rgba(63,63,70,0.5)" }} />
-                                                ))}
-                                            </div>
-                                            <span className="text-xs font-mono" style={{ color: strengthColor[pw] }}>{strengthLabel[pw]}</span>
+                        <AnimatePresence mode="wait">
+                            {/* Step 1: Email */}
+                            {step === "email" && (
+                                <motion.form
+                                    key="step-email"
+                                    initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}
+                                    transition={{ duration: 0.22 }}
+                                    onSubmit={handleSendOtp}
+                                    className="space-y-4"
+                                >
+                                    <div>
+                                        {labelEl("Email Address")}
+                                        <div className="relative">
+                                            <input
+                                                type="email" value={email} onChange={e => setEmail(e.target.value)}
+                                                onFocus={() => setFocused("email")} onBlur={() => setFocused(null)}
+                                                className="w-full f-mono border text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 rounded-lg px-4 py-3 text-sm"
+                                                style={inputStyle("email")}
+                                                placeholder="you@example.com" required autoComplete="email"
+                                            />
+                                            {focused === "email" && (
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: F1.red }} />
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-2 font-mono">Confirm Access Code</label>
-                                    <input
-                                        type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                                        onFocus={() => setFocused("confirmpw")} onBlur={() => setFocused(null)}
-                                        className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3.5 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono"
-                                        style={{ ...inputStyle("confirmpw"), borderColor: confirmPassword && confirmPassword !== newPassword ? "#ef4444" : focused === "confirmpw" ? "#ef4444" : "rgba(63,63,70,0.5)" }}
-                                        placeholder="••••••••" required autoComplete="new-password" />
-                                </div>
-                                <div className="flex gap-3">
-                                    <button type="button" onClick={() => { setStep("email"); setError(""); setOtp(""); }}
-                                        className="flex-1 py-3.5 rounded-xl font-bold text-sm text-zinc-400 border border-zinc-700/50 hover:border-zinc-500 transition-all">
-                                        ← BACK
-                                    </button>
-                                    <button type="submit" disabled={loading}
-                                        className="flex-[2] py-3.5 rounded-xl font-black tracking-widest text-sm text-white transition-all duration-300 disabled:opacity-50"
-                                        style={{ background: loading ? "rgba(39,39,42,0.8)" : "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: loading ? "none" : "0 0 30px rgba(239,68,68,0.3)" }}>
-                                        {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />RESETTING...</span> : "RESET ACCESS →"}
-                                    </button>
-                                </div>
-                            </form>
-                        )}
+                                    </div>
+                                    {primaryBtn(loading ? <><Spinner /> Sending...</> : "Send Reset Code →", loading)}
+                                </motion.form>
+                            )}
 
-                        {/* Step 3: Done */}
-                        {step === "done" && (
-                            <div className="text-center space-y-5 fade-up">
-                                <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center mx-auto">
-                                    <span className="text-3xl">✓</span>
-                                </div>
-                                <p className="text-zinc-300 font-mono text-sm">Your access code has been updated.<br />You can now log in with your new password.</p>
-                                <button onClick={() => router.push("/login")}
-                                    className="w-full py-4 rounded-xl font-black tracking-widest text-sm text-white transition-all duration-300"
-                                    style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: "0 0 30px rgba(239,68,68,0.3)" }}>
-                                    BACK TO LOGIN →
-                                </button>
-                            </div>
-                        )}
+                            {/* Step 2: OTP + new password */}
+                            {step === "reset" && (
+                                <motion.form
+                                    key="step-reset"
+                                    initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}
+                                    transition={{ duration: 0.22 }}
+                                    onSubmit={handleReset}
+                                    className="space-y-4"
+                                >
+                                    {/* OTP input */}
+                                    <div>
+                                        {labelEl("Verification Code")}
+                                        <input
+                                            type="text" value={otp}
+                                            onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                            onFocus={() => setFocused("otp")} onBlur={() => setFocused(null)}
+                                            className="w-full f-mono border focus:outline-none transition-all duration-300 rounded-lg px-4 py-3.5 text-white text-center text-2xl tracking-[0.6em]"
+                                            style={{
+                                                ...inputStyle("otp"),
+                                                letterSpacing: "0.6em",
+                                            }}
+                                            placeholder="——————" required autoComplete="one-time-code"
+                                            inputMode="numeric" maxLength={6} autoFocus
+                                        />
+                                        <p className="f-mono text-zinc-600 text-[10px] mt-1.5">Sent to {email} · expires in 5 min</p>
+                                    </div>
 
-                        <div className="mt-6 pt-5 border-t border-zinc-800/50 text-center fade-up">
-                            <p className="text-zinc-600 text-xs font-mono">
+                                    {/* New password */}
+                                    <div>
+                                        {labelEl("New Access Code")}
+                                        <div className="relative">
+                                            <input
+                                                type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                                                onFocus={() => setFocused("newpw")} onBlur={() => setFocused(null)}
+                                                className="w-full f-mono border text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 rounded-lg px-4 py-3 text-sm"
+                                                style={inputStyle("newpw")}
+                                                placeholder="••••••••" required autoComplete="new-password"
+                                            />
+                                            {focused === "newpw" && (
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: F1.red }} />
+                                            )}
+                                        </div>
+                                        {newPassword && (
+                                            <div className="mt-1.5">
+                                                <div className="flex gap-1 mb-0.5">
+                                                    {[1, 2, 3, 4].map(i => (
+                                                        <div
+                                                            key={i}
+                                                            className="h-0.5 flex-1 rounded-full transition-all duration-300"
+                                                            style={{ background: i <= pw ? STRENGTH_COLORS[pw] : "rgba(63,63,70,0.5)" }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <p className="f-mono text-[10px]" style={{ color: STRENGTH_COLORS[pw] }}>{STRENGTH_LABELS[pw]}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Confirm password */}
+                                    <div>
+                                        {labelEl("Confirm Access Code")}
+                                        <div className="relative">
+                                            <input
+                                                type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                                                onFocus={() => setFocused("confirmpw")} onBlur={() => setFocused(null)}
+                                                className="w-full f-mono border text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 rounded-lg px-4 py-3 text-sm"
+                                                style={{
+                                                    borderColor: (confirmPassword && confirmPassword !== newPassword)
+                                                        ? "#ef4444"
+                                                        : (focused === "confirmpw" ? F1.red : F1.hairline),
+                                                    boxShadow: focused === "confirmpw" ? `0 0 18px rgba(225,6,0,0.18)` : "none",
+                                                    background: "rgba(10,10,12,0.82)",
+                                                }}
+                                                placeholder="••••••••" required autoComplete="new-password"
+                                            />
+                                            {focused === "confirmpw" && (
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: F1.red }} />
+                                            )}
+                                        </div>
+                                        {confirmPassword && (
+                                            <p className={`f-mono text-[10px] mt-1 ${newPassword === confirmPassword ? "text-green-400" : "text-red-400"}`}>
+                                                {newPassword === confirmPassword ? "✓ Passwords match" : "✗ Passwords do not match"}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-3 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setStep("email"); setError(""); setOtp(""); }}
+                                            className="flex-1 py-3 rounded-lg f-mono text-xs font-bold uppercase tracking-wider text-zinc-400 transition-all duration-200"
+                                            style={{ border: `1px solid ${F1.hairline}`, background: "transparent" }}
+                                            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.15)"}
+                                            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.borderColor = F1.hairline}
+                                        >
+                                            ← Back
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={loading}
+                                            className="flex-[2] py-3 rounded-lg f-mono text-xs font-bold uppercase tracking-wider text-white transition-all duration-300 disabled:opacity-50 chamfer-sm"
+                                            style={{
+                                                background: loading ? "rgba(39,39,42,0.8)" : `linear-gradient(135deg,${F1.red},#dc2626)`,
+                                                boxShadow: loading ? "none" : `0 0 24px rgba(225,6,0,0.28)`,
+                                            }}
+                                        >
+                                            {loading
+                                                ? <span className="flex items-center justify-center gap-2"><Spinner /> Resetting...</span>
+                                                : "Reset Access →"}
+                                        </button>
+                                    </div>
+                                </motion.form>
+                            )}
+
+                            {/* Step 3: Done */}
+                            {step === "done" && (
+                                <motion.div
+                                    key="step-done"
+                                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="text-center space-y-5"
+                                >
+                                    <div
+                                        className="w-16 h-16 rounded-full flex items-center justify-center mx-auto text-2xl"
+                                        style={{
+                                            background: "rgba(0,230,118,0.10)",
+                                            border: `1px solid rgba(0,230,118,0.30)`,
+                                            boxShadow: "0 0 24px rgba(0,230,118,0.15)",
+                                        }}
+                                    >
+                                        ✓
+                                    </div>
+                                    <p className="f-mono text-zinc-300 text-sm">
+                                        Your access code has been updated.<br />
+                                        <span className="text-zinc-500 text-xs">You can now log in with your new password.</span>
+                                    </p>
+                                    <button
+                                        onClick={() => router.push("/login")}
+                                        className="relative w-full py-3.5 rounded-lg f-mono font-bold text-xs tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 text-white chamfer-sm"
+                                        style={{
+                                            background: `linear-gradient(135deg,${F1.red},#dc2626)`,
+                                            boxShadow: `0 0 28px rgba(225,6,0,0.30)`,
+                                        }}
+                                    >
+                                        <span className="shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{ width: "60%" }} />
+                                        <span className="relative">Back to Login →</span>
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Footer */}
+                        <div className="mt-6 pt-5 text-center" style={{ borderTop: `1px solid ${F1.hairline}` }}>
+                            <p className="f-mono text-zinc-600 text-[11px]">
                                 Remember it?{" "}
                                 <a href="/login" className="text-red-500 hover:text-red-400 transition-colors">Back to login</a>
                             </p>
                         </div>
                     </div>
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-700 to-transparent" />
+
+                    <div className="h-px w-full" style={{ background: F1.hairline }} />
+                    <div className="h-0.5 w-1/3 mx-auto" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 }
