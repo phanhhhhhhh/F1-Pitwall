@@ -19,5 +19,8 @@ public interface DriverRepository extends JpaRepository<Driver, Long> {
     @Query("SELECT d FROM Driver d ORDER BY d.careerPoints DESC")
     List<Driver> findAllOrderByCareerPoints();
 
+    @Query("SELECT d FROM Driver d LEFT JOIN FETCH d.team ORDER BY d.carNumber")
+    List<Driver> findAllWithTeam();
+
     Page<Driver> findAll(Pageable pageable);
 }
