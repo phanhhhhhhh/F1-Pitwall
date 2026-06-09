@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { authFetch, getAccessToken } from "../../../lib/pitwall-auth";
 import Navbar from "../../../components/Navbar";
+import PitwallBackground from "../../../components/PitwallBackground";
+import { SkeletonTable } from "../../../components/LoadingSkeleton";
+import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -15,11 +19,20 @@ interface QualifyingResult {
     q1TimeRaw: number | null; q2TimeRaw: number | null; q3TimeRaw: number | null;
 }
 
-function TimeDelta({ time, best }: { time: number | null; best: number | null }) {
-    if (!time || !best) return <span className="text-zinc-700 font-mono">—</span>;
+function TimeDelta({ time, best, highlight }: { time: number | null; best: number | null; highlight?: boolean }) {
+    if (!time || !best) return <span className="text-zinc-700 f-mono text-xs">—</span>;
     const delta = time - best;
-    if (delta < 0.001) return <span className="text-white font-mono font-bold">{formatTime(time)}</span>;
-    return <span className="text-zinc-400 font-mono">{formatTime(time)}<span className="text-zinc-600 text-xs ml-1">+{delta.toFixed(3)}</span></span>;
+    if (delta < 0.001) return (
+        <span className="f-mono text-xs font-bold" style={{ color: highlight ? F1.gold : "white" }}>
+            {formatTime(time)}
+        </span>
+    );
+    return (
+        <span className="f-mono text-xs text-zinc-400">
+            {formatTime(time)}
+            <span className="text-zinc-600 ml-1">+{delta.toFixed(3)}</span>
+        </span>
+    );
 }
 
 function formatTime(sec: number): string {
@@ -32,6 +45,21 @@ function safeBest(values: (number | null)[]): number | null {
     return valid.length > 0 ? Math.min(...valid) : null;
 }
 
+// Q session pill colors
+const Q_COLORS = {
+    q3: { bg: "rgba(225,6,0,.15)", border: "rgba(225,6,0,.4)", text: "#ff6a52", dot: F1.red },
+    q2: { bg: "rgba(234,179,8,.12)", border: "rgba(234,179,8,.35)", text: "#facc15", dot: "#eab308" },
+    q1: { bg: "rgba(82,82,91,.15)", border: "rgba(82,82,91,.3)", text: "#71717a", dot: "#52525b" },
+} as const;
+
+type QSeg = "q3" | "q2" | "q1";
+
+function getSegment(r: QualifyingResult): QSeg {
+    if (r.q3Time) return "q3";
+    if (r.q2Time) return "q2";
+    return "q1";
+}
+
 export default function QualifyingPage() {
     const router = useRouter();
     const params = useParams();
@@ -42,6 +70,8 @@ export default function QualifyingPage() {
     const [syncing, setSyncing] = useState(false);
     const [resyncing, setResyncing] = useState(false);
     const [raceName, setRaceName] = useState("");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [raceInfo, setRaceInfo] = useState<any>(null);
     const [hasData, setHasData] = useState(false);
     const [feedback, setFeedback] = useState("");
 
@@ -60,7 +90,12 @@ export default function QualifyingPage() {
     };
 
     const fetchRaceInfo = async () => {
-        try { const res = await authFetch(`${API}/api/races/${raceId}`); const d = await res.json(); setRaceName(d.name || ""); } catch { }
+        try {
+            const res = await authFetch(`${API}/api/races/${raceId}`);
+            const d = await res.json();
+            setRaceName(d.name || "");
+            setRaceInfo(d);
+        } catch { }
     };
 
     const handleSync = async () => {
@@ -86,184 +121,458 @@ export default function QualifyingPage() {
     const bestQ2 = safeBest(results.map(r => r.q2TimeRaw));
     const bestQ3 = safeBest(results.map(r => r.q3TimeRaw));
 
-    return (
-        <div className="min-h-screen bg-zinc-950 relative overflow-x-hidden">
-            <style>{`
-        @keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
-        @keyframes glow{0%,100%{opacity:.3}50%{opacity:.8}}
-        .slide-up{animation:slideUp .4s ease-out both}
-        .glow-pulse{animation:glow 3s ease-in-out infinite}
-      `}</style>
-            <div className="fixed inset-0 z-0">
-                <div className="absolute inset-0 bg-zinc-950" />
-                <div className="absolute top-0 left-1/3 w-[400px] h-[300px] bg-yellow-500/3 rounded-full blur-[120px] glow-pulse" />
-                <div className="absolute inset-0 opacity-[0.012]" style={{ backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)", backgroundSize: "60px 60px" }} />
-            </div>
+    const poleDriver = results.find(r => r.gridPosition === 1);
+    const countryFlag = flagForCountry(raceInfo?.circuit?.country);
+
+    // ── Loading
+    if (loading) return (
+        <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: F1.bg }}>
+            <PitwallBackground glow="top-center" />
             <Navbar />
-            <main className="relative z-10 max-w-7xl mx-auto px-8 py-10">
-
-                {/* Header */}
-                <div className="flex items-end justify-between mb-8 flex-wrap gap-4 slide-up">
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                            <p className="text-yellow-500/60 font-mono text-xs tracking-[0.3em]">QUALIFYING · GRID POSITIONS</p>
-                        </div>
-                        <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
-                            STARTING<br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">GRID</span>
-                        </h1>
-                        {raceName && <p className="text-zinc-400 mt-2 font-mono text-sm">{raceName}</p>}
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap justify-end">
-                        {feedback && (
-                            <span className={`text-xs font-mono px-3 py-1.5 rounded-xl border ${feedback.startsWith("✓") ? "text-green-400 border-green-500/30 bg-green-500/10" : "text-red-400 border-red-500/30 bg-red-500/10"}`}>{feedback}</span>
-                        )}
-                        {hasData && (
-                            <button onClick={handleResync} disabled={resyncing}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"}`}>
-                                {resyncing ? (<><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />RE-SYNCING...</>) : "⚠️ RE-SYNC"}
-                            </button>
-                        )}
-                        <button onClick={handleSync} disabled={syncing}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${syncing ? "border-zinc-700 text-zinc-500" : "border-red-500/50 text-red-400 hover:bg-red-500/10"}`}>
-                            {syncing ? (<><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />SYNCING...</>) : "↻ SYNC FROM OPENF1"}
-                        </button>
-                        <Link href={`/races/${raceId}/results`} className="text-xs border border-zinc-700 text-zinc-500 hover:text-white hover:border-zinc-500 px-4 py-2 rounded-xl transition-all font-mono">RACE RESULTS →</Link>
-                        <Link href="/races" className="text-xs border border-zinc-700 text-zinc-500 hover:text-white px-4 py-2 rounded-xl transition-all font-mono">← CALENDAR</Link>
-                    </div>
+            <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+                <div className="mb-6">
+                    <div className="h-3 w-40 bg-zinc-800 rounded animate-pulse mb-4" />
+                    <div className="h-12 w-80 bg-zinc-800 rounded animate-pulse mb-2" />
+                    <div className="h-3 w-52 bg-zinc-800 rounded animate-pulse" />
                 </div>
+                <div className="h-40 rounded-2xl bg-zinc-900/80 border border-zinc-800/50 animate-pulse mb-8" />
+                <SkeletonTable rows={12} cols={6} />
+            </main>
+        </div>
+    );
 
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-32 gap-4">
-                        <div className="relative w-12 h-12">
-                            <div className="absolute inset-0 border-2 border-yellow-500/20 rounded-full" />
-                            <div className="absolute inset-0 border-2 border-yellow-500 rounded-full border-t-transparent animate-spin" />
-                        </div>
-                        <p className="text-yellow-500/70 font-mono text-xs animate-pulse">LOADING QUALIFYING DATA...</p>
+    return (
+        <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: F1.bg }}>
+            <PitwallBackground glow="top-center" />
+            <Navbar />
+            <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+
+                {/* ── Page header */}
+                <motion.div
+                    className="mb-8 sm:mb-10"
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                >
+                    <Link
+                        href="/races"
+                        className="f-mono text-[11px] tracking-widest text-zinc-600 hover:text-[#ff6a52] transition-colors mb-4 inline-flex items-center gap-1.5"
+                    >
+                        ← BACK TO CALENDAR
+                    </Link>
+
+                    <div className="flex items-center gap-2.5 mb-2">
+                        <span className="inline-block w-8 h-[3px] rounded-full" style={{ background: F1.gold }} />
+                        <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500 uppercase">
+                            {raceInfo?.circuit?.country && `${countryFlag} `}
+                            {raceInfo?.date ? raceInfo.date.slice(0, 4) : "2026"}
+                            {raceInfo?.roundNumber ? ` · ROUND ${raceInfo.roundNumber}` : ""}
+                            {raceInfo?.circuit?.country ? ` · ${raceInfo.circuit.country.toUpperCase()}` : ""}
+                        </span>
                     </div>
-                ) : !hasData ? (
-                    <div className="text-center py-24 border border-dashed border-zinc-800/50 rounded-2xl slide-up">
-                        <p className="text-zinc-400 text-xl font-bold mb-2">No qualifying data yet</p>
-                        <p className="text-zinc-600 text-sm font-mono mb-8">Click SYNC to fetch qualifying results from OpenF1</p>
-                        <button onClick={handleSync} disabled={syncing}
-                            className="px-8 py-3 rounded-xl font-black text-sm text-white"
-                            style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", boxShadow: "0 0 20px rgba(239,68,68,0.3)" }}>
-                            {syncing ? "SYNCING..." : "🔄 SYNC QUALIFYING DATA"}
+
+                    <h1 className="f-cond font-black tracking-tight leading-[0.85]" style={{ fontSize: "clamp(40px,7vw,76px)" }}>
+                        <span className="block text-white">{raceName?.toUpperCase().replace(/ GRAND PRIX$/, "") || "QUALIFYING"}</span>
+                        <span
+                            className="block text-transparent bg-clip-text"
+                            style={{ backgroundImage: `linear-gradient(90deg, ${F1.gold}, #f59e0b)` }}
+                        >
+                            QUALIFYING
+                        </span>
+                    </h1>
+
+                    {raceInfo?.circuit?.name && (
+                        <p className="f-mono text-xs text-zinc-500 mt-2">{raceInfo.circuit.name}</p>
+                    )}
+                </motion.div>
+
+                {/* ── Feedback toast */}
+                <AnimatePresence>
+                    {feedback && (
+                        <motion.div
+                            className={`mb-4 text-xs f-mono px-4 py-2.5 rounded-xl border inline-flex items-center gap-2 ${feedback.startsWith("✓") ? "text-[#00E676] border-[#00E676]/25 bg-[#00E676]/08" : "text-red-400 border-red-500/25 bg-red-500/08"}`}
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                        >
+                            {feedback}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* ── Action bar */}
+                <motion.div
+                    className="flex flex-wrap items-center gap-3 justify-end mb-6"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                >
+                    {hasData && (
+                        <button onClick={handleResync} disabled={resyncing}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all f-mono ${resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/08"}`}>
+                            {resyncing ? (<><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />RE-SYNCING...</>) : "⚠ RE-SYNC"}
                         </button>
-                    </div>
+                    )}
+                    <button onClick={handleSync} disabled={syncing}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all f-mono ${syncing ? "border-zinc-700 text-zinc-500" : "border-[#E10600]/40 text-[#ff6a52] hover:bg-[#E10600]/08"}`}>
+                        {syncing ? (<><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />SYNCING...</>) : "↻ SYNC FROM OPENF1"}
+                    </button>
+                    <Link href={`/races/${raceId}/results`}
+                        className="f-mono text-xs border border-zinc-700 text-zinc-500 hover:text-white hover:border-zinc-500 px-4 py-2 rounded-xl transition-all">
+                        RACE RESULTS →
+                    </Link>
+                </motion.div>
+
+                {/* ── No data state */}
+                {!hasData ? (
+                    <motion.div
+                        className="flex flex-col items-center justify-center text-center py-24 border border-dashed rounded-2xl"
+                        style={{ borderColor: "rgba(255,255,255,.07)" }}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                    >
+                        <div className="w-14 h-14 rounded-2xl border flex items-center justify-center mb-5"
+                            style={{ borderColor: "rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)" }}>
+                            <span className="text-2xl">🏎</span>
+                        </div>
+                        <p className="f-cond font-black text-xl text-white mb-1">Qualifying Data Unavailable</p>
+                        <p className="f-mono text-xs text-zinc-500 max-w-xs mb-8">
+                            Session not yet complete · Sync from OpenF1 once qualifying has finished
+                        </p>
+                        <button onClick={handleSync} disabled={syncing}
+                            className="px-8 py-3 rounded-xl f-cond font-black text-sm text-white transition-all"
+                            style={{ background: `linear-gradient(135deg, ${F1.red}, #dc2626)`, boxShadow: `0 0 24px rgba(225,6,0,.3)` }}>
+                            {syncing ? "SYNCING..." : "SYNC QUALIFYING DATA"}
+                        </button>
+                    </motion.div>
                 ) : (
-                    <div className="space-y-6">
-                        {/* Starting grid visual */}
-                        <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl overflow-hidden slide-up">
-                            <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
-                            <div className="px-6 py-4 border-b border-zinc-800/50 flex items-center justify-between">
-                                <p className="text-xs font-mono text-zinc-500 tracking-widest">STARTING GRID</p>
-                                <div className="flex items-center gap-4">
-                                    {[{ color: "#ef4444", label: "Q3" }, { color: "#eab308", label: "Q2" }, { color: "#52525b", label: "Q1" }].map(s => (
-                                        <span key={s.label} className="flex items-center gap-1.5 text-xs text-zinc-600 font-mono">
-                                            <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: s.color }} />
-                                            {s.label}
-                                        </span>
-                                    ))}
+                    <div className="space-y-8">
+
+                        {/* ── Pole position hero */}
+                        {poleDriver && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 16 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
+                            >
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="inline-block w-5 h-[2px]" style={{ background: F1.gold }} />
+                                    <span className="f-mono text-[10px] tracking-[0.35em] text-zinc-500">POLE POSITION</span>
                                 </div>
-                            </div>
-                            <div className="p-5 space-y-2">
-                                {Array.from({ length: Math.ceil(results.length / 2) }, (_, rowIdx) => {
-                                    const left = results[rowIdx * 2];
-                                    const right = results[rowIdx * 2 + 1];
+
+                                {(() => {
+                                    const tc = getTeamColor(poleDriver.teamName, poleDriver.teamColor);
+                                    const lastName = poleDriver.driverName.split(" ").slice(-1)[0].toUpperCase();
                                     return (
-                                        <div key={rowIdx} className="flex gap-3">
-                                            {[left, right].map((driver, side) => {
-                                                if (!driver) return <div key={side} className="flex-1" />;
-                                                const seg = driver.q3Time ? "q3" : driver.q2Time ? "q2" : "q1";
-                                                const segColor = seg === "q3" ? "#ef4444" : seg === "q2" ? "#eab308" : "#52525b";
-                                                return (
-                                                    <div key={driver.id} className="flex-1 flex items-center gap-3 bg-zinc-800/30 rounded-xl px-4 py-3 border border-zinc-700/30 hover:border-zinc-600/50 transition-all"
-                                                        style={{ borderLeftColor: driver.teamColor, borderLeftWidth: 3 }}>
-                                                        <span className="text-2xl font-black text-zinc-700 w-8 tabular-nums">{driver.gridPosition}</span>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-sm font-black text-white truncate">{driver.driverName.split(" ").pop()}</p>
-                                                            <p className="text-xs font-mono truncate" style={{ color: driver.teamColor }}>{driver.teamName}</p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-xs font-mono text-white">{driver.bestTime || "—"}</p>
-                                                            <div className="w-2 h-2 rounded-full ml-auto mt-1" style={{ backgroundColor: segColor, boxShadow: `0 0 4px ${segColor}` }} />
+                                        <div
+                                            className="relative rounded-2xl border p-6 sm:p-8 overflow-hidden"
+                                            style={{ background: F1.card, borderColor: `${F1.gold}30` }}
+                                        >
+                                            {/* Glow */}
+                                            <div className="absolute top-0 right-0 w-80 h-80 pointer-events-none"
+                                                style={{ background: `radial-gradient(circle at 90% 10%, ${F1.gold}18 0%, transparent 60%)`, filter: "blur(20px)" }} />
+                                            <div className="absolute top-0 left-0 right-0 h-[3px]"
+                                                style={{ background: `linear-gradient(90deg, ${tc}, ${F1.gold}, ${tc})` }} />
+
+                                            <div className="relative flex flex-col sm:flex-row sm:items-center gap-6">
+                                                {/* P1 badge */}
+                                                <div className="flex-shrink-0">
+                                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex flex-col items-center justify-center"
+                                                        style={{ background: `linear-gradient(135deg, ${F1.gold}25, ${F1.gold}08)`, border: `2px solid ${F1.gold}40` }}>
+                                                        <span className="f-mono text-[10px] text-zinc-500 tracking-widest">POLE</span>
+                                                        <span className="f-cond font-black text-4xl leading-tight" style={{ color: F1.gold, textShadow: `0 0 20px ${F1.gold}60` }}>P1</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Driver info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: tc }} />
+                                                        <div>
+                                                            <p className="f-cond font-black text-3xl sm:text-4xl leading-tight text-white tracking-wide">{lastName}</p>
+                                                            <p className="f-cond font-bold text-sm sm:text-base text-zinc-400 leading-tight">{poleDriver.driverName}</p>
                                                         </div>
                                                     </div>
-                                                );
-                                            })}
+                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                        <span className="f-mono text-[10px] font-bold px-2.5 py-0.5 rounded"
+                                                            style={{ color: tc, background: `${tc}15` }}>
+                                                            {poleDriver.teamName}
+                                                        </span>
+                                                        <span className="f-mono text-[10px] text-zinc-600 border border-zinc-800 px-2 py-0.5 rounded">
+                                                            #{poleDriver.carNumber}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Pole time */}
+                                                <div className="flex-shrink-0 text-right sm:text-right">
+                                                    <p className="f-mono text-[10px] text-zinc-500 tracking-widest mb-1">POLE TIME</p>
+                                                    <p className="f-cond font-black text-3xl sm:text-4xl" style={{ color: F1.gold }}>
+                                                        {poleDriver.bestTime || poleDriver.q3Time || "—"}
+                                                    </p>
+                                                    <p className="f-mono text-[10px] text-zinc-600 mt-1">Q3 · BEST LAP</p>
+                                                </div>
+                                            </div>
                                         </div>
+                                    );
+                                })()}
+                            </motion.div>
+                        )}
+
+                        {/* ── Starting grid (2-wide layout) */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.1 }}
+                        >
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="inline-block w-5 h-[2px]" style={{ background: F1.red }} />
+                                <span className="f-mono text-[10px] tracking-[0.35em] text-zinc-500">STARTING GRID</span>
+                                <div className="ml-auto flex items-center gap-4">
+                                    {(["q3", "q2", "q1"] as QSeg[]).map(seg => {
+                                        const c = Q_COLORS[seg];
+                                        return (
+                                            <span key={seg} className="flex items-center gap-1.5 f-mono text-[10px] text-zinc-600">
+                                                <span className="w-2 h-2 rounded-full" style={{ background: c.dot }} />
+                                                {seg.toUpperCase()}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div
+                                className="rounded-2xl border overflow-hidden"
+                                style={{ background: F1.card, borderColor: F1.hairline }}
+                            >
+                                <div className="h-[2px]" style={{ background: `linear-gradient(90deg, transparent, ${F1.gold}50, transparent)` }} />
+                                <div className="p-4 sm:p-5 space-y-2">
+                                    {Array.from({ length: Math.ceil(results.length / 2) }, (_, rowIdx) => {
+                                        const left = results[rowIdx * 2];
+                                        const right = results[rowIdx * 2 + 1];
+
+                                        return (
+                                            <motion.div
+                                                key={rowIdx}
+                                                className="flex gap-2 sm:gap-3"
+                                                initial={{ opacity: 0, x: -6 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ duration: 0.3, delay: 0.12 + rowIdx * 0.03 }}
+                                            >
+                                                {[left, right].map((driver, side) => {
+                                                    if (!driver) return <div key={side} className="flex-1" />;
+                                                    const seg = getSegment(driver);
+                                                    const segC = Q_COLORS[seg];
+                                                    const tc = getTeamColor(driver.teamName, driver.teamColor);
+                                                    const isPole = driver.gridPosition === 1;
+
+                                                    return (
+                                                        <div
+                                                            key={driver.id}
+                                                            className="flex-1 flex items-center gap-3 rounded-xl px-3 sm:px-4 py-2.5 transition-all group border"
+                                                            style={{
+                                                                background: isPole ? `rgba(255,210,0,.06)` : "rgba(255,255,255,.02)",
+                                                                borderColor: isPole ? `${F1.gold}30` : "rgba(255,255,255,.06)",
+                                                                borderLeft: `3px solid ${tc}`,
+                                                            }}
+                                                        >
+                                                            {/* Grid position */}
+                                                            <span
+                                                                className="f-cond font-black text-2xl w-7 flex-shrink-0 tabular-nums leading-none"
+                                                                style={{
+                                                                    color: isPole ? F1.gold
+                                                                        : driver.gridPosition === 2 ? "#C0C0C0"
+                                                                        : driver.gridPosition === 3 ? "#CD7F32"
+                                                                        : "#3f3f46",
+                                                                }}
+                                                            >
+                                                                {driver.gridPosition}
+                                                            </span>
+
+                                                            {/* Name + team */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="f-cond font-black text-white text-sm sm:text-base truncate leading-tight">
+                                                                    {driver.driverName.split(" ").slice(-1)[0].toUpperCase()}
+                                                                </p>
+                                                                <p className="f-mono text-[10px] truncate" style={{ color: tc }}>{driver.teamName}</p>
+                                                            </div>
+
+                                                            {/* Best time + segment dot */}
+                                                            <div className="text-right flex-shrink-0">
+                                                                <p className="f-mono text-xs text-zinc-400">{driver.bestTime || "—"}</p>
+                                                                <div className="flex items-center justify-end gap-1 mt-0.5">
+                                                                    <span className="f-mono text-[9px] font-bold" style={{ color: segC.text }}>{seg.toUpperCase()}</span>
+                                                                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: segC.dot, boxShadow: `0 0 4px ${segC.dot}` }} />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </motion.div>
+
+                        {/* ── Qualifying times table with Q1/Q2/Q3 columns */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.18 }}
+                        >
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="inline-block w-5 h-[2px]" style={{ background: "#52525b" }} />
+                                <span className="f-mono text-[10px] tracking-[0.35em] text-zinc-500">SESSION TIMES</span>
+                            </div>
+
+                            <div
+                                className="rounded-2xl border overflow-hidden"
+                                style={{ background: F1.card, borderColor: F1.hairline }}
+                            >
+                                <div className="h-[2px]" style={{ background: `linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent)` }} />
+
+                                {/* Header */}
+                                <div className="border-b" style={{ borderColor: "rgba(255,255,255,.06)" }}>
+                                    <div className="grid grid-cols-[40px_1fr_auto_auto_auto_auto] sm:grid-cols-[48px_1fr_1fr_auto_auto_auto] px-4 sm:px-6 py-3 gap-0">
+                                        <span className="f-mono text-[10px] text-zinc-600 tracking-widest">P</span>
+                                        <span className="f-mono text-[10px] text-zinc-600 tracking-widest">DRIVER</span>
+                                        <span className="f-mono text-[10px] text-zinc-600 tracking-widest hidden sm:block">TEAM</span>
+                                        <span className="f-mono text-[10px] tracking-widest text-right" style={{ color: Q_COLORS.q3.text }}>Q3</span>
+                                        <span className="f-mono text-[10px] tracking-widest text-right px-3" style={{ color: Q_COLORS.q2.text }}>Q2</span>
+                                        <span className="f-mono text-[10px] tracking-widest text-right" style={{ color: Q_COLORS.q1.text }}>Q1</span>
+                                    </div>
+                                </div>
+
+                                {/* Rows */}
+                                {results.map((r, i) => {
+                                    const tc = getTeamColor(r.teamName, r.teamColor);
+                                    const seg = getSegment(r);
+                                    const isElimQ1 = !r.q2Time && !r.q3Time;
+                                    const isElimQ2 = !!r.q2Time && !r.q3Time;
+                                    const isPole = r.gridPosition === 1;
+
+                                    return (
+                                        <>
+                                            {i === 10 && (
+                                                <div key="sep-q2" className="px-5 py-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 h-px" style={{ background: `${Q_COLORS.q2.dot}30` }} />
+                                                        <span className="f-mono text-[10px] px-2 py-0.5 rounded" style={{ color: Q_COLORS.q2.text, background: `${Q_COLORS.q2.dot}12`, border: `1px solid ${Q_COLORS.q2.dot}25` }}>
+                                                            Eliminated after Q2
+                                                        </span>
+                                                        <div className="flex-1 h-px" style={{ background: `${Q_COLORS.q2.dot}30` }} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {i === 15 && (
+                                                <div key="sep-q1" className="px-5 py-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 h-px" style={{ background: "rgba(82,82,91,.25)" }} />
+                                                        <span className="f-mono text-[10px] text-zinc-600 px-2 py-0.5 rounded border border-zinc-700/30">
+                                                            Eliminated after Q1
+                                                        </span>
+                                                        <div className="flex-1 h-px" style={{ background: "rgba(82,82,91,.25)" }} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <motion.div
+                                                key={r.id}
+                                                className="grid grid-cols-[40px_1fr_auto_auto_auto_auto] sm:grid-cols-[48px_1fr_1fr_auto_auto_auto] items-center px-4 sm:px-6 py-3 border-b transition-colors group"
+                                                style={{
+                                                    borderColor: "rgba(255,255,255,.04)",
+                                                    opacity: isElimQ1 ? 0.45 : isElimQ2 ? 0.65 : 1,
+                                                    background: isPole ? "rgba(255,210,0,.04)" : "transparent",
+                                                }}
+                                                initial={{ opacity: 0, x: -6 }}
+                                                animate={{ opacity: isElimQ1 ? 0.45 : isElimQ2 ? 0.65 : 1, x: 0 }}
+                                                transition={{ duration: 0.3, delay: 0.2 + i * 0.02 }}
+                                                whileHover={{ backgroundColor: "rgba(255,255,255,.025)" }}
+                                            >
+                                                {/* Grid pos */}
+                                                <span
+                                                    className="f-cond font-black text-xl leading-none"
+                                                    style={{
+                                                        color: isPole ? F1.gold
+                                                            : r.gridPosition === 2 ? "#C0C0C0"
+                                                            : r.gridPosition === 3 ? "#CD7F32"
+                                                            : "#3f3f46",
+                                                    }}
+                                                >
+                                                    {r.gridPosition}
+                                                </span>
+
+                                                {/* Driver */}
+                                                <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                                                    <div className="w-[3px] h-8 rounded-full flex-shrink-0" style={{ background: tc }} />
+                                                    <div className="min-w-0">
+                                                        <p className={`f-cond font-black text-sm sm:text-base leading-tight truncate ${isPole ? "text-[#FFD200]" : "text-white"}`}>
+                                                            {r.driverName}
+                                                        </p>
+                                                        <p className="f-mono text-[10px] text-zinc-600">#{r.carNumber}</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Team — sm+ */}
+                                                <div className="hidden sm:flex items-center">
+                                                    <span className="f-mono text-[10px] font-bold px-2.5 py-0.5 rounded truncate"
+                                                        style={{ color: tc, background: `${tc}15` }}>
+                                                        {r.teamName}
+                                                    </span>
+                                                </div>
+
+                                                {/* Q3 */}
+                                                <div className="text-right">
+                                                    {r.q3TimeRaw !== null
+                                                        ? <TimeDelta time={r.q3TimeRaw} best={bestQ3} highlight={isPole} />
+                                                        : <span className="f-mono text-xs text-zinc-700">—</span>}
+                                                </div>
+
+                                                {/* Q2 */}
+                                                <div className="text-right px-3">
+                                                    {r.q2TimeRaw !== null
+                                                        ? <TimeDelta time={r.q2TimeRaw} best={bestQ2} />
+                                                        : <span className="f-mono text-xs text-zinc-700">—</span>}
+                                                </div>
+
+                                                {/* Q1 */}
+                                                <div className="text-right">
+                                                    {r.q1TimeRaw !== null
+                                                        ? <TimeDelta time={r.q1TimeRaw} best={bestQ1} />
+                                                        : <span className="f-mono text-xs text-zinc-700">—</span>}
+                                                </div>
+                                            </motion.div>
+                                        </>
                                     );
                                 })}
                             </div>
-                        </div>
+                        </motion.div>
 
-                        {/* Qualifying times table */}
-                        <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl overflow-hidden slide-up" style={{ animationDelay: "100ms" }}>
-                            <div className="px-6 py-4 border-b border-zinc-800/50">
-                                <p className="text-xs font-mono text-zinc-500 tracking-widest">QUALIFYING TIMES</p>
-                            </div>
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-zinc-800/30">
-                                        <th className="text-left px-5 py-3 text-xs font-mono text-zinc-600">P</th>
-                                        <th className="text-left px-5 py-3 text-xs font-mono text-zinc-600">DRIVER</th>
-                                        <th className="text-left px-5 py-3 text-xs font-mono text-zinc-600 hidden md:table-cell">TEAM</th>
-                                        <th className="text-right px-5 py-3 text-xs font-mono text-red-400">Q3</th>
-                                        <th className="text-right px-5 py-3 text-xs font-mono text-yellow-400">Q2</th>
-                                        <th className="text-right px-5 py-3 text-xs font-mono text-zinc-500">Q1</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {results.map((r, i) => {
-                                        const isQ3 = !!r.q3Time, isQ2 = !!r.q2Time && !r.q3Time;
-                                        return (
-                                            <>
-                                                {i === 10 && (
-                                                    <tr key="sep-q2"><td colSpan={6} className="px-5 py-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex-1 h-px bg-yellow-500/20" />
-                                                            <span className="text-xs text-yellow-500/50 font-mono">Eliminated after Q2</span>
-                                                            <div className="flex-1 h-px bg-yellow-500/20" />
-                                                        </div>
-                                                    </td></tr>
-                                                )}
-                                                {i === 15 && (
-                                                    <tr key="sep-q1"><td colSpan={6} className="px-5 py-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex-1 h-px bg-zinc-700/30" />
-                                                            <span className="text-xs text-zinc-600 font-mono">Eliminated after Q1</span>
-                                                            <div className="flex-1 h-px bg-zinc-700/30" />
-                                                        </div>
-                                                    </td></tr>
-                                                )}
-                                                <tr key={r.id} className={`border-b border-zinc-800/20 last:border-0 hover:bg-zinc-800/20 transition-colors ${!isQ3 && !isQ2 ? "opacity-50" : ""}`}>
-                                                    <td className="px-5 py-3">
-                                                        <span className={`text-lg font-black ${i === 0 ? "text-yellow-400" : i === 1 ? "text-zinc-300" : i === 2 ? "text-amber-600" : "text-zinc-600"}`}>{r.gridPosition}</span>
-                                                    </td>
-                                                    <td className="px-5 py-3">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-0.5 h-8 rounded-full" style={{ backgroundColor: r.teamColor }} />
-                                                            <div>
-                                                                <p className="text-sm font-black text-white">{r.driverName}</p>
-                                                                <p className="text-xs text-zinc-600 font-mono">#{r.carNumber}</p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-5 py-3 hidden md:table-cell">
-                                                        <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ color: r.teamColor, backgroundColor: `${r.teamColor}15` }}>{r.teamName}</span>
-                                                    </td>
-                                                    <td className="px-5 py-3 text-right"><TimeDelta time={r.q3TimeRaw} best={bestQ3} /></td>
-                                                    <td className="px-5 py-3 text-right"><TimeDelta time={r.q2TimeRaw} best={bestQ2} /></td>
-                                                    <td className="px-5 py-3 text-right"><TimeDelta time={r.q1TimeRaw} best={bestQ1} /></td>
-                                                </tr>
-                                            </>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                        {/* ── Q session summary pills */}
+                        <motion.div
+                            className="flex flex-wrap gap-3 pt-2"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.35 }}
+                        >
+                            {([
+                                { label: "Q3 BEST", time: bestQ3 ? formatTime(bestQ3) : null, color: Q_COLORS.q3 },
+                                { label: "Q2 BEST", time: bestQ2 ? formatTime(bestQ2) : null, color: Q_COLORS.q2 },
+                                { label: "Q1 BEST", time: bestQ1 ? formatTime(bestQ1) : null, color: Q_COLORS.q1 },
+                            ] as const).map(({ label, time, color }) => time && (
+                                <div
+                                    key={label}
+                                    className="flex items-center gap-2 rounded-xl px-4 py-2.5 border"
+                                    style={{ background: color.bg, borderColor: color.border }}
+                                >
+                                    <div className="w-2 h-2 rounded-full" style={{ background: color.dot }} />
+                                    <span className="f-mono text-[10px] text-zinc-500 tracking-widest">{label}</span>
+                                    <span className="f-cond font-black text-base" style={{ color: color.text }}>{time}</span>
+                                </div>
+                            ))}
+                        </motion.div>
+
                     </div>
                 )}
             </main>
