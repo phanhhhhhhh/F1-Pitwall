@@ -66,9 +66,8 @@ public class TelemetrySimulator {
      */
     private List<DriverInfo> loadDriversFromDb() {
         if (cachedDrivers != null) return cachedDrivers;
-        List<Driver> dbDrivers = driverRepository.findAll()
+        List<Driver> dbDrivers = driverRepository.findAllWithTeam()
                 .stream()
-                .sorted(Comparator.comparingInt(Driver::getCarNumber))
                 .limit(10)
                 .collect(Collectors.toList());
 
