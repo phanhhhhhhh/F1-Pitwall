@@ -48,6 +48,7 @@ export default function Home() {
   const [nextRace, setNextRace] = useState<any>(null);
   /* eslint-enable @typescript-eslint/no-explicit-any */
   const [cd, setCd] = useState({ d: 0, h: 0, m: 0, s: 0, raceDay: false });
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
@@ -74,33 +75,68 @@ export default function Home() {
   }, [nextRace]);
 
   const fetchData = async () => {
+    setFetchError(null);
+    const errors: string[] = [];
     try {
-      const [d, t, r, c] = await Promise.all([
-        authFetch(`${API}/api/drivers`), authFetch(`${API}/api/teams`),
-        authFetch(`${API}/api/races/season/2026`), authFetch(`${API}/api/circuits`),
-      ]);
-      const [drivers, teams, races, circuits] = await Promise.all([d.json(), t.json(), r.json(), c.json()]);
-      const gp = races.filter((x) => !x.name.toLowerCase().includes("sprint"));
-      const sp = races.filter((x) => x.name.toLowerCase().includes("sprint"));
-      setStats({ drivers: drivers.length, teams: teams.length, circuits: circuits.length });
-      setSprintCount(sp.length);
-      setAllRaces(races);
-      setCalendar(gp.slice(0, 6));
-      const today = new Date().toISOString().split("T")[0];
-      const up = gp.filter((x) => x.status === "SCHEDULED" && x.date >= today).sort((a, b) => a.date.localeCompare(b.date));
-      if (up.length) setNextRace(up[0]);
-      try {
-        const w = await (await authFetch(`${API}/api/race-results/winners/2026`)).json();
-        const m: Record<string, { driver: string; team: string }> = {};
+
+    // Run all 4 core calls independently so one failure doesn't blank the rest
+    const [driversRes, teamsRes, racesRes, circuitsRes] = await Promise.allSettled([
+      authFetch(`${API}/api/drivers`),
+      authFetch(`${API}/api/teams`),
+      authFetch(`${API}/api/races/season/2026`),
+      authFetch(`${API}/api/circuits`),
+    ]);
+
+    try {
+      if (driversRes.status === "fulfilled") {
+        const drivers = await driversRes.value.json();
+        setStats(s => ({ ...s, drivers: drivers.length }));
+      } else { errors.push(`Drivers: ${driversRes.reason?.message || driversRes.reason}`); }
+    } catch { errors.push("Drivers: parse error"); }
+
+    try {
+      if (teamsRes.status === "fulfilled") {
+        const teams = await teamsRes.value.json();
+        setStats(s => ({ ...s, teams: teams.length }));
+      } else { errors.push(`Teams: ${teamsRes.reason?.message || teamsRes.reason}`); }
+    } catch { errors.push("Teams: parse error"); }
+
+    try {
+      if (racesRes.status === "fulfilled") {
+        const races = await racesRes.value.json();
+        const gp = races.filter((x: { name: string }) => !x.name.toLowerCase().includes("sprint"));
+        const sp = races.filter((x: { name: string }) => x.name.toLowerCase().includes("sprint"));
+        setSprintCount(sp.length);
+        setAllRaces(races);
+        setCalendar(gp.slice(0, 6));
+        const today = new Date().toISOString().split("T")[0];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.entries(w).forEach(([n, v]: [string, any]) => { m[n] = { driver: v.driverLastName || v.driverName, team: v.teamName }; });
-        setWinners(m);
-      } catch { }
-      try {
-        const st = await (await authFetch(`${API}/api/race-results/standings/drivers/2026`)).json();
-        setStandings(Array.isArray(st) ? st.slice(0, 6) : []);
-      } catch { }
-    } catch (e) { console.error(e); }
+        const up = gp.filter((x: any) => x.status === "SCHEDULED" && x.date >= today).sort((a: any, b: any) => a.date.localeCompare(b.date));
+        if (up.length) setNextRace(up[0]);
+      } else { errors.push(`Races: ${racesRes.reason?.message || racesRes.reason}`); }
+    } catch { errors.push("Races: parse error"); }
+
+    try {
+      if (circuitsRes.status === "fulfilled") {
+        const circuits = await circuitsRes.value.json();
+        setStats(s => ({ ...s, circuits: circuits.length }));
+      } else { errors.push(`Circuits: ${circuitsRes.reason?.message || circuitsRes.reason}`); }
+    } catch { errors.push("Circuits: parse error"); }
+
+    if (errors.length) setFetchError(errors.join(" · "));
+
+    try {
+      const w = await (await authFetch(`${API}/api/race-results/winners/2026`)).json();
+      const m: Record<string, { driver: string; team: string }> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Object.entries(w).forEach(([n, v]: [string, any]) => { m[n] = { driver: v.driverLastName || v.driverName, team: v.teamName }; });
+      setWinners(m);
+    } catch { }
+    try {
+      const st = await (await authFetch(`${API}/api/race-results/standings/drivers/2026`)).json();
+      setStandings(Array.isArray(st) ? st.slice(0, 6) : []);
+    } catch { }
+    } catch (e) { console.error("[Overview] unexpected error:", e); }
     finally { setLoading(false); }
   };
 
@@ -149,6 +185,13 @@ export default function Home() {
       </div>
 
       <Navbar />
+
+      {/* API error banner */}
+      {fetchError && (
+        <div className="relative z-20 bg-red-950/60 border-b border-red-500/30 px-5 py-2 text-center">
+          <span className="f-mono text-[11px] text-red-400">⚠ API error — {fetchError}</span>
+        </div>
+      )}
 
       {/* Broadcast ticker */}
       <div className="relative z-10 border-b border-white/5" style={{ background: "rgba(255,255,255,.015)" }}>
