@@ -4,7 +4,107 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { register } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
+import { motion, AnimatePresence } from "framer-motion";
+import PitwallBackground from "../components/PitwallBackground";
+import { F1 } from "../lib/f1-theme";
 
+/* ── Shared micro-components (local copies keep page self-contained) ─────── */
+
+function RedLine() {
+    return (
+        <div
+            className="h-px w-full"
+            style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }}
+        />
+    );
+}
+
+function Spinner() {
+    return <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />;
+}
+
+function ErrorBanner({ msg }: { msg: string }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-5 p-3 rounded-lg f-mono text-xs text-red-400 text-center flex items-center gap-2 justify-center chamfer-sm"
+            style={{ background: "rgba(225,6,0,0.08)", border: `1px solid rgba(225,6,0,0.28)` }}
+        >
+            <span className="text-base">⚠</span> {msg}
+        </motion.div>
+    );
+}
+
+/* ── Password strength ───────────────────────────────────────────────────── */
+const STRENGTH_COLORS = ["", "#ef4444", "#f97316", "#eab308", "#22c55e"];
+const STRENGTH_LABELS = ["", "Weak", "Fair", "Good", "Strong"];
+
+function strengthScore(p: string): number {
+    if (!p) return 0;
+    return p.length < 6 ? 1 : p.length < 10 ? 2 : /[A-Z]/.test(p) && /[0-9]/.test(p) ? 4 : 3;
+}
+
+function StrengthBar({ password }: { password: string }) {
+    const s = strengthScore(password);
+    if (!password) return null;
+    return (
+        <div className="mt-1.5">
+            <div className="flex gap-1 mb-0.5">
+                {[1, 2, 3, 4].map(i => (
+                    <div
+                        key={i}
+                        className="h-0.5 flex-1 rounded-full transition-all duration-300"
+                        style={{ background: i <= s ? STRENGTH_COLORS[s] : "rgba(63,63,70,0.5)" }}
+                    />
+                ))}
+            </div>
+            <p className="f-mono text-[10px]" style={{ color: STRENGTH_COLORS[s] }}>{STRENGTH_LABELS[s]}</p>
+        </div>
+    );
+}
+
+/* ── Logo lockup ─────────────────────────────────────────────────────────── */
+function PitwallLogo({ sub }: { sub: string }) {
+    return (
+        <div className="text-center mb-7">
+            <div className="relative inline-flex items-center justify-center mb-4">
+                <svg
+                    className="absolute"
+                    width="64" height="64" viewBox="0 0 64 64"
+                    style={{ animation: "spin-slow 9s linear infinite" }}
+                >
+                    <circle cx="32" cy="32" r="30" fill="none" stroke={F1.red} strokeWidth="1" strokeDasharray="6 5" opacity="0.35" />
+                </svg>
+                <svg
+                    className="absolute"
+                    width="50" height="50" viewBox="0 0 50 50"
+                    style={{ animation: "spin-slow 5s linear infinite reverse" }}
+                >
+                    <circle cx="25" cy="25" r="22" fill="none" stroke={F1.red} strokeWidth="0.8" strokeDasharray="3 9" opacity="0.2" />
+                </svg>
+                <div
+                    className="relative w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                    style={{
+                        background: "rgba(225,6,0,0.10)",
+                        border: `1px solid rgba(225,6,0,0.22)`,
+                        boxShadow: "0 0 22px rgba(225,6,0,0.15)",
+                    }}
+                >
+                    🏎️
+                </div>
+            </div>
+            <h1 className="f-cond font-black tracking-tight leading-none"
+                style={{ fontSize: "clamp(2rem,6vw,2.6rem)" }}>
+                <span style={{ color: F1.red }}>PIT</span>
+                <span className="text-white">WALL</span>
+            </h1>
+            <div className="mt-1 mx-auto h-px w-14" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
+            <p className="f-mono text-zinc-500 text-[10px] tracking-[0.4em] uppercase mt-1.5">{sub}</p>
+        </div>
+    );
+}
+
+/* ── Page ────────────────────────────────────────────────────────────────── */
 export default function RegisterPage() {
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
@@ -16,17 +116,15 @@ export default function RegisterPage() {
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
 
-    useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
+    useEffect(() => { setTimeout(() => setMounted(true), 30); }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-
         if (!username.trim() || username.trim().length < 3) { setError("Callsign must be at least 3 characters"); return; }
         if (!email.trim() || !email.includes("@") || !email.includes(".")) { setError("Please enter a valid email address"); return; }
         if (password !== confirm) { setError("Passwords do not match"); return; }
         if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
-
         setIsLoading(true);
         try {
             await register(username, password, email);
@@ -38,80 +136,72 @@ export default function RegisterPage() {
         }
     };
 
-    const fields = [
-        { key: "username", label: "Callsign", type: "text", value: username, set: setUsername, placeholder: "e.g. hamilton44", autoComplete: "username" },
-        { key: "email", label: "Email", type: "email", value: email, set: setEmail, placeholder: "you@pitwall.f1", autoComplete: "email" },
-        { key: "password", label: "Access Code", type: "password", value: password, set: setPassword, placeholder: "min 6 characters", autoComplete: "new-password" },
-        { key: "confirm", label: "Confirm Code", type: "password", value: confirm, set: setConfirm, placeholder: "••••••••", autoComplete: "new-password" },
+    const fields: Array<{
+        key: string; label: string; type: string; value: string;
+        set: (v: string) => void; placeholder: string; autoComplete: string;
+    }> = [
+        { key: "username", label: "Callsign", type: "text",     value: username,  set: setUsername,  placeholder: "e.g. hamilton44",   autoComplete: "username"     },
+        { key: "email",    label: "Email",    type: "email",    value: email,     set: setEmail,     placeholder: "you@pitwall.f1",    autoComplete: "email"        },
+        { key: "password", label: "Access Code",   type: "password", value: password,  set: setPassword,  placeholder: "min 6 characters",  autoComplete: "new-password" },
+        { key: "confirm",  label: "Confirm Code",  type: "password", value: confirm,   set: setConfirm,   placeholder: "••••••••",          autoComplete: "new-password" },
     ];
 
-    const strength = password.length === 0 ? 0
-        : password.length < 6 ? 1
-            : password.length < 10 ? 2
-                : /[A-Z]/.test(password) && /[0-9]/.test(password) ? 4 : 3;
-
-    const strengthColors = ["", "#ef4444", "#f97316", "#eab308", "#22c55e"];
-    const strengthLabels = ["", "Weak", "Fair", "Good", "Strong"];
+    const inputStyle = (key: string) => ({
+        borderColor: focused === key ? F1.red : F1.hairline,
+        boxShadow: focused === key ? `0 0 18px rgba(225,6,0,0.18)` : "none",
+        background: "rgba(10,10,12,0.82)",
+    });
 
     return (
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4 py-10 relative overflow-hidden">
-            <style>{`
-                @keyframes fadeUp { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
-                @keyframes glow { 0%,100%{opacity:.3} 50%{opacity:.8} }
-                @keyframes scan { 0%{transform:translateY(-100vh)} 100%{transform:translateY(100vh)} }
-                @keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-                .fade-up { animation: fadeUp .5s ease-out both; }
-                .glow-pulse { animation: glow 3s ease-in-out infinite; }
-            `}</style>
+        <div
+            className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden"
+            style={{ background: F1.bg }}
+        >
+            <PitwallBackground glow="top-center" streaks={4} />
 
-            { }
-            <div className="absolute inset-0">
-                <div className="absolute inset-0 opacity-[0.03]" style={{
-                    backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)",
-                    backgroundSize: "40px 40px",
-                }} />
-                <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-red-500/8 rounded-full blur-[120px] glow-pulse" />
-                <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-orange-900/10 rounded-full blur-[80px] glow-pulse" style={{ animationDelay: "1.5s" }} />
-                <div className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-500/20 to-transparent"
-                    style={{ animation: "scan 8s linear infinite" }} />
-            </div>
+            <div
+                className={`relative z-10 w-full max-w-md transition-all duration-600 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+            >
+                {/* Glow halo */}
+                <div
+                    className="absolute -inset-4 rounded-2xl blur-2xl pointer-events-none"
+                    style={{ background: "radial-gradient(ellipse at 50% 50%,rgba(225,6,0,0.07),transparent 70%)" }}
+                />
 
-            { }
-            <div className={`relative w-full max-w-md transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-                <div className="absolute inset-0 rounded-3xl bg-red-500/5 blur-xl" />
+                {/* Card */}
+                <div
+                    className="relative rounded-xl overflow-hidden shadow-2xl"
+                    style={{
+                        background: F1.card,
+                        border: `1px solid ${F1.hairline}`,
+                        backdropFilter: "blur(24px)",
+                        WebkitBackdropFilter: "blur(24px)",
+                    }}
+                >
+                    <RedLine />
 
-                <div className="relative bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-3xl overflow-hidden shadow-2xl">
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-red-500 to-transparent" />
+                    <div className="p-7 sm:p-8">
+                        <PitwallLogo sub="Create Account" />
 
-                    <div className="p-8">
-                        { }
-                        <div className="text-center mb-8 fade-up">
-                            <div className="relative inline-block mb-4">
-                                <div className="absolute inset-0 rounded-full border border-red-500/20"
-                                    style={{ animation: "spin-slow 8s linear infinite" }} />
-                                <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
-                                    <span className="text-xl">🏎️</span>
-                                </div>
-                            </div>
-                            <h1 className="text-3xl font-black tracking-tighter text-white">
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">PIT</span>WALL
-                            </h1>
-                            <p className="text-zinc-500 text-xs tracking-[0.4em] uppercase mt-1.5 font-mono">
-                                Create Account
-                            </p>
-                        </div>
+                        <AnimatePresence>
+                            {error && <ErrorBanner msg={error} />}
+                        </AnimatePresence>
 
-                        { }
-                        {error && (
-                            <div className="mb-5 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm text-center flex items-center gap-2 justify-center fade-up">
-                                <span>⚠️</span> {error}
-                            </div>
-                        )}
-
-                        { }
-                        <a href={`${API}/oauth2/authorize/google`}
-                            className="flex items-center justify-center gap-3 w-full py-3 rounded-xl border border-zinc-700/50 bg-zinc-800/40 hover:bg-zinc-800 hover:border-zinc-600 transition-all duration-200 text-sm font-bold text-white fade-up">
-                            <svg width="18" height="18" viewBox="0 0 18 18">
+                        {/* Google */}
+                        <a
+                            href={`${API}/oauth2/authorize/google`}
+                            className="flex items-center justify-center gap-3 w-full py-3 rounded-lg f-mono text-xs font-bold uppercase tracking-wider text-white transition-all duration-200 mb-1"
+                            style={{ border: `1px solid ${F1.hairline}`, background: "rgba(255,255,255,0.03)" }}
+                            onMouseEnter={e => {
+                                (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.15)";
+                                (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.06)";
+                            }}
+                            onMouseLeave={e => {
+                                (e.currentTarget as HTMLAnchorElement).style.borderColor = F1.hairline;
+                                (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.03)";
+                            }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 18 18">
                                 <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z" />
                                 <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z" />
                                 <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z" />
@@ -120,19 +210,22 @@ export default function RegisterPage() {
                             Continue with Google
                         </a>
 
-                        <div className="flex items-center gap-3">
-                            <div className="flex-1 h-px bg-zinc-800" />
-                            <span className="text-zinc-600 text-xs font-mono">OR</span>
-                            <div className="flex-1 h-px bg-zinc-800" />
+                        {/* Divider */}
+                        <div className="flex items-center gap-3 my-4">
+                            <div className="flex-1 h-px" style={{ background: F1.hairline }} />
+                            <span className="f-mono text-zinc-600 text-[10px] tracking-widest uppercase">or</span>
+                            <div className="flex-1 h-px" style={{ background: F1.hairline }} />
                         </div>
 
-                        { }
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Form */}
+                        <form onSubmit={handleSubmit} className="space-y-3.5">
                             {fields.map((f, i) => (
-                                <div key={f.key} className="fade-up" style={{ animationDelay: `${i * 60}ms` }}>
-                                    <label className="block text-zinc-500 text-xs uppercase tracking-[0.2em] mb-1.5 font-mono">
-                                        {f.label}
-                                    </label>
+                                <motion.div
+                                    key={f.key}
+                                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.05 + i * 0.04 }}
+                                >
+                                    <label className="f-mono block text-zinc-500 text-[10px] uppercase tracking-[0.25em] mb-1.5">{f.label}</label>
                                     <div className="relative">
                                         <input
                                             type={f.type}
@@ -143,81 +236,73 @@ export default function RegisterPage() {
                                             autoComplete={f.autoComplete}
                                             placeholder={f.placeholder}
                                             required
-                                            className="w-full bg-zinc-950/80 border rounded-xl px-4 py-3 text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 font-mono text-sm"
-                                            style={{
-                                                borderColor: focused === f.key ? "#ef4444" : "rgba(63,63,70,0.5)",
-                                                boxShadow: focused === f.key ? "0 0 20px rgba(239,68,68,0.12)" : "none",
-                                            }}
+                                            className="w-full f-mono border text-white placeholder-zinc-700 focus:outline-none transition-all duration-300 rounded-lg px-4 py-3 text-sm"
+                                            style={inputStyle(f.key)}
                                         />
                                         {focused === f.key && (
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                                            <span
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full animate-pulse"
+                                                style={{ background: F1.red }}
+                                            />
                                         )}
                                     </div>
 
-                                    { }
-                                    {f.key === "password" && password.length > 0 && (
-                                        <div className="mt-2">
-                                            <div className="flex gap-1">
-                                                {[1, 2, 3, 4].map(l => (
-                                                    <div key={l} className="flex-1 h-1 rounded-full transition-all duration-300"
-                                                        style={{ backgroundColor: l <= strength ? strengthColors[strength] : "#27272a" }} />
-                                                ))}
-                                            </div>
-                                            <p className="text-xs mt-1 font-mono" style={{ color: strengthColors[strength] }}>
-                                                {strengthLabels[strength]}
-                                            </p>
-                                        </div>
-                                    )}
+                                    {/* Password strength meter */}
+                                    {f.key === "password" && <StrengthBar password={password} />}
 
-                                    { }
+                                    {/* Confirm match */}
                                     {f.key === "confirm" && confirm.length > 0 && (
-                                        <p className={`text-xs mt-1 font-mono ${password === confirm ? "text-green-400" : "text-red-400"}`}>
+                                        <p className={`f-mono text-[10px] mt-1 ${password === confirm ? "text-green-400" : "text-red-400"}`}>
                                             {password === confirm ? "✓ Passwords match" : "✗ Passwords do not match"}
                                         </p>
                                     )}
-                                </div>
+                                </motion.div>
                             ))}
 
-                            { }
-                            <div className="bg-zinc-800/40 border border-zinc-700/30 rounded-xl px-4 py-3 fade-up" style={{ animationDelay: "240ms" }}>
-                                <p className="text-xs text-zinc-500 font-mono">
-                                    🔒 New accounts are granted <span className="text-zinc-300 font-bold">VIEWER</span> role by default.
+                            {/* Role notice */}
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
+                                className="rounded-lg px-4 py-3"
+                                style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${F1.hairline}` }}
+                            >
+                                <p className="f-mono text-[10px] text-zinc-500">
+                                    🔒 New accounts receive <span className="text-zinc-300 font-bold">VIEWER</span> role.
                                     Contact an admin to upgrade.
                                 </p>
-                            </div>
+                            </motion.div>
 
-                            { }
-                            <div className="fade-up" style={{ animationDelay: "280ms" }}>
-                                <button type="submit" disabled={isLoading}
-                                    className="relative w-full py-4 rounded-xl font-black tracking-widest text-sm overflow-hidden transition-all duration-300 disabled:opacity-50 text-white"
+                            {/* Submit */}
+                            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="relative w-full py-3.5 rounded-lg f-mono font-bold text-xs tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 disabled:opacity-50 text-white chamfer-sm"
                                     style={{
-                                        background: isLoading ? "rgba(39,39,42,0.8)" : "linear-gradient(135deg,#ef4444,#dc2626)",
-                                        boxShadow: isLoading ? "none" : "0 0 30px rgba(239,68,68,0.3)",
-                                    }}>
+                                        background: isLoading ? "rgba(39,39,42,0.8)" : `linear-gradient(135deg,${F1.red},#dc2626)`,
+                                        boxShadow: isLoading ? "none" : `0 0 28px rgba(225,6,0,0.30)`,
+                                    }}
+                                >
                                     {!isLoading && (
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-700" />
+                                        <span className="shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{ width: "60%" }} />
                                     )}
                                     <span className="relative flex items-center justify-center gap-2">
-                                        {isLoading ? (
-                                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />CREATING ACCOUNT...</>
-                                        ) : "CREATE ACCOUNT →"}
+                                        {isLoading ? <><Spinner /> Creating Account...</> : "Create Account →"}
                                     </span>
                                 </button>
-                            </div>
+                            </motion.div>
                         </form>
 
-                        { }
-                        <div className="mt-6 pt-5 border-t border-zinc-800/50 text-center fade-up" style={{ animationDelay: "320ms" }}>
-                            <p className="text-zinc-600 text-xs font-mono">
+                        {/* Footer */}
+                        <div className="mt-6 pt-5 text-center" style={{ borderTop: `1px solid ${F1.hairline}` }}>
+                            <p className="f-mono text-zinc-600 text-[11px]">
                                 Already have an account?{" "}
-                                <a href="/login" className="text-red-500 hover:text-red-400 transition-colors font-bold">
-                                    Sign in
-                                </a>
+                                <a href="/login" className="text-red-500 hover:text-red-400 transition-colors font-bold">Sign in</a>
                             </p>
                         </div>
                     </div>
 
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-700 to-transparent" />
+                    <div className="h-px w-full" style={{ background: F1.hairline }} />
+                    <div className="h-0.5 w-1/3 mx-auto" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
                 </div>
             </div>
         </div>

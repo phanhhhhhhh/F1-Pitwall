@@ -6,6 +6,7 @@ import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonTable } from "../components/LoadingSkeleton";
+import { flagForCountry } from "../lib/f1-theme";
 
 interface Circuit {
   id: number; name: string; country: string; city: string; type: string;
@@ -18,52 +19,127 @@ const typeConfig: Record<string, { color: string; label: string }> = {
   OVAL: { color: "#A855F7", label: "OVAL" },
 };
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  "Australia": "🇦🇺", "China": "🇨🇳", "Japan": "🇯🇵", "Bahrain": "🇧🇭",
-  "Saudi Arabia": "🇸🇦", "United States": "🇺🇸", "Canada": "🇨🇦",
-  "Monaco": "🇲🇨", "Spain": "🇪🇸", "Austria": "🇦🇹", "United Kingdom": "🇬🇧",
-  "Belgium": "🇧🇪", "Hungary": "🇭🇺", "Netherlands": "🇳🇱", "Italy": "🇮🇹",
-  "Azerbaijan": "🇦🇿", "Singapore": "🇸🇬", "Mexico": "🇲🇽", "Brazil": "🇧🇷",
-  "UAE": "🇦🇪", "Qatar": "🇶🇦", "Las Vegas": "🇺🇸",
-};
-
 const formatTime = (s: number) => { const m = Math.floor(s / 60); const sec = (s % 60).toFixed(3); return `${m}:${sec.padStart(6, "0")}`; };
 
+// ─── Stylized track motif (decorative badge — NOT a real layout map) ──────────
+// Each type variant has a purely abstract geometry suggesting the circuit class.
+function TrackMotif({ type, color }: { type: string; color: string }) {
+  const isPermanent = type === "PERMANENT";
+  const isStreet = type === "STREET";
+  // isOval: remaining case
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: 64, height: 64 }}>
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        {isPermanent && (
+          // Permanent: oval-ish flowing loop motif
+          <>
+            <ellipse cx="32" cy="32" rx="26" ry="18" stroke={color} strokeWidth="2.5" strokeOpacity="0.25" fill="none" />
+            <path d="M10 32 Q14 14 32 10 Q50 6 54 22 Q58 36 44 44 Q32 50 20 46 Q8 42 10 32Z"
+              stroke={color} strokeWidth="2" strokeOpacity="0.55" fill="none" strokeDasharray="4 2" />
+            <circle cx="32" cy="32" r="3" fill={color} fillOpacity="0.7" />
+          </>
+        )}
+        {isStreet && (
+          // Street: angular urban-block shape suggesting a street circuit
+          <>
+            <rect x="12" y="12" width="40" height="40" rx="3" stroke={color} strokeWidth="2" strokeOpacity="0.2" fill="none" />
+            <path d="M16 16 L48 16 L48 30 L36 30 L36 48 L16 48 Z"
+              stroke={color} strokeWidth="2.5" strokeOpacity="0.6" fill="none" strokeLinejoin="round" />
+            <circle cx="16" cy="16" r="2.5" fill={color} fillOpacity="0.8" />
+          </>
+        )}
+        {!isPermanent && !isStreet && (
+          // Oval: clean oval ring
+          <>
+            <ellipse cx="32" cy="32" rx="26" ry="14" stroke={color} strokeWidth="2.5" strokeOpacity="0.6" fill="none" />
+            <ellipse cx="32" cy="32" rx="18" ry="8" stroke={color} strokeWidth="1" strokeOpacity="0.2" fill="none" />
+          </>
+        )}
+        {/* Corner entry mark — always shown */}
+        <circle cx="54" cy="18" r="2" fill={color} fillOpacity="0.4" />
+      </svg>
+      {/* Glow behind the motif */}
+      <div className="absolute inset-0 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle at 50% 50%,${color}18,transparent 70%)` }} />
+    </div>
+  );
+}
+
+// ─── Key Stats Grid ───────────────────────────────────────────────────────────
+function KeyStatsGrid({ circuit, color }: { circuit: Circuit; color: string }) {
+  // Total race distance = laps × length
+  const raceDistanceKm = (circuit.totalLaps * circuit.lengthKm).toFixed(1);
+
+  const stats = [
+    { label: "LAPS",       value: String(circuit.totalLaps),         unit: "",    icon: "◎" },
+    { label: "LENGTH",     value: String(circuit.lengthKm),          unit: "km",  icon: "⟷" },
+    { label: "CORNERS",    value: String(circuit.turnCount),          unit: "",    icon: "↺" },
+    { label: "RACE DIST",  value: raceDistanceKm,                    unit: "km",  icon: "⟶" },
+    { label: "LAP RECORD", value: formatTime(circuit.lapRecordSec),   unit: "",    icon: "⏱" },
+  ];
+
+  return (
+    <div className="grid grid-cols-5 gap-1 mt-4 mb-3">
+      {stats.map((s) => (
+        <div key={s.label}
+          className="flex flex-col items-center justify-center rounded-lg px-1 py-2 text-center"
+          style={{ background: `${color}0d`, border: `1px solid ${color}20` }}>
+          <span className="text-[10px] leading-none mb-1" style={{ color: `${color}90` }}>{s.icon}</span>
+          <span className="f-cond font-black tabular-nums leading-none" style={{ fontSize: "15px", color: "#f4f4f5" }}>{s.value}</span>
+          {s.unit && <span className="f-mono text-[8px] leading-none mt-0.5" style={{ color: color, opacity: 0.7 }}>{s.unit}</span>}
+          <span className="f-mono text-[8px] text-zinc-600 tracking-wider mt-0.5 leading-none">{s.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Circuit Card ─────────────────────────────────────────────────────────────
 function CircuitCard({ circuit, idx }: { circuit: Circuit; idx: number }) {
   const [hov, setHov] = useState(false);
   const cfg = typeConfig[circuit.type] || { color: "#71717a", label: circuit.type };
   const col = cfg.color;
-  const flag = COUNTRY_FLAGS[circuit.country] || "🏁";
+  // Use shared flagForCountry — falls back to 🏁
+  const flag = flagForCountry(circuit.country);
 
   return (
     <div className="group relative rise" style={{ animationDelay: `${idx * 40}ms` }} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}>
       <div className="absolute inset-0 rounded-2xl transition-opacity duration-500 pointer-events-none" style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 32px ${col}24` }} />
-      <div className="relative border rounded-2xl overflow-hidden transition-all duration-300 chamfer" style={{ borderColor: hov ? `${col}40` : "rgba(255,255,255,.06)", transform: hov ? "translateY(-3px)" : "none", background: "rgba(18,18,21,.78)" }}>
+      <div className="relative border rounded-2xl overflow-hidden transition-all duration-300 chamfer"
+        style={{ borderColor: hov ? `${col}40` : "rgba(255,255,255,.06)", transform: hov ? "translateY(-3px)" : "none", background: "rgba(18,18,21,.78)" }}>
         <div className="h-[3px] w-full" style={{ background: col, boxShadow: hov ? `0 0 12px ${col}` : "none" }} />
-        <div className="absolute right-4 bottom-3 f-mono font-black select-none pointer-events-none transition-all duration-500" style={{ fontSize: "2.4rem", color: col, opacity: hov ? 0.1 : 0.05, transform: hov ? "scale(1.05)" : "none" }}>{formatTime(circuit.lapRecordSec)}</div>
+
         <div className="relative z-10 p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">{flag}</span>
-            <span className="f-mono text-[10px] font-bold px-2 py-0.5 rounded border" style={{ color: col, borderColor: `${col}40`, background: `${col}12` }}>{cfg.label}</span>
-          </div>
-          <h2 className="f-cond font-black text-2xl uppercase leading-none tracking-tight transition-colors" style={{ color: hov ? col : "#fff" }}>{circuit.name}</h2>
-          <p className="f-mono text-[11px] text-zinc-500 mt-1">{circuit.city}, {circuit.country}</p>
-          <div className="h-px my-4" style={{ background: `linear-gradient(90deg,${col}50,transparent)`, opacity: hov ? 1 : 0.4 }} />
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            {[{ l: "LAPS", v: circuit.totalLaps }, { l: "KM", v: circuit.lengthKm }, { l: "TURNS", v: circuit.turnCount }].map(s => (
-              <div key={s.l} className="text-center">
-                <p className="f-cond font-black text-2xl tabular-nums" style={{ color: hov ? "#fff" : "#e4e4e7" }}>{s.v}</p>
-                <p className="f-mono text-[9px] text-zinc-600 tracking-widest">{s.l}</p>
-              </div>
-            ))}
-            <div className="text-center">
-              <p className="f-cond font-black text-base tabular-nums leading-tight pt-1.5" style={{ color: col }}>{formatTime(circuit.lapRecordSec)}</p>
-              <p className="f-mono text-[9px] text-zinc-600 tracking-widest">RECORD</p>
+          {/* ── Header row: flag + badge + track motif ── */}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl leading-none">{flag}</span>
+              <span className="f-mono text-[10px] font-bold px-2 py-0.5 rounded border" style={{ color: col, borderColor: `${col}40`, background: `${col}12` }}>{cfg.label}</span>
+            </div>
+            {/* Decorative track motif — clearly a style element */}
+            <div className="opacity-80 group-hover:opacity-100 transition-opacity duration-300">
+              <TrackMotif type={circuit.type} color={col} />
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-lg px-3 py-2 border" style={{ background: "rgba(255,255,255,.02)", borderColor: "rgba(255,255,255,.06)" }}>
+
+          {/* ── Circuit name + location ── */}
+          <h2 className="f-cond font-black text-2xl uppercase leading-none tracking-tight transition-colors mb-1"
+            style={{ color: hov ? col : "#fff" }}>{circuit.name}</h2>
+          <p className="f-mono text-[11px] text-zinc-500">{circuit.city}, {circuit.country}</p>
+
+          <div className="h-px my-3" style={{ background: `linear-gradient(90deg,${col}50,transparent)`, opacity: hov ? 1 : 0.4 }} />
+
+          {/* ── Key stats grid ── */}
+          <KeyStatsGrid circuit={circuit} color={col} />
+
+          {/* ── Lap record holder ── */}
+          <div className="flex items-center gap-2 rounded-lg px-3 py-2 border mt-1"
+            style={{ background: "rgba(255,255,255,.02)", borderColor: "rgba(255,255,255,.06)" }}>
             <span className="text-[#E10600] text-xs">⚡</span>
-            <p className="f-mono text-[11px] text-zinc-400">REC BY <span className="text-white font-bold">{circuit.lapRecordHolder}</span></p>
+            <p className="f-mono text-[11px] text-zinc-400 truncate">
+              REC BY <span className="text-white font-bold">{circuit.lapRecordHolder}</span>
+              <span className="ml-2 tabular-nums" style={{ color: col }}>{formatTime(circuit.lapRecordSec)}</span>
+            </p>
           </div>
         </div>
       </div>
@@ -71,6 +147,7 @@ function CircuitCard({ circuit, idx }: { circuit: Circuit; idx: number }) {
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CircuitsPage() {
   const router = useRouter();
   const [circuits, setCircuits] = useState<Circuit[]>([]);

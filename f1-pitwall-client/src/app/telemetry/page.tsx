@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
+import PitwallBackground from "../components/PitwallBackground";
 import Navbar from "../components/Navbar";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -48,153 +54,175 @@ interface LiveStatus {
 
 const MAX_HISTORY = 40;
 
-const TYRE_CONFIG: Record<string, { maxLaps: number; color: string; optimalTemp: [number, number] }> = {
-  SOFT: { maxLaps: 20, color: "#ef4444", optimalTemp: [80, 110] },
-  MEDIUM: { maxLaps: 30, color: "#eab308", optimalTemp: [90, 120] },
-  HARD: { maxLaps: 40, color: "#e2e8f0", optimalTemp: [100, 130] },
-  INTERMEDIATE: { maxLaps: 25, color: "#22c55e", optimalTemp: [50, 80] },
-  WET: { maxLaps: 30, color: "#3b82f6", optimalTemp: [30, 60] },
-  UNKNOWN: { maxLaps: 30, color: "#666", optimalTemp: [80, 120] },
+// Tyre lifespan lookup (presentation only) — colors come from the shared `tyre()` helper.
+const MAX_LAPS: Record<string, number> = {
+  SOFT: 20, MEDIUM: 30, HARD: 40, INTERMEDIATE: 25, INTER: 25, WET: 30, UNKNOWN: 30,
 };
+const maxLapsFor = (t: string) => MAX_LAPS[(t || "").toUpperCase()] ?? 30;
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * LIVE sparkline — kept on <canvas> for performance (≤10 drivers × 40 pts/sec).
+ * Restyled: team-colored gradient stroke, soft glow, gradient fill, fine grid.
+ * ────────────────────────────────────────────────────────────────────────── */
 function SpeedChart({ data, color }: { data: number[]; color: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || data.length < 2) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const min = 150, max = 360, w = canvas.width, h = canvas.height, pad = 4;
-    ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = pad + (h - pad * 2) * (i / 4);
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
-    const grad = ctx.createLinearGradient(0, 0, w, 0);
-    grad.addColorStop(0, color + "40");
-    grad.addColorStop(1, color);
-    ctx.beginPath(); ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.lineJoin = "round";
-    data.forEach((v, i) => {
-      const x = (i / (MAX_HISTORY - 1)) * w;
-      const y = h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-    ctx.fillStyle = color + "10"; ctx.fill();
-  }, [data, color]);
-  return <canvas ref={canvasRef} width={200} height={50} className="w-full" />;
-}
-
-function DualChart({ data1, data2, color1, color2, label }: {
-  data1: number[]; data2: number[]; color1: string; color2: string; label: string;
-}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const min = 100, max = 380, w = canvas.width, h = canvas.height, pad = 4;
-    ctx.strokeStyle = "rgba(255,255,255,0.04)"; ctx.lineWidth = 1;
+    const w = canvas.width, h = canvas.height, pad = 4, min = 150, max = 360;
+    ctx.clearRect(0, 0, w, h);
+    // gridlines
+    ctx.strokeStyle = "rgba(255,255,255,0.045)"; ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = pad + (h - pad * 2) * (i / 4);
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
     }
-    const drawLine = (data: number[], color: string) => {
-      if (data.length < 2) return;
-      ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = "round";
-      data.forEach((v, i) => {
-        const x = (i / (MAX_HISTORY - 1)) * w;
-        const y = h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-    };
-    drawLine(data1, color1);
-    drawLine(data2, color2 + "CC");
-  }, [data1, data2, color1, color2]);
+    if (data.length < 2) return;
+    const pt = (v: number, i: number): [number, number] => [
+      (i / (MAX_HISTORY - 1)) * w,
+      h - pad - ((v - min) / (max - min)) * (h - pad * 2),
+    ];
+    // fill
+    ctx.beginPath();
+    data.forEach((v, i) => { const [x, y] = pt(v, i); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    const last = pt(data[data.length - 1], data.length - 1);
+    ctx.lineTo(last[0], h); ctx.lineTo(0, h); ctx.closePath();
+    const fill = ctx.createLinearGradient(0, 0, 0, h);
+    fill.addColorStop(0, color + "33"); fill.addColorStop(1, color + "00");
+    ctx.fillStyle = fill; ctx.fill();
+    // stroke with glow
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, color + "55"); grad.addColorStop(1, color);
+    ctx.beginPath();
+    data.forEach((v, i) => { const [x, y] = pt(v, i); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.strokeStyle = grad; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.shadowColor = color; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0;
+    // leading dot
+    ctx.beginPath(); ctx.arc(last[0], last[1], 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+  }, [data, color]);
+  return <canvas ref={canvasRef} width={220} height={50} className="w-full" />;
+}
+
+/* Recharts-backed detail chart (single + compare). Memoized rows keep it smooth. */
+type SeriesPoint = { i: number; a?: number; b?: number };
+function DetailChart({
+  data, colorA, colorB, labelA, labelB, height = 220, domain,
+}: {
+  data: SeriesPoint[]; colorA: string; colorB?: string;
+  labelA: string; labelB?: string; height?: number; domain?: [number, number];
+}) {
   return (
-    <div>
-      <p className="text-xs text-zinc-600 font-mono mb-1.5">{label}</p>
-      <canvas ref={canvasRef} width={500} height={60} className="w-full" />
-    </div>
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
+        <defs>
+          <linearGradient id="strokeA" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={colorA} stopOpacity={0.45} />
+            <stop offset="100%" stopColor={colorA} stopOpacity={1} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <XAxis dataKey="i" hide />
+        <YAxis
+          domain={domain ?? ["auto", "auto"]} width={38}
+          tick={{ fill: "rgba(255,255,255,0.32)", fontSize: 9, fontFamily: "var(--font-geist-mono),monospace" }}
+          axisLine={false} tickLine={false}
+        />
+        <Tooltip
+          cursor={{ stroke: "rgba(255,255,255,0.18)", strokeWidth: 1 }}
+          contentStyle={{
+            background: "rgba(10,10,12,.92)", border: `1px solid ${F1.hairline}`,
+            borderRadius: 10, fontSize: 11, fontFamily: "var(--font-geist-mono),monospace",
+            boxShadow: "0 8px 30px rgba(0,0,0,.6)",
+          }}
+          labelStyle={{ display: "none" }}
+          itemStyle={{ padding: 0 }}
+        />
+        <Line type="monotone" dataKey="a" name={labelA} stroke="url(#strokeA)" strokeWidth={2.5}
+          dot={false} isAnimationActive={false} connectNulls />
+        {colorB && (
+          <Line type="monotone" dataKey="b" name={labelB} stroke={colorB} strokeWidth={2.5}
+            dot={false} isAnimationActive={false} connectNulls strokeDasharray="0" />
+        )}
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
 
-function GaugeBar({ value, max, color, label, showPct = true }: {
-  value: number; max: number; color: string; label: string; showPct?: boolean;
+/* Radial-style gauge bar used for throttle / brake / tyre temp. */
+function GaugeBar({ value, max, color, label, unit = "%", optimal }: {
+  value: number; max: number; color: string; label: string; unit?: string;
+  optimal?: [number, number];
 }) {
   const pct = Math.min((value / max) * 100, 100);
+  const inWindow = optimal ? value >= optimal[0] && value <= optimal[1] : true;
   return (
     <div>
-      <div className="flex justify-between text-xs mb-1.5">
-        <span className="text-zinc-500 font-mono">{label}</span>
-        <span className="font-bold font-mono" style={{ color }}>{value.toFixed(0)}{showPct ? "%" : ""}</span>
+      <div className="flex items-baseline justify-between mb-1.5">
+        <span className="f-mono text-[10px] tracking-widest text-zinc-500">{label}</span>
+        <span className="f-cond font-black text-lg tabular-nums" style={{ color }}>
+          {value.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5 f-mono">{unit}</span>
+        </span>
       </div>
-      <div className="h-2 bg-zinc-800/80 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-200"
-          style={{ width: `${pct}%`, backgroundColor: color, boxShadow: `0 0 6px ${color}60` }} />
+      <div className="h-2 rounded-full overflow-hidden relative" style={{ background: "rgba(255,255,255,.06)" }}>
+        <motion.div className="h-full rounded-full"
+          initial={false} animate={{ width: `${pct}%` }}
+          transition={{ type: "spring", stiffness: 140, damping: 22 }}
+          style={{ background: `linear-gradient(90deg,${color}99,${color})`, boxShadow: `0 0 10px ${color}70` }} />
+        {optimal && !inWindow && (
+          <span className="absolute top-1/2 -translate-y-1/2 right-1 w-1.5 h-1.5 rounded-full bg-[#FFD200]" />
+        )}
       </div>
     </div>
   );
 }
 
+/* Head-to-head split bar for COMPARE mode. */
 function CompareRow({ label, v1, v2, color1, color2, unit = "" }: {
   label: string; v1: number; v2: number; color1: string; color2: string; unit?: string;
 }) {
   const max = Math.max(v1, v2, 1);
+  const lead = v1 === v2 ? 0 : v1 > v2 ? 1 : 2;
   return (
-    <div className="mb-3">
-      <p className="text-xs text-zinc-600 font-mono mb-1.5">{label}</p>
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-mono w-14 text-right font-bold" style={{ color: color1 }}>{v1.toFixed(0)}{unit}</span>
-        <div className="flex-1 flex gap-1 items-center">
-          <div className="flex-1 flex justify-end">
-            <div className="h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(v1 / max) * 100}%`, backgroundColor: color1, boxShadow: `0 0 4px ${color1}60` }} />
-          </div>
-          <div className="w-px h-3 bg-zinc-700" />
-          <div className="flex-1">
-            <div className="h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(v2 / max) * 100}%`, backgroundColor: color2, boxShadow: `0 0 4px ${color2}60` }} />
-          </div>
+    <div className="mb-2.5">
+      <div className="flex items-center justify-between mb-1">
+        <span className="f-cond font-black text-sm tabular-nums" style={{ color: color1, opacity: lead === 2 ? 0.55 : 1 }}>{v1.toFixed(0)}{unit}</span>
+        <span className="f-mono text-[9px] tracking-widest text-zinc-600">{label}</span>
+        <span className="f-cond font-black text-sm tabular-nums" style={{ color: color2, opacity: lead === 1 ? 0.55 : 1 }}>{v2.toFixed(0)}{unit}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <div className="flex-1 flex justify-end">
+          <motion.div className="h-1.5 rounded-full" initial={false} animate={{ width: `${(v1 / max) * 100}%` }}
+            transition={{ type: "spring", stiffness: 130, damping: 20 }}
+            style={{ background: color1, boxShadow: `0 0 6px ${color1}70` }} />
         </div>
-        <span className="text-xs font-mono w-14 font-bold" style={{ color: color2 }}>{v2.toFixed(0)}{unit}</span>
+        <div className="w-px h-3 bg-white/15" />
+        <div className="flex-1">
+          <motion.div className="h-1.5 rounded-full" initial={false} animate={{ width: `${(v2 / max) * 100}%` }}
+            transition={{ type: "spring", stiffness: 130, damping: 20 }}
+            style={{ background: color2, boxShadow: `0 0 6px ${color2}70` }} />
+        </div>
       </div>
     </div>
   );
 }
 
-function TyreLifeBar({ tyre, lap, tyreType }: { tyre: typeof TYRE_CONFIG[string]; lap: number; tyreType: string }) {
-  const life = Math.max(0, 100 - (lap / tyre.maxLaps) * 100);
-  const color = life < 20 ? "#ef4444" : life < 50 ? "#eab308" : tyre.color;
+/* Small tyre compound chip. */
+function TyreChip({ type, size = "sm" }: { type: string; size?: "sm" | "lg" }) {
+  const t = tyreSpec(type);
+  const dim = size === "lg" ? "w-7 h-7 text-sm" : "w-5 h-5 text-[10px]";
   return (
-    <div>
-      <div className="flex justify-between text-xs mb-1">
-        <span className="text-zinc-600">TYRE LIFE</span>
-        <span className="font-bold font-mono" style={{ color }}>{life.toFixed(0)}%</span>
-      </div>
-      <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${life}%`, backgroundColor: color, boxShadow: `0 0 6px ${color}60` }} />
-      </div>
-    </div>
+    <span className={`inline-flex items-center justify-center rounded-full border-2 f-cond font-black ${dim}`}
+      style={{ borderColor: t.color, color: t.color, background: `${t.color}14` }}>
+      {t.letter}
+    </span>
   );
 }
 
-function getFlagEmoji(countryName: string): string {
-  const flags: Record<string, string> = {
-    "United States": "🇺🇸", "Australia": "🇦🇺", "China": "🇨🇳", "Japan": "🇯🇵",
-    "Bahrain": "🇧🇭", "Saudi Arabia": "🇸🇦", "Canada": "🇨🇦", "Monaco": "🇲🇨",
-    "Spain": "🇪🇸", "Austria": "🇦🇹", "United Kingdom": "🇬🇧", "Belgium": "🇧🇪",
-    "Hungary": "🇭🇺", "Netherlands": "🇳🇱", "Italy": "🇮🇹", "Azerbaijan": "🇦🇿",
-    "Singapore": "🇸🇬", "Mexico": "🇲🇽", "Brazil": "🇧🇷", "UAE": "🇦🇪", "Qatar": "🇶🇦",
-  };
-  return flags[countryName] || "🏁";
-}
+const STAGGER = { hidden: { opacity: 0, y: 14 }, show: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.02, duration: 0.4, ease: [0.16, 1, 0.3, 1] as const } }) };
+const PANEL = { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 }, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] as const } };
 
 export default function TelemetryPage() {
   const router = useRouter();
@@ -273,400 +301,458 @@ export default function TelemetryPage() {
   const selectedDriver = drivers.find(d => d.driverName === selected) || drivers[0];
   const compareDriver = drivers.find(d => d.driverName === compareWith);
 
-  const MODES = [
-    { key: "single", label: "SINGLE", activeClass: "border-red-500 text-red-400 bg-red-500/10" },
-    { key: "compare", label: "COMPARE", activeClass: "border-blue-500 text-blue-400 bg-blue-500/10" },
-    { key: "tyres", label: "TYRES 🔴", activeClass: "border-orange-500 text-orange-400 bg-orange-500/10" },
+  // Derived recharts series. The React Compiler memoizes these automatically.
+  const singleSpeedSeries: SeriesPoint[] =
+    ((selectedDriver && speedHistory[selectedDriver.driverName]) || []).map((v, i) => ({ i, a: v }));
+
+  const buildPair = (h: Record<string, number[]>): SeriesPoint[] => {
+    const a = (selectedDriver && h[selectedDriver.driverName]) || [];
+    const b = (compareDriver && h[compareDriver.driverName]) || [];
+    const len = Math.max(a.length, b.length);
+    const offA = len - a.length, offB = len - b.length;
+    return Array.from({ length: len }, (_, i) => ({ i, a: i >= offA ? a[i - offA] : undefined, b: i >= offB ? b[i - offB] : undefined }));
+  };
+  const cmpSpeed = buildPair(speedHistory);
+  const cmpThrottle = buildPair(throttleHistory);
+  const cmpRpm = buildPair(rpmHistory);
+
+  const MODES: { key: "single" | "compare" | "tyres"; label: string }[] = [
+    { key: "single", label: "SINGLE" },
+    { key: "compare", label: "COMPARE" },
+    { key: "tyres", label: "TYRES" },
   ];
+  const modeAccent = mode === "single" ? F1.red : mode === "compare" ? "#3671C6" : F1.orange;
 
   return (
-    <div className="min-h-screen bg-zinc-950 relative overflow-x-hidden">
-      <style>{`
-        @keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
-        @keyframes glowPulse { 0%,100%{opacity:.3} 50%{opacity:.8} }
-        @keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(100vh)} }
-        .slide-up { animation: slideUp .4s ease-out both; }
-        .glow-pulse { animation: glowPulse 2s ease-in-out infinite; }
-      `}</style>
-
-      {/* Background */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-zinc-950" />
-        <div className="absolute top-0 left-0 w-[500px] h-[400px] bg-red-500/4 rounded-full blur-[150px] glow-pulse" />
-        <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-blue-900/5 rounded-full blur-[100px]" />
-        <div className="absolute inset-0 opacity-[0.012]" style={{
-          backgroundImage: "linear-gradient(#ef4444 1px,transparent 1px),linear-gradient(90deg,#ef4444 1px,transparent 1px)",
-          backgroundSize: "60px 60px",
-        }} />
-      </div>
-
+    <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
+      <PitwallBackground glow="top-left" />
       <Navbar />
 
-      <main className="relative z-10 max-w-7xl mx-auto px-8 py-8">
+      <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4 slide-up">
+        {/* ── Header ── */}
+        <div className="flex items-end justify-between mb-7 flex-wrap gap-5 rise">
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-2 h-2 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
-              <p className={`font-mono text-xs tracking-[0.3em] ${connected ? "text-green-500/60" : "text-red-500/60"}`}>
-                LIVE · 2026 SEASON
-              </p>
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="inline-block w-8 h-[3px]" style={{ background: connected ? F1.green : F1.red }} />
+              <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">
+                REAL-TIME FEED · 2026 SEASON
+              </span>
             </div>
-            <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
-              LIVE<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">TELEMETRY</span>
+            <h1 className="f-cond font-black tracking-tight leading-[0.82]" style={{ fontSize: "clamp(46px,7vw,82px)" }}>
+              <span className="block text-white">LIVE</span>
+              <span className="block text-transparent bg-clip-text" style={{ backgroundImage: "linear-gradient(90deg,#E10600,#ff5a3c)" }}>TELEMETRY</span>
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Mode tabs */}
-            <div className="flex gap-1.5 bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-xl p-1">
-              {MODES.map(m => (
-                <button key={m.key} onClick={() => setMode(m.key as "single" | "compare" | "tyres")}
-                  className={`px-4 py-2 rounded-lg text-xs font-black border transition-all duration-200 ${mode === m.key ? m.activeClass : "border-transparent text-zinc-500 hover:text-zinc-300"
-                    }`}>
-                  {m.label}
-                </button>
-              ))}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Segmented mode control */}
+            <div className="relative flex gap-1 p-1 rounded-xl border border-white/8" style={{ background: "rgba(255,255,255,.03)" }}>
+              {MODES.map(m => {
+                const active = mode === m.key;
+                const acc = m.key === "single" ? F1.red : m.key === "compare" ? "#3671C6" : F1.orange;
+                return (
+                  <button key={m.key} onClick={() => setMode(m.key)}
+                    className="relative px-4 py-2 rounded-lg f-cond text-xs font-black tracking-wide transition-colors"
+                    style={{ color: active ? acc : "rgba(255,255,255,.45)" }}>
+                    {active && (
+                      <motion.span layoutId="modePill" className="absolute inset-0 rounded-lg border"
+                        style={{ borderColor: `${acc}55`, background: `${acc}18` }}
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }} />
+                    )}
+                    <span className="relative z-10 flex items-center gap-1.5">
+                      {m.label}
+                      {m.key === "tyres" && <span className="w-1.5 h-1.5 rounded-full" style={{ background: F1.red, animation: "live 1.6s infinite" }} />}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {/* Connection status */}
-            <div className={`flex items-center gap-2 border rounded-xl px-4 py-2 ${connected ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"
-              }`}>
-              <div className={`w-2 h-2 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500 animate-pulse"}`} />
-              <span className={`text-xs font-mono font-bold ${connected ? "text-green-400" : "text-red-400"}`}>
-                {connected ? "LIVE" : "CONNECTING..."}
+            <div className="flex items-center gap-2 rounded-xl border px-3.5 py-2"
+              style={{ borderColor: connected ? "rgba(0,230,118,.3)" : "rgba(225,6,0,.3)", background: connected ? "rgba(0,230,118,.06)" : "rgba(225,6,0,.06)" }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: connected ? F1.green : F1.red, animation: "live 1.6s infinite" }} />
+              <span className="f-mono text-[11px] font-bold tracking-wider" style={{ color: connected ? F1.green : "#ff6a52" }}>
+                {connected ? "LIVE" : "CONNECTING"}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Live session banner */}
+        {/* ── Live session banner ── */}
         {liveStatus && (
-          <div className={`flex items-center justify-between mb-6 p-4 rounded-xl border slide-up ${liveStatus.isLive ? "bg-red-500/5 border-red-500/20" : "bg-zinc-900/50 border-zinc-800/50"
-            }`} style={{ animationDelay: "100ms" }}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+            className="flex items-center justify-between mb-6 px-4 py-3 rounded-xl border chamfer-sm flex-wrap gap-3"
+            style={{ borderColor: liveStatus.isLive ? "rgba(225,6,0,.25)" : F1.hairline, background: liveStatus.isLive ? "linear-gradient(90deg,rgba(225,6,0,.1),rgba(15,15,18,.6))" : "rgba(255,255,255,.02)" }}>
             <div className="flex items-center gap-3 flex-wrap">
-              {liveStatus.isLive && <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
-              <span className="text-xs font-mono font-bold text-white">
+              {liveStatus.isLive && <span className="w-2 h-2 rounded-full" style={{ background: F1.red, animation: "live 1.6s infinite" }} />}
+              <span className="f-mono text-[11px] font-bold tracking-wider text-white">
                 {liveStatus.isLive
-                  ? `${liveStatus.sessionEmoji} ${liveStatus.sessionType.toUpperCase()} · LIVE`
-                  : "SIMULATOR DATA · No session live"}
+                  ? `${liveStatus.sessionEmoji} ${liveStatus.sessionType?.toUpperCase()} · LIVE`
+                  : "SIMULATOR FEED · NO SESSION LIVE"}
               </span>
               {liveStatus.isLive && (
-                <span className="text-xs text-zinc-400 font-mono">
-                  {getFlagEmoji(liveStatus.countryName)} {liveStatus.countryName}
+                <span className="f-mono text-[11px] text-zinc-400">
+                  {flagForCountry(liveStatus.countryName)} {liveStatus.countryName}
                   {liveStatus.circuitName ? ` · ${liveStatus.circuitName}` : ""}
                 </span>
               )}
             </div>
             <button onClick={handleRefresh}
-              className="text-xs border border-zinc-700 hover:border-red-500/50 text-zinc-500 hover:text-red-400 px-3 py-1.5 rounded-lg transition-all font-mono">
+              className="f-mono text-[11px] border border-white/10 hover:border-[#E10600]/50 text-zinc-500 hover:text-[#ff6a52] px-3 py-1.5 rounded-lg transition-all tracking-wider">
               ↻ REFRESH
             </button>
-          </div>
+          </motion.div>
         )}
 
         {!connected ? (
-          <div className="flex flex-col items-center justify-center py-32 gap-4">
+          /* ── Connecting state ── */
+          <div className="flex flex-col items-center justify-center py-32 gap-5">
             <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-2 border-red-500/20 rounded-full" />
-              <div className="absolute inset-0 border-2 border-red-500 rounded-full border-t-transparent animate-spin" />
-              <div className="absolute inset-2 border border-red-500/40 rounded-full border-b-transparent animate-spin" style={{ animationDirection: "reverse", animationDuration: "0.8s" }} />
+              <div className="absolute inset-0 border-2 rounded-full" style={{ borderColor: "rgba(225,6,0,.18)" }} />
+              <div className="absolute inset-0 border-2 border-transparent rounded-full" style={{ borderTopColor: F1.red, animation: "spin-slow .9s linear infinite" }} />
+              <div className="absolute inset-[7px] border border-transparent rounded-full" style={{ borderBottomColor: "rgba(225,6,0,.5)", animation: "spin-slow .7s linear infinite reverse" }} />
+              <div className="absolute inset-0 flex items-center justify-center f-cond font-black text-[10px]" style={{ color: F1.red }}>F1</div>
             </div>
-            <p className="text-red-500/70 font-mono text-xs tracking-widest animate-pulse">CONNECTING TO TELEMETRY FEED...</p>
+            <p className="f-mono text-[11px] tracking-[0.3em] glow-pulse" style={{ color: "#ff6a52" }}>ESTABLISHING TELEMETRY LINK…</p>
           </div>
-        ) : mode === "tyres" ? (
-
-          /* ── TYRES MODE ── */
-          <div>
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              {(liveStatus?.isLive ? ["SOFT", "MEDIUM", "HARD", "INTER"] : ["SOFT", "MEDIUM", "HARD", "PIT⚠"]).map(compound => {
-                const cfg = TYRE_CONFIG[compound];
-                const count = liveStatus?.isLive
-                  ? liveTyreData.filter(d => d.tyreCompound === compound).length
-                  : compound === "PIT⚠"
-                    ? drivers.filter(d => { const c = TYRE_CONFIG[d.tyreType] || TYRE_CONFIG.HARD; return (c.maxLaps - d.lap) <= 5; }).length
-                    : drivers.filter(d => d.tyreType === compound).length;
-                return (
-                  <div key={compound} className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl p-4 text-center slide-up">
-                    <p className="text-3xl font-black tabular-nums" style={{ color: cfg?.color || "#ef4444" }}>{count}</p>
-                    <p className="text-xs text-zinc-600 font-mono mt-1">{compound}</p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {(liveStatus?.isLive ? liveTyreData.map(d => ({
-                name: d.driverName, number: d.driverNumber, team: d.teamName, color: d.teamColor,
-                tyreType: d.tyreCompound, lap: d.tyreAge, pos: d.position, stint: d.stintNumber,
-              })) : drivers.sort((a, b) => a.position - b.position).map(d => ({
-                name: d.driverName, number: d.carNumber, team: d.teamName, color: d.teamColor,
-                tyreType: d.tyreType, lap: d.lap, pos: d.position, stint: null,
-              }))).map((d, idx) => {
-                const cfg = TYRE_CONFIG[d.tyreType] || TYRE_CONFIG.HARD;
-                const life = Math.max(0, 100 - (d.lap / cfg.maxLaps) * 100);
-                const lifeColor = life < 20 ? "#ef4444" : life < 50 ? "#eab308" : cfg.color;
-                const pitIn = Math.max(0, cfg.maxLaps - d.lap);
-                return (
-                  <div key={d.number} className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-zinc-600/50 transition-all duration-200 slide-up"
-                    style={{ animationDelay: `${idx * 30}ms` }}>
-                    <div className="h-0.5" style={{ backgroundColor: d.color }} />
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-black text-zinc-600">P{d.pos}</span>
-                          <div>
-                            <p className="text-xs font-black text-white">{d.name.split(" ").pop()}</p>
-                            <p className="text-xs font-mono" style={{ color: d.color }}>#{d.number}</p>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black px-2 py-0.5 rounded-lg" style={{ color: cfg.color, backgroundColor: `${cfg.color}20` }}>
-                          {d.tyreType}
-                        </span>
-                      </div>
-                      <div className="mb-3">
-                        <TyreLifeBar tyre={cfg} lap={d.lap} tyreType={d.tyreType} />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: "AGE", value: `${d.lap}L` },
-                          { label: d.stint ? "STINT" : "LIFE", value: d.stint ? `#${d.stint}` : `${life.toFixed(0)}%`, color: lifeColor },
-                          { label: "PIT IN", value: pitIn, color: pitIn <= 5 ? "#ef4444" : pitIn <= 10 ? "#eab308" : "white" },
-                        ].map(stat => (
-                          <div key={stat.label} className="bg-zinc-800/40 rounded-xl p-2 text-center">
-                            <p className="text-sm font-black" style={{ color: stat.color || "white" }}>{stat.value}</p>
-                            <p className="text-xs text-zinc-600 font-mono">{stat.label}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
         ) : (
-          /* ── SINGLE / COMPARE MODE ── */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <AnimatePresence mode="wait">
 
-            {/* Driver list */}
-            <div className="lg:col-span-1 space-y-2">
-              <p className="text-xs font-mono text-zinc-500 tracking-widest mb-3">RACE ORDER</p>
-              {drivers.map((d, idx) => {
-                const isSelected = d.driverName === (selected || drivers[0]?.driverName);
-                const isCompare = d.driverName === compareWith;
-                return (
-                  <div key={d.driverName}
-                    onClick={() => mode === "single" ? setSelected(d.driverName) : (!isSelected && setCompareWith(d.driverName))}
-                    className={`relative bg-zinc-900/80 backdrop-blur rounded-xl p-3.5 cursor-pointer transition-all duration-200 border slide-up ${isSelected ? "border-2" : isCompare ? "border-2 border-dashed" : "border-zinc-800/50 hover:border-zinc-600/50"
-                      }`}
-                    style={{
-                      animationDelay: `${idx * 20}ms`,
-                      borderColor: isSelected ? d.teamColor : isCompare ? `${d.teamColor}88` : undefined,
-                      boxShadow: isSelected ? `0 0 15px ${d.teamColor}15` : undefined,
-                    }}>
-                    {isSelected && <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl" style={{ backgroundColor: d.teamColor }} />}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-base font-black text-zinc-600 w-5">{d.position}</span>
-                        <div>
-                          <p className="text-xs font-black text-white">{d.driverName.split(" ").pop()}</p>
-                          <p className="text-xs font-mono" style={{ color: d.teamColor }}>#{d.carNumber}</p>
+            {mode === "tyres" ? (
+              /* ════════════════════ TYRES MODE ════════════════════ */
+              <motion.div key="tyres" {...PANEL}>
+                {/* Compound summary strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                  {(liveStatus?.isLive ? ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE"] : ["SOFT", "MEDIUM", "HARD", "PIT"]).map((compound, i) => {
+                    const isPit = compound === "PIT";
+                    const spec = tyreSpec(compound);
+                    const count = liveStatus?.isLive
+                      ? liveTyreData.filter(d => (d.tyreCompound || "").toUpperCase() === compound).length
+                      : isPit
+                        ? drivers.filter(d => (maxLapsFor(d.tyreType) - d.lap) <= 5).length
+                        : drivers.filter(d => (d.tyreType || "").toUpperCase() === compound).length;
+                    const col = isPit ? F1.red : spec.color;
+                    return (
+                      <motion.div key={compound} variants={STAGGER} custom={i} initial="hidden" animate="show"
+                        className="relative rounded-2xl border chamfer-sm overflow-hidden px-4 py-3.5"
+                        style={{ borderColor: F1.hairline, background: F1.card }}>
+                        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: col }} />
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="f-cond font-black text-4xl tabular-nums leading-none" style={{ color: col }}>{count}</p>
+                            <p className="f-mono text-[10px] text-zinc-500 mt-1.5 tracking-widest">{isPit ? "PIT WINDOW" : spec.label}</p>
+                          </div>
+                          {isPit
+                            ? <span className="text-xl">⚠</span>
+                            : <TyreChip type={compound} size="lg" />}
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-black text-white tabular-nums">{d.speed.toFixed(0)}</p>
-                        <p className="text-xs text-zinc-600">km/h</p>
-                      </div>
-                    </div>
-                    <SpeedChart data={speedHistory[d.driverName] || [d.speed]} color={d.teamColor} />
-                    <div className="flex justify-between mt-1.5 text-xs text-zinc-600 font-mono">
-                      <span>G{d.gear}</span>
-                      <span>{(d.rpm / 1000).toFixed(1)}k RPM</span>
-                      <span className={d.drsActive ? "text-green-400 font-bold" : ""}>DRS{d.drsActive ? "✓" : ""}</span>
-                      <span>+{d.gap.toFixed(3)}s</span>
-                    </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                {/* Per-driver tyre cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {(liveStatus?.isLive ? liveTyreData.map(d => ({
+                    name: d.driverName, number: d.driverNumber, team: d.teamName, color: d.teamColor,
+                    tyreType: d.tyreCompound, lap: d.tyreAge, pos: d.position, stint: d.stintNumber as number | null,
+                  })) : [...drivers].sort((a, b) => a.position - b.position).map(d => ({
+                    name: d.driverName, number: d.carNumber, team: d.teamName, color: d.teamColor,
+                    tyreType: d.tyreType, lap: d.lap, pos: d.position, stint: null as number | null,
+                  }))).map((d, idx) => {
+                    const col = getTeamColor(d.team, d.color);
+                    const spec = tyreSpec(d.tyreType);
+                    const maxLaps = maxLapsFor(d.tyreType);
+                    const life = Math.max(0, 100 - (d.lap / maxLaps) * 100);
+                    const lifeColor = life < 20 ? F1.red : life < 50 ? F1.gold : spec.color;
+                    const pitIn = Math.max(0, maxLaps - d.lap);
+                    return (
+                      <motion.div key={d.number} variants={STAGGER} custom={idx} initial="hidden" animate="show"
+                        whileHover={{ y: -4 }}
+                        className="group relative rounded-2xl border chamfer overflow-hidden transition-colors"
+                        style={{ borderColor: F1.hairline, background: F1.card }}>
+                        <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
+                        <div className="absolute -bottom-4 -right-2 f-cond font-black select-none pointer-events-none"
+                          style={{ fontSize: "6rem", lineHeight: .8, color: col, opacity: 0.07 }}>{d.number}</div>
+                        <div className="relative z-10 p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="f-cond font-black text-2xl text-zinc-600 leading-none">P{d.pos}</span>
+                              <div>
+                                <p className="f-cond font-black text-base text-white uppercase tracking-tight leading-none">{d.name.split(" ").pop()}</p>
+                                <p className="f-mono text-[11px] mt-1" style={{ color: col }}>#{d.number}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ background: `${spec.color}18` }}>
+                              <TyreChip type={d.tyreType} />
+                              <span className="f-cond font-black text-xs" style={{ color: spec.color }}>{spec.label}</span>
+                            </div>
+                          </div>
+                          {/* Tyre life bar */}
+                          <div className="mb-3">
+                            <div className="flex justify-between mb-1">
+                              <span className="f-mono text-[9px] tracking-widest text-zinc-600">TYRE LIFE</span>
+                              <span className="f-cond font-black text-sm tabular-nums" style={{ color: lifeColor }}>{life.toFixed(0)}%</span>
+                            </div>
+                            <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,.06)" }}>
+                              <motion.div className="h-full rounded-full" initial={false} animate={{ width: `${life}%` }}
+                                transition={{ type: "spring", stiffness: 120, damping: 22 }}
+                                style={{ background: `linear-gradient(90deg,${lifeColor}99,${lifeColor})`, boxShadow: `0 0 8px ${lifeColor}70` }} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { label: "AGE", value: `${d.lap}L`, color: "#fff" },
+                              { label: d.stint != null ? "STINT" : "LIFE", value: d.stint != null ? `#${d.stint}` : `${life.toFixed(0)}%`, color: lifeColor },
+                              { label: "PIT IN", value: `${pitIn}`, color: pitIn <= 5 ? F1.red : pitIn <= 10 ? F1.gold : "#fff" },
+                            ].map(stat => (
+                              <div key={stat.label} className="rounded-xl py-2 text-center" style={{ background: "rgba(255,255,255,.03)" }}>
+                                <p className="f-cond font-black text-base tabular-nums leading-none" style={{ color: stat.color }}>{stat.value}</p>
+                                <p className="f-mono text-[9px] text-zinc-600 mt-1 tracking-widest">{stat.label}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+
+            ) : (
+              /* ════════════════════ SINGLE / COMPARE MODE ════════════════════ */
+              <motion.div key="detail" {...PANEL} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+                {/* ── Driver list (race order) ── */}
+                <div className="lg:col-span-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-block w-5 h-[2px]" style={{ background: modeAccent }} />
+                    <p className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">RACE ORDER</p>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Detail panel */}
-            <div className="lg:col-span-2 space-y-4">
-
-              {/* SINGLE MODE */}
-              {mode === "single" && selectedDriver && (
-                <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl overflow-hidden slide-up">
-                  <div className="h-0.5" style={{ backgroundColor: selectedDriver.teamColor, boxShadow: `0 0 10px ${selectedDriver.teamColor}` }} />
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
-                      <div>
-                        <p className="text-xs font-mono mb-1.5 font-bold" style={{ color: selectedDriver.teamColor }}>
-                          {selectedDriver.teamName} · #{selectedDriver.carNumber}
-                        </p>
-                        <h2 className="text-3xl font-black text-white">{selectedDriver.driverName}</h2>
-                        <p className="text-zinc-500 text-sm mt-1.5 font-mono">
-                          P{selectedDriver.position} · Lap {selectedDriver.lap} · {selectedDriver.tyreType}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-6xl font-black text-white tabular-nums leading-none"
-                          style={{ textShadow: `0 0 30px ${selectedDriver.teamColor}30` }}>
-                          {selectedDriver.speed.toFixed(0)}
-                        </p>
-                        <p className="text-xs text-zinc-500 font-mono mt-1">km/h</p>
-                      </div>
-                    </div>
-
-                    {/* Speed chart */}
-                    <div className="bg-zinc-800/30 rounded-xl p-4 mb-5 border border-zinc-700/20">
-                      <p className="text-xs text-zinc-500 font-mono mb-2">SPEED · LAST {MAX_HISTORY}s</p>
-                      <canvas ref={el => {
-                        if (!el) return;
-                        const ctx = el.getContext("2d"); if (!ctx) return;
-                        const data = speedHistory[selectedDriver.driverName] || []; if (data.length < 2) return;
-                        ctx.clearRect(0, 0, el.width, el.height);
-                        const min = 150, max = 360, w = el.width, h = el.height, pad = 8;
-                        ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
-                        [0, 1, 2, 3, 4].forEach(i => {
-                          const y = pad + (h - pad * 2) * (i / 4);
-                          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-                          ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.font = "9px monospace";
-                          ctx.fillText(`${Math.round(max - (max - min) * (i / 4))}`, 4, y - 2);
-                        });
-                        const grad = ctx.createLinearGradient(0, 0, w, 0);
-                        grad.addColorStop(0, selectedDriver.teamColor + "40");
-                        grad.addColorStop(1, selectedDriver.teamColor);
-                        ctx.beginPath(); ctx.strokeStyle = grad; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
-                        data.forEach((v, i) => {
-                          const x = (i / (MAX_HISTORY - 1)) * w, y = h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-                          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                        });
-                        ctx.stroke(); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-                        ctx.fillStyle = selectedDriver.teamColor + "15"; ctx.fill();
-                      }} width={600} height={80} className="w-full" />
-                    </div>
-
-                    {/* Stats grid */}
-                    <div className="grid grid-cols-4 gap-3 mb-5">
-                      {[
-                        { label: "GEAR", value: `G${selectedDriver.gear}`, big: true },
-                        { label: "RPM", value: `${(selectedDriver.rpm / 1000).toFixed(1)}k`, big: false },
-                        { label: "LAP TIME", value: `${Math.floor(selectedDriver.lapTime / 60)}:${(selectedDriver.lapTime % 60).toFixed(3).padStart(6, "0")}`, big: false },
-                        { label: "FUEL", value: `${selectedDriver.fuelLoad.toFixed(1)}kg`, big: false },
-                      ].map(s => (
-                        <div key={s.label} className="bg-zinc-800/40 border border-zinc-700/20 rounded-xl p-3 text-center">
-                          <p className="text-xs text-zinc-500 font-mono mb-1">{s.label}</p>
-                          <p className={`font-black text-white ${s.big ? "text-3xl" : "text-base"}`}>{s.value}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Gauges */}
-                    <div className="space-y-3 mb-4">
-                      <GaugeBar value={selectedDriver.throttle} max={100} color="#22c55e" label="THROTTLE" />
-                      <GaugeBar value={selectedDriver.brake} max={100} color="#ef4444" label="BRAKE" />
-                      <GaugeBar value={selectedDriver.tyreTemp} max={120} color="#f97316" label={`TYRE TEMP (${selectedDriver.tyreType})`} showPct={false} />
-                    </div>
-
-                    {/* DRS + Gap */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className={`px-4 py-2 rounded-xl border font-mono text-sm font-black transition-all ${selectedDriver.drsActive
-                        ? "bg-green-500/15 border-green-500/40 text-green-400"
-                        : "bg-zinc-800/50 border-zinc-700/50 text-zinc-600"
-                        }`}>
-                        DRS {selectedDriver.drsActive ? "ACTIVE ✓" : "INACTIVE"}
-                      </div>
-                      <div className="text-xs text-zinc-500 font-mono">
-                        Gap to leader: <span className="text-white font-bold">+{selectedDriver.gap.toFixed(3)}s</span>
-                      </div>
-                    </div>
+                  {/* horizontal scroll on mobile, vertical stack on lg */}
+                  <div className="flex lg:block gap-3 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 lg:space-y-2 -mx-1 px-1">
+                    {drivers.map((d, idx) => {
+                      const col = getTeamColor(d.teamName, d.teamColor);
+                      const isSelected = d.driverName === (selected || drivers[0]?.driverName);
+                      const isCompare = d.driverName === compareWith;
+                      return (
+                        <motion.div key={d.driverName} variants={STAGGER} custom={idx} initial="hidden" animate="show"
+                          onClick={() => mode === "single" ? setSelected(d.driverName) : (!isSelected && setCompareWith(d.driverName))}
+                          whileHover={{ y: -2 }}
+                          className="relative shrink-0 w-[230px] lg:w-auto rounded-xl p-3.5 cursor-pointer transition-colors overflow-hidden chamfer-sm"
+                          style={{
+                            border: `1px solid ${isSelected ? col : isCompare ? `${col}77` : F1.hairline}`,
+                            background: isSelected ? `linear-gradient(135deg,${col}14,${F1.card})` : F1.card,
+                            boxShadow: isSelected ? `0 0 22px ${col}22` : undefined,
+                          }}>
+                          {isSelected && <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: col, boxShadow: `0 0 8px ${col}` }} />}
+                          {isCompare && <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `repeating-linear-gradient(0deg,${col} 0 4px,transparent 4px 8px)` }} />}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2.5">
+                              <span className="f-cond font-black text-xl text-zinc-600 w-6 leading-none">{d.position}</span>
+                              <div>
+                                <p className="f-cond font-black text-sm text-white uppercase tracking-tight leading-none">{d.driverName.split(" ").pop()}</p>
+                                <p className="f-mono text-[11px] mt-1" style={{ color: col }}>#{d.carNumber}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="f-cond font-black text-xl text-white tabular-nums leading-none">{d.speed.toFixed(0)}</p>
+                              <p className="f-mono text-[9px] text-zinc-600">km/h</p>
+                            </div>
+                          </div>
+                          <SpeedChart data={speedHistory[d.driverName] || [d.speed]} color={col} />
+                          <div className="flex justify-between mt-1.5 f-mono text-[10px] text-zinc-500">
+                            <span>G{d.gear}</span>
+                            <span>{(d.rpm / 1000).toFixed(1)}k</span>
+                            <span style={d.drsActive ? { color: F1.green, fontWeight: 700 } : undefined}>DRS{d.drsActive ? "✓" : ""}</span>
+                            <span>+{d.gap.toFixed(3)}s</span>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
 
-              {/* COMPARE MODE */}
-              {mode === "compare" && (
-                <>
-                  {!compareDriver ? (
-                    <div className="bg-zinc-900/60 border border-dashed border-zinc-700/50 rounded-2xl p-16 text-center slide-up">
-                      <p className="text-4xl mb-4">🏎️</p>
-                      <p className="text-zinc-400 font-bold text-lg mb-2">Select a driver to compare</p>
-                      <p className="text-zinc-600 text-sm font-mono">Click any driver in the list on the left</p>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Driver header cards */}
-                      <div className="grid grid-cols-2 gap-4">
-                        {[selectedDriver, compareDriver].map(d => d && (
-                          <div key={d.driverName} className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl overflow-hidden slide-up">
-                            <div className="h-0.5" style={{ backgroundColor: d.teamColor, boxShadow: `0 0 8px ${d.teamColor}` }} />
-                            <div className="p-4">
-                              <p className="text-xs font-mono mb-1" style={{ color: d.teamColor }}>{d.teamName}</p>
-                              <h3 className="text-xl font-black text-white mb-3">{d.driverName}</h3>
-                              <div className="grid grid-cols-4 gap-2">
-                                {[
-                                  { label: "km/h", value: d.speed.toFixed(0) },
-                                  { label: "GEAR", value: `G${d.gear}` },
-                                  { label: "DRS", value: d.drsActive ? "ON" : "OFF", color: d.drsActive ? "#22c55e" : "#666" },
-                                  { label: "POS", value: `P${d.position}` },
-                                ].map(s => (
-                                  <div key={s.label} className="text-center">
-                                    <p className="text-lg font-black" style={{ color: s.color || "white" }}>{s.value}</p>
-                                    <p className="text-xs text-zinc-600 font-mono">{s.label}</p>
-                                  </div>
-                                ))}
+                {/* ── Detail panel ── */}
+                <div className="lg:col-span-2 space-y-4">
+
+                  {/* SINGLE */}
+                  {mode === "single" && selectedDriver && (() => {
+                    const col = getTeamColor(selectedDriver.teamName, selectedDriver.teamColor);
+                    const t = tyreSpec(selectedDriver.tyreType);
+                    return (
+                      <motion.div key={selectedDriver.driverName} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                        className="relative rounded-2xl border chamfer overflow-hidden" style={{ borderColor: F1.hairline, background: F1.card }}>
+                        <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: col, boxShadow: `0 0 14px ${col}` }} />
+                        <div className="absolute -top-6 -right-3 f-cond font-black select-none pointer-events-none" style={{ fontSize: "11rem", lineHeight: .8, color: col, opacity: 0.06 }}>{selectedDriver.carNumber}</div>
+                        <div className="relative z-10 p-5 sm:p-6">
+                          {/* Hero */}
+                          <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+                            <div>
+                              <p className="f-mono text-[11px] mb-1.5 font-bold tracking-widest" style={{ color: col }}>
+                                {selectedDriver.teamName} · #{selectedDriver.carNumber}
+                              </p>
+                              <h2 className="f-cond font-black text-4xl text-white uppercase tracking-tight leading-none">{selectedDriver.driverName}</h2>
+                              <div className="flex items-center gap-2.5 mt-2.5">
+                                <span className="f-mono text-[11px] text-zinc-500">P{selectedDriver.position}</span>
+                                <span className="text-zinc-700">·</span>
+                                <span className="f-mono text-[11px] text-zinc-500">LAP {selectedDriver.lap}</span>
+                                <span className="text-zinc-700">·</span>
+                                <span className="flex items-center gap-1.5"><TyreChip type={selectedDriver.tyreType} /><span className="f-mono text-[11px]" style={{ color: t.color }}>{t.label}</span></span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="flex items-baseline gap-2 justify-end">
+                                <span className="f-cond font-black text-white tabular-nums leading-none" style={{ fontSize: "clamp(56px,9vw,84px)", textShadow: `0 0 40px ${col}55` }}>{selectedDriver.speed.toFixed(0)}</span>
+                                <span className="f-mono text-xs text-zinc-500 mb-1">km/h</span>
+                              </div>
+                              {/* DRS pill */}
+                              <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border f-mono text-[11px] font-bold tracking-wider transition-colors"
+                                style={selectedDriver.drsActive
+                                  ? { borderColor: "rgba(0,230,118,.4)", background: "rgba(0,230,118,.12)", color: F1.green }
+                                  : { borderColor: F1.hairline, background: "rgba(255,255,255,.03)", color: "#71717a" }}>
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: selectedDriver.drsActive ? F1.green : "#52525b" }} />
+                                DRS {selectedDriver.drsActive ? "OPEN" : "CLOSED"}
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
 
-                      {/* Overlay charts */}
-                      <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl p-5 slide-up" style={{ animationDelay: "100ms" }}>
-                        <div className="flex items-center gap-4 mb-5">
-                          <p className="text-xs font-mono text-zinc-500 tracking-widest">OVERLAY CHARTS</p>
-                          {[selectedDriver, compareDriver].map(d => d && (
-                            <span key={d.driverName} className="flex items-center gap-1.5 text-xs font-bold" style={{ color: d.teamColor }}>
-                              <span className="w-5 h-0.5 inline-block rounded" style={{ backgroundColor: d.teamColor }} />
-                              {d.driverName.split(" ").pop()}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="space-y-5">
-                          <DualChart data1={speedHistory[selectedDriver?.driverName || ""] || []} data2={speedHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="SPEED (km/h)" />
-                          <DualChart data1={throttleHistory[selectedDriver?.driverName || ""] || []} data2={throttleHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="THROTTLE (%)" />
-                          <DualChart data1={rpmHistory[selectedDriver?.driverName || ""] || []} data2={rpmHistory[compareDriver.driverName] || []} color1={selectedDriver?.teamColor || "#fff"} color2={compareDriver.teamColor} label="RPM" />
-                        </div>
-                      </div>
+                          {/* Speed detail chart (recharts) */}
+                          <div className="rounded-xl p-3 mb-5 border" style={{ borderColor: F1.hairline, background: "rgba(255,255,255,.02)" }}>
+                            <p className="f-mono text-[10px] text-zinc-500 mb-1 tracking-widest">SPEED · LAST {MAX_HISTORY}S</p>
+                            <DetailChart data={singleSpeedSeries} colorA={col} labelA="km/h" height={170} domain={[120, 360]} />
+                          </div>
 
-                      {/* Head to head */}
-                      <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800/50 rounded-2xl p-5 slide-up" style={{ animationDelay: "150ms" }}>
-                        <p className="text-xs font-mono text-zinc-500 tracking-widest mb-4">HEAD TO HEAD</p>
-                        {selectedDriver && (<>
-                          <CompareRow label="SPEED" v1={selectedDriver.speed} v2={compareDriver.speed} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit=" km/h" />
-                          <CompareRow label="THROTTLE" v1={selectedDriver.throttle} v2={compareDriver.throttle} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="%" />
-                          <CompareRow label="BRAKE" v1={selectedDriver.brake} v2={compareDriver.brake} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="%" />
-                          <CompareRow label="RPM (×100)" v1={selectedDriver.rpm / 100} v2={compareDriver.rpm / 100} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="00" />
-                          <CompareRow label="TYRE TEMP" v1={selectedDriver.tyreTemp} v2={compareDriver.tyreTemp} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="°C" />
-                          <CompareRow label="FUEL" v1={selectedDriver.fuelLoad} v2={compareDriver.fuelLoad} color1={selectedDriver.teamColor} color2={compareDriver.teamColor} unit="kg" />
-                        </>)}
-                        <div className="mt-4 pt-4 border-t border-zinc-800/50 grid grid-cols-2 gap-4">
-                          {[selectedDriver, compareDriver].map(d => d && (
-                            <div key={d.driverName} className="text-center">
-                              <p className="text-xs text-zinc-600 font-mono mb-1">GAP TO LEADER</p>
-                              <p className="text-2xl font-black" style={{ color: d.teamColor }}>+{d.gap.toFixed(3)}s</p>
+                          {/* Stat tiles */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                            {[
+                              { label: "GEAR", value: `${selectedDriver.gear}`, big: true },
+                              { label: "RPM", value: `${(selectedDriver.rpm / 1000).toFixed(1)}k`, big: false },
+                              { label: "LAP TIME", value: `${Math.floor(selectedDriver.lapTime / 60)}:${(selectedDriver.lapTime % 60).toFixed(3).padStart(6, "0")}`, big: false },
+                              { label: "FUEL", value: `${selectedDriver.fuelLoad.toFixed(1)}`, unit: "kg", big: false },
+                            ].map(s => (
+                              <div key={s.label} className="rounded-xl border chamfer-sm p-3 text-center" style={{ borderColor: F1.hairline, background: "rgba(255,255,255,.03)" }}>
+                                <p className="f-mono text-[9px] text-zinc-600 mb-1 tracking-widest">{s.label}</p>
+                                <p className={`f-cond font-black text-white tabular-nums leading-none ${s.big ? "text-3xl" : "text-xl"}`}>{s.value}{s.unit && <span className="text-xs text-zinc-500 ml-0.5">{s.unit}</span>}</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Gauges */}
+                          <div className="grid sm:grid-cols-3 gap-x-5 gap-y-3">
+                            <GaugeBar value={selectedDriver.throttle} max={100} color={F1.green} label="THROTTLE" />
+                            <GaugeBar value={selectedDriver.brake} max={100} color={F1.red} label="BRAKE" />
+                            <GaugeBar value={selectedDriver.tyreTemp} max={140} color={F1.orange} label="TYRE TEMP" unit="°C" optimal={t.optimalTemp} />
+                          </div>
+
+                          {/* Gap footer */}
+                          <div className="mt-5 pt-4 border-t flex items-center justify-between" style={{ borderColor: F1.hairline }}>
+                            <span className="f-mono text-[11px] text-zinc-500 tracking-widest">GAP TO LEADER</span>
+                            <span className="f-cond font-black text-2xl tabular-nums" style={{ color: col }}>+{selectedDriver.gap.toFixed(3)}<span className="text-sm text-zinc-500 ml-0.5">s</span></span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })()}
+
+                  {/* COMPARE */}
+                  {mode === "compare" && (
+                    !compareDriver ? (
+                      <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+                        className="rounded-2xl border border-dashed chamfer p-16 text-center" style={{ borderColor: "rgba(255,255,255,.12)", background: "rgba(255,255,255,.015)" }}>
+                        <p className="f-cond font-black text-5xl mb-3" style={{ color: "#3671C6" }}>VS</p>
+                        <p className="f-cond font-bold text-xl text-zinc-300 mb-1.5">Select a driver to compare</p>
+                        <p className="f-mono text-[11px] text-zinc-600 tracking-wider">Click any driver in the race order list</p>
+                      </motion.div>
+                    ) : (() => {
+                      const colA = getTeamColor(selectedDriver?.teamName, selectedDriver?.teamColor);
+                      const colB = getTeamColor(compareDriver.teamName, compareDriver.teamColor);
+                      const pair = [selectedDriver, compareDriver];
+                      return (
+                        <>
+                          {/* Driver header cards */}
+                          <div className="grid grid-cols-2 gap-4">
+                            {pair.map((d, i) => d && (
+                              <motion.div key={d.driverName} initial={{ opacity: 0, x: i === 0 ? -12 : 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}
+                                className="relative rounded-2xl border chamfer-sm overflow-hidden" style={{ borderColor: F1.hairline, background: F1.card }}>
+                                <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: getTeamColor(d.teamName, d.teamColor), boxShadow: `0 0 10px ${getTeamColor(d.teamName, d.teamColor)}` }} />
+                                <div className="p-4">
+                                  <p className="f-mono text-[10px] mb-1 tracking-widest" style={{ color: getTeamColor(d.teamName, d.teamColor) }}>{d.teamName}</p>
+                                  <h3 className="f-cond font-black text-xl text-white uppercase tracking-tight mb-3 leading-none">{d.driverName}</h3>
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {[
+                                      { label: "km/h", value: d.speed.toFixed(0), color: "#fff" },
+                                      { label: "GEAR", value: `G${d.gear}`, color: "#fff" },
+                                      { label: "DRS", value: d.drsActive ? "ON" : "OFF", color: d.drsActive ? F1.green : "#52525b" },
+                                      { label: "POS", value: `P${d.position}`, color: "#fff" },
+                                    ].map(s => (
+                                      <div key={s.label} className="text-center">
+                                        <p className="f-cond font-black text-lg tabular-nums leading-none" style={{ color: s.color }}>{s.value}</p>
+                                        <p className="f-mono text-[9px] text-zinc-600 mt-1 tracking-wider">{s.label}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+
+                          {/* Overlay charts */}
+                          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
+                            className="rounded-2xl border chamfer p-4 sm:p-5" style={{ borderColor: F1.hairline, background: F1.card }}>
+                            <div className="flex items-center gap-4 mb-4 flex-wrap">
+                              <p className="f-mono text-[11px] text-zinc-500 tracking-[0.3em]">OVERLAY</p>
+                              {pair.map(d => d && (
+                                <span key={d.driverName} className="flex items-center gap-1.5 f-cond text-xs font-bold" style={{ color: getTeamColor(d.teamName, d.teamColor) }}>
+                                  <span className="w-5 h-[2px] inline-block rounded" style={{ background: getTeamColor(d.teamName, d.teamColor) }} />
+                                  {d.driverName.split(" ").pop()}
+                                </span>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    </>
+                            <div className="space-y-4">
+                              {[
+                                { label: "SPEED (km/h)", data: cmpSpeed, domain: [120, 360] as [number, number] },
+                                { label: "THROTTLE (%)", data: cmpThrottle, domain: [0, 100] as [number, number] },
+                                { label: "RPM", data: cmpRpm, domain: undefined },
+                              ].map(c => (
+                                <div key={c.label}>
+                                  <p className="f-mono text-[9px] text-zinc-600 mb-1 tracking-widest">{c.label}</p>
+                                  <DetailChart data={c.data} colorA={colA} colorB={colB} labelA={selectedDriver?.driverName.split(" ").pop() || ""} labelB={compareDriver.driverName.split(" ").pop()} height={120} domain={c.domain} />
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+
+                          {/* Head to head */}
+                          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                            className="rounded-2xl border chamfer p-4 sm:p-5" style={{ borderColor: F1.hairline, background: F1.card }}>
+                            <p className="f-mono text-[11px] text-zinc-500 tracking-[0.3em] mb-4">HEAD TO HEAD</p>
+                            {selectedDriver && (<>
+                              <CompareRow label="SPEED" v1={selectedDriver.speed} v2={compareDriver.speed} color1={colA} color2={colB} unit="" />
+                              <CompareRow label="THROTTLE" v1={selectedDriver.throttle} v2={compareDriver.throttle} color1={colA} color2={colB} unit="" />
+                              <CompareRow label="BRAKE" v1={selectedDriver.brake} v2={compareDriver.brake} color1={colA} color2={colB} unit="" />
+                              <CompareRow label="RPM" v1={selectedDriver.rpm} v2={compareDriver.rpm} color1={colA} color2={colB} unit="" />
+                              <CompareRow label="TYRE °C" v1={selectedDriver.tyreTemp} v2={compareDriver.tyreTemp} color1={colA} color2={colB} unit="" />
+                              <CompareRow label="FUEL kg" v1={selectedDriver.fuelLoad} v2={compareDriver.fuelLoad} color1={colA} color2={colB} unit="" />
+                            </>)}
+                            <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4" style={{ borderColor: F1.hairline }}>
+                              {pair.map(d => d && (
+                                <div key={d.driverName} className="text-center">
+                                  <p className="f-mono text-[9px] text-zinc-600 mb-1 tracking-widest">GAP TO LEADER</p>
+                                  <p className="f-cond font-black text-2xl tabular-nums" style={{ color: getTeamColor(d.teamName, d.teamColor) }}>+{d.gap.toFixed(3)}s</p>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        </>
+                      );
+                    })()
                   )}
-                </>
-              )}
-            </div>
-          </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
       </main>
     </div>
