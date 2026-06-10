@@ -13,6 +13,7 @@ import java.util.List;
 @Repository
 public interface RaceResultRepository extends JpaRepository<RaceResult, Long> {
 
+    @Query("SELECT r FROM RaceResult r JOIN FETCH r.driver d LEFT JOIN FETCH d.team t JOIN FETCH r.race rc WHERE rc.id = :raceId ORDER BY r.finishPosition")
     List<RaceResult> findByRaceIdOrderByFinishPosition(Long raceId);
 
     @Query("SELECT r FROM RaceResult r JOIN FETCH r.driver d LEFT JOIN FETCH d.team t JOIN FETCH r.race rc WHERE rc.season = :season AND rc.status = :status")
