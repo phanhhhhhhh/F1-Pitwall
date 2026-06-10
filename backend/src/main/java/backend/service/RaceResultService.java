@@ -21,7 +21,6 @@ public class RaceResultService {
     private final NotificationService notificationService;
 
     private static final float[] POINTS = { 25, 18, 15, 12, 10, 8, 6, 4, 2, 1 };
-    private static final float FASTEST_LAP_POINT = 1.0f;
 
     @Transactional
     public List<RaceResultResponse> submitResults(Long raceId, List<RaceResultRequest> requests) {
@@ -123,13 +122,19 @@ public class RaceResultService {
             Long driverId = r.getDriver().getId();
             DriverStats stats = statsMap.computeIfAbsent(driverId, k -> new DriverStats(r.getDriver()));
             stats.totalPoints += r.getPoints();
-            if (r.getFinishPosition() == 1 && r.getDnfReason() == null) stats.wins++;
-            if (r.getFinishPosition() <= 3 && r.getDnfReason() == null) stats.podiums++;
-            if (r.isHasFastestLap()) stats.fastestLaps++;
+            // Sprint results count for points only — official wins/podiums are GP-only
+            boolean isSprint = isSprintRace(r);
+            boolean classified = r.getFinishPosition() >= 1 && r.getDnfReason() == null;
+            if (!isSprint && classified && r.getFinishPosition() == 1) stats.wins++;
+            if (!isSprint && classified && r.getFinishPosition() <= 3) stats.podiums++;
+            if (!isSprint && r.isHasFastestLap()) stats.fastestLaps++;
         }
 
         List<DriverStats> sorted = statsMap.values().stream()
-                .sorted(Comparator.comparingDouble((DriverStats s) -> s.totalPoints).reversed())
+                .sorted(Comparator.comparingDouble((DriverStats s) -> s.totalPoints)
+                        .thenComparingInt((DriverStats s) -> s.wins)
+                        .thenComparingInt((DriverStats s) -> s.podiums)
+                        .reversed())
                 .collect(Collectors.toList());
 
         float leaderPoints = sorted.isEmpty() ? 0 : sorted.get(0).totalPoints;
@@ -169,13 +174,18 @@ public class RaceResultService {
             Team team = driver.getTeam();
             ConstructorStats stats = statsMap.computeIfAbsent(team.getId(), k -> new ConstructorStats(team));
             stats.totalPoints += r.getPoints();
-            if (r.getFinishPosition() == 1 && r.getDnfReason() == null) stats.wins++;
-            if (r.getFinishPosition() <= 3 && r.getDnfReason() == null) stats.podiums++;
+            boolean isSprint = isSprintRace(r);
+            boolean classified = r.getFinishPosition() >= 1 && r.getDnfReason() == null;
+            if (!isSprint && classified && r.getFinishPosition() == 1) stats.wins++;
+            if (!isSprint && classified && r.getFinishPosition() <= 3) stats.podiums++;
             stats.driverPoints.merge(driver.getName(), (double) r.getPoints(), Double::sum);
         }
 
         List<ConstructorStats> sorted = statsMap.values().stream()
-                .sorted(Comparator.comparingDouble((ConstructorStats s) -> s.totalPoints).reversed())
+                .sorted(Comparator.comparingDouble((ConstructorStats s) -> s.totalPoints)
+                        .thenComparingInt((ConstructorStats s) -> s.wins)
+                        .thenComparingInt((ConstructorStats s) -> s.podiums)
+                        .reversed())
                 .collect(Collectors.toList());
 
         float leaderPoints = sorted.isEmpty() ? 0 : sorted.get(0).totalPoints;
@@ -209,11 +219,15 @@ public class RaceResultService {
         return standings;
     }
 
+    private boolean isSprintRace(RaceResult r) {
+        String name = r.getRace().getName();
+        return name != null && name.toLowerCase().contains("sprint");
+    }
+
+    // 2026 rules: no fastest-lap bonus point (abolished from 2025)
     private float calculatePoints(int position, boolean hasFastestLap, String dnfReason) {
         if (dnfReason != null && !dnfReason.isEmpty()) return 0;
-        float pts = (position >= 1 && position <= 10) ? POINTS[position - 1] : 0;
-        if (hasFastestLap && position <= 10) pts += FASTEST_LAP_POINT;
-        return pts;
+        return (position >= 1 && position <= 10) ? POINTS[position - 1] : 0;
     }
 
     private RaceResultResponse toResponse(RaceResult r) {
