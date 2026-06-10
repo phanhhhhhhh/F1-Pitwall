@@ -261,19 +261,26 @@ public class OpenF1SyncService {
     }
 
     private Optional<Driver> findDriver(String fullName, List<Driver> allDrivers) {
-        String fName = fullName.toLowerCase();
+        // Normalize diacritics so Jolpica names (Hülkenberg, Pérez) match DB names without accents
+        String fName = stripAccents(fullName);
         String[] fParts = fName.split(" ");
         String fLast = fParts.length > 0 ? fParts[fParts.length - 1] : "";
 
         return allDrivers.stream()
                 .filter(d -> {
-                    String dName = d.getName().toLowerCase();
+                    String dName = stripAccents(d.getName());
                     String[] dParts = dName.split(" ");
                     String dLast = dParts.length > 0 ? dParts[dParts.length - 1] : "";
                     return dName.equals(fName) || dLast.equals(fLast) ||
                             dName.contains(fLast) || fName.contains(dLast);
                 })
                 .findFirst();
+    }
+
+    static String stripAccents(String s) {
+        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase();
     }
 
     private Integer toInt(Object o) {
