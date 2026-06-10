@@ -210,12 +210,14 @@ public class QualifyingService {
     }
 
     private Optional<Driver> findDriver(String fullName, List<Driver> allDrivers) {
+        // Normalize diacritics so Jolpica names (Hülkenberg, Pérez) match DB names without accents
+        String fName = OpenF1SyncService.stripAccents(fullName);
+        String[] fParts = fName.split(" ");
+        String fLast = fParts.length > 0 ? fParts[fParts.length - 1] : "";
+
         return allDrivers.stream()
                 .filter(d -> {
-                    String dName = d.getName().toLowerCase();
-                    String fName = fullName.toLowerCase();
-                    String[] fParts = fName.split(" ");
-                    String fLast = fParts.length > 0 ? fParts[fParts.length - 1] : "";
+                    String dName = OpenF1SyncService.stripAccents(d.getName());
                     String[] dParts = dName.split(" ");
                     String dLast = dParts.length > 0 ? dParts[dParts.length - 1] : "";
                     return dName.equals(fName) || dLast.equals(fLast) || dName.contains(fLast) || fName.contains(dLast);
