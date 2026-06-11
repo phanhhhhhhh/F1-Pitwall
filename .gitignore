@@ -15,3 +15,13 @@ build/
 # File cấu hình hệ điều hành
 .DS_Store
 Thumbs.db
+
+# Secrets and sensitive files
+.env
+.env.local
+.env*.local
+*.env
+application-secrets.yml
+application-local.yml
+recovery-codes.txt
+secrets.txt
