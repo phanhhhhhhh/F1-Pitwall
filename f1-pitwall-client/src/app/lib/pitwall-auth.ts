@@ -97,7 +97,8 @@ export async function register(username: string, password: string, email: string
     return data;
 }
 
-const REQUEST_TIMEOUT_MS = 10_000;
+// Render free tier cold-starts can take well over 10s
+const REQUEST_TIMEOUT_MS = 35_000;
 
 export class ApiError extends Error {
     status: number;
@@ -117,16 +118,18 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+    const buildHeaders = (authToken: string | null): HeadersInit => ({
+        ...options.headers,
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    });
+
     let res: Response;
     try {
         res = await fetch(url, {
             ...options,
             signal: controller.signal,
-            headers: {
-                ...options.headers,
-                "Content-Type": "application/json",
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
+            headers: buildHeaders(token),
         });
     } catch (err: unknown) {
         clearTimeout(timeoutId);
@@ -141,9 +144,11 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
     if (res.status === 401 && currentRefresh) {
         const refreshed = await tryRefreshToken();
         if (refreshed) {
-            return fetch(url, {
+            // Must rebuild the FULL headers (incl. Content-Type) — dropping them
+            // made every retried POST/PATCH fail with 415 after token expiry
+            res = await fetch(url, {
                 ...options,
-                headers: { ...options.headers, Authorization: `Bearer ${getAccessToken()}` },
+                headers: buildHeaders(getAccessToken()),
             });
         } else {
             clearTokens();
