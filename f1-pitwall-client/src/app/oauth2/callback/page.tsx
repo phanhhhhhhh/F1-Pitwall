@@ -106,8 +106,8 @@ function CallbackHandler() {
 
         // Store username/role for Navbar — phải lưu trước khi redirect
         if (typeof window !== "undefined") {
-            sessionStorage.setItem("pitwall_username", username || "");
-            sessionStorage.setItem("pitwall_role", role || "VIEWER");
+            localStorage.setItem("pitwall_username", username || "");
+            localStorage.setItem("pitwall_role", role || "VIEWER");
         }
 
         // Delay nhỏ để sessionStorage kịp ghi trước khi redirect
