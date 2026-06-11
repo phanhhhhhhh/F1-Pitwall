@@ -9,6 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loginSuccess: (data: AuthResponse) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,10 +22,10 @@ async function fetchUserWithRetry(retries = 2): Promise<User | null> {
       const res = await authFetch(`${API_URL}/api/auth/me`);
       if (res.ok) {
         const data = await res.json();
-        // Cache avatar + displayName in localStorage
+        // Cache avatar + displayName in localStorage (clear when removed server-side)
         if (typeof window !== "undefined") {
-          if (data.avatarUrl) localStorage.setItem("pitwall_avatar", data.avatarUrl);
-          if (data.displayName) localStorage.setItem("pitwall_displayname", data.displayName);
+          localStorage.setItem("pitwall_avatar", data.avatarUrl || "");
+          localStorage.setItem("pitwall_displayname", data.displayName || "");
         }
         return data;
       }
@@ -89,8 +90,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => { clearTokens(); setUser(null); window.location.href = "/login"; };
 
+  // Re-fetch /me so Navbar etc. pick up profile changes without a full reload
+  const refreshUser = async () => {
+    const data = await fetchUserWithRetry(0);
+    if (data) setUser(data);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginSuccess, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginSuccess, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { authFetch, getAccessToken, clearTokens } from "../lib/pitwall-auth";
+import { authFetch, getAccessToken, clearTokens, isApiError } from "../lib/pitwall-auth";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
@@ -47,7 +47,7 @@ type Tab = "profile" | "security";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user }    = useAuth();
+  const { user, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<ProfileData>({
@@ -123,18 +123,18 @@ export default function ProfilePage() {
         method: "PATCH",
         body: JSON.stringify(profile),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (typeof window !== "undefined") {
-          localStorage.setItem("pitwall_avatar",      data.avatarUrl   || "");
-          localStorage.setItem("pitwall_displayname", data.displayName || "");
-        }
-        showFeedback("Profile saved successfully");
-      } else {
-        const data = await res.json();
-        showFeedback(data.error || "Update failed", false);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showFeedback(data.error || "Update failed", false); return; }
+      if (typeof window !== "undefined") {
+        localStorage.setItem("pitwall_avatar",      data.avatarUrl   || "");
+        localStorage.setItem("pitwall_displayname", data.displayName || "");
       }
-    } catch { showFeedback("Connection error", false); }
+      await refreshUser(); // update Navbar avatar without a reload
+      showFeedback("Profile saved successfully");
+    } catch (err) {
+      // authFetch throws ApiError with the backend's message for non-2xx responses
+      showFeedback(isApiError(err) ? err.message : "Connection error", false);
+    }
     finally { setSaveLoading(false); }
   };
 
@@ -152,10 +152,12 @@ export default function ProfilePage() {
         showPwdMsg("Password changed successfully");
         setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
       } else {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         showPwdMsg(data.error || "Failed", false);
       }
-    } catch { showPwdMsg("Connection error", false); }
+    } catch (err) {
+      showPwdMsg(isApiError(err) ? err.message : "Connection error", false);
+    }
     finally { setPwdLoading(false); }
   };
 
