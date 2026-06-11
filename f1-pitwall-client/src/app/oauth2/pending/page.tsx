@@ -117,8 +117,8 @@ function PendingHandler() {
         try {
             const data = await verifyOauth2Otp(email, otp.trim());
             if (typeof window !== "undefined") {
-                sessionStorage.setItem("pitwall_username", data.username);
-                sessionStorage.setItem("pitwall_role", data.role);
+                localStorage.setItem("pitwall_username", data.username);
+                localStorage.setItem("pitwall_role", data.role);
             }
             setTimeout(() => { window.location.href = "/"; }, 200);
         } catch (err) {
