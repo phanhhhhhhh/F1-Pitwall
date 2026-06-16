@@ -20,6 +20,7 @@ public class OpenF1SessionService {
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
     private static final Map<String, String> COUNTRY_NAME_MAP = Map.ofEntries(
+        Map.entry("United Kingdom", "Great Britain"),
         Map.entry("UAE", "United Arab Emirates"),
         Map.entry("USA", "United States")
     );

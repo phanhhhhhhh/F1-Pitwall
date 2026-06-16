@@ -46,28 +46,21 @@ async function fetchUserWithRetry(retries = 2): Promise<User | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window === "undefined") return null;
-    const token = localStorage.getItem("pitwall_access");
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) { setIsLoading(false); return; }
+
+    // Populate from cache immediately so UI doesn't flash logged-out state
     const username = localStorage.getItem("pitwall_username");
     const role = localStorage.getItem("pitwall_role");
     const avatarUrl = localStorage.getItem("pitwall_avatar") || "";
     const displayName = localStorage.getItem("pitwall_displayname") || "";
-    if (token && username) {
-      return { id: 0, username, email: "", role: role || "VIEWER", createdAt: "", avatarUrl, displayName };
+    if (username) {
+      setUser({ id: 0, username, email: "", role: role || "VIEWER", createdAt: "", avatarUrl, displayName });
     }
-    return null;
-  });
-
-  const [isLoading, setIsLoading] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return Boolean(localStorage.getItem("pitwall_access"));
-  });
-
-  useEffect(() => {
-    const token = getAccessToken();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!token) { setIsLoading(false); return; }
 
     fetchUserWithRetry(2)
       .then((data) => {
