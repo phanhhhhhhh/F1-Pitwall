@@ -215,6 +215,10 @@ export default function RacesPage() {
                                                 {winner && <p className="f-mono text-[11px] text-zinc-500 mt-1">🏆 <span className="text-[#FFD23F] font-bold">{winner.driver}</span> <span className="text-zinc-700 mx-1">·</span> {winner.team}</p>}
                                             </div>
                                             <div className="flex items-center gap-2 flex-shrink-0">
+                                                <Link href={`/races/${race.id}/weekend`}
+                                                    className="f-mono text-[11px] text-zinc-500 hover:text-blue-400 border border-white/10 hover:border-blue-400/40 px-3 py-1.5 rounded-lg transition-all">
+                                                    Weekend →
+                                                </Link>
                                                 {(isCompleted || race.status === "SCHEDULED") && (
                                                     <Link href={`/races/${race.id}/qualifying`}
                                                         className={`f-mono text-[11px] border px-3 py-1.5 rounded-lg transition-all ${isSprint ? "text-zinc-500 hover:text-[#F97316] border-white/10 hover:border-[#F97316]/40" : "text-zinc-500 hover:text-[#FFD23F] border-white/10 hover:border-[#FFD23F]/40"}`}>
