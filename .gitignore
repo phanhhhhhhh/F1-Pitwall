@@ -25,3 +25,6 @@ application-secrets.yml
 application-local.yml
 recovery-codes.txt
 secrets.txt
+
+# OMC runtime state (không cần track)
+.omc/state/
