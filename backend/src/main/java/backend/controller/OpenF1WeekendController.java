@@ -38,6 +38,16 @@ public class OpenF1WeekendController {
     }
 
     /**
+     * POST /api/openf1/sessions/cache/clear
+     * Clear session results cache (use when data seems stale for live sessions)
+     */
+    @PostMapping("/sessions/cache/clear")
+    public ResponseEntity<Map<String, Object>> clearSessionCache() {
+        sessionService.clearCache();
+        return ResponseEntity.ok(Map.of("status", "cleared"));
+    }
+
+    /**
      * GET /api/openf1/race/{raceId}/sessions
      * Trả về danh sách sessions (FP1/FP2/FP3/Quali/Race) cho một race weekend cụ thể.
      */
