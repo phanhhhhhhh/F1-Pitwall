@@ -10,6 +10,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -25,6 +26,10 @@ public class OpenF1SessionService {
         Map.entry("USA", "United States")
     );
 
+    // Past session data never changes — cache indefinitely
+    private final Map<Long, List<Map<String, Object>>> sessionResultsCache = new ConcurrentHashMap<>();
+    private final Map<Long, List<Map<String, Object>>> sessionListCache = new ConcurrentHashMap<>();
+
     private final RaceRepository raceRepository;
 
     private final RestTemplate restTemplate = createRestTemplate();
@@ -32,7 +37,7 @@ public class OpenF1SessionService {
     private static RestTemplate createRestTemplate() {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(6000);
-        factory.setReadTimeout(15000);
+        factory.setReadTimeout(20000);
         return new RestTemplate(factory);
     }
 
@@ -40,6 +45,10 @@ public class OpenF1SessionService {
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getSessionsForRace(Long raceId) {
+        if (sessionListCache.containsKey(raceId)) {
+            return sessionListCache.get(raceId);
+        }
+
         Race race = raceRepository.findById(raceId)
             .orElseThrow(() -> new RuntimeException("Race not found: " + raceId));
 
@@ -47,7 +56,6 @@ public class OpenF1SessionService {
         String openf1Country = COUNTRY_NAME_MAP.getOrDefault(country, country);
         int year = race.getDate().getYear();
 
-        // Fetch all meetings for the year + country
         String meetingUrl = OPENF1_BASE + "/meetings?year=" + year
             + "&country_name=" + openf1Country.replace(" ", "%20");
 
@@ -61,7 +69,6 @@ public class OpenF1SessionService {
 
         if (meetings == null || meetings.isEmpty()) return List.of();
 
-        // Match meeting by race date (race weekend spans race_date-5 to race_date)
         LocalDate raceDate = race.getDate();
         Integer meetingKey = meetings.stream()
             .filter(m -> {
@@ -86,7 +93,6 @@ public class OpenF1SessionService {
             return List.of();
         }
 
-        // Fetch sessions for this meeting
         String sessionUrl = OPENF1_BASE + "/sessions?meeting_key=" + meetingKey;
         List<Map<String, Object>> sessions;
         try {
@@ -103,7 +109,7 @@ public class OpenF1SessionService {
             "Sprint Qualifying", "Sprint", "Qualifying", "Race"
         );
 
-        return sessions.stream()
+        List<Map<String, Object>> result = sessions.stream()
             .filter(s -> SESSION_ORDER.contains(String.valueOf(s.getOrDefault("session_name", ""))))
             .sorted(Comparator.comparing(s -> String.valueOf(s.getOrDefault("date_start", ""))))
             .map(s -> {
@@ -116,22 +122,54 @@ public class OpenF1SessionService {
                 return out;
             })
             .collect(Collectors.toList());
+
+        sessionListCache.put(raceId, result);
+        return result;
     }
 
     // ─── Practice session results (fastest lap per driver) ────────────────────
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getSessionResults(Long sessionKey) {
-        // Fetch drivers
+        if (sessionResultsCache.containsKey(sessionKey)) {
+            log.debug("[Sessions] Cache hit for session {}", sessionKey);
+            return sessionResultsCache.get(sessionKey);
+        }
+
+        // Fetch drivers and laps in parallel
         String driversUrl = OPENF1_BASE + "/drivers?session_key=" + sessionKey;
+        String lapsUrl    = OPENF1_BASE + "/laps?session_key=" + sessionKey + "&is_pit_out_lap=false";
+
+        CompletableFuture<List<Map<String, Object>>> driversFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<Map<String, Object>> res = restTemplate.getForObject(driversUrl, List.class);
+                return res != null ? res : List.of();
+            } catch (Exception e) {
+                log.warn("[Sessions] Failed to fetch drivers for session {}: {}", sessionKey, e.getMessage());
+                return List.of();
+            }
+        });
+
+        CompletableFuture<List<Map<String, Object>>> lapsFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<Map<String, Object>> res = restTemplate.getForObject(lapsUrl, List.class);
+                return res != null ? res : List.of();
+            } catch (Exception e) {
+                log.warn("[Sessions] Failed to fetch laps for session {}: {}", sessionKey, e.getMessage());
+                return List.of();
+            }
+        });
+
         List<Map<String, Object>> drivers;
+        List<Map<String, Object>> laps;
         try {
-            drivers = restTemplate.getForObject(driversUrl, List.class);
+            CompletableFuture.allOf(driversFuture, lapsFuture).get(25, TimeUnit.SECONDS);
+            drivers = driversFuture.get();
+            laps    = lapsFuture.get();
         } catch (Exception e) {
-            log.warn("[Sessions] Failed to fetch drivers for session {}: {}", sessionKey, e.getMessage());
+            log.warn("[Sessions] Parallel fetch failed for session {}: {}", sessionKey, e.getMessage());
             return List.of();
         }
-        if (drivers == null) drivers = List.of();
 
         Map<Integer, Map<String, Object>> driverMap = new HashMap<>();
         for (Map<String, Object> d : drivers) {
@@ -139,25 +177,13 @@ public class OpenF1SessionService {
             if (num instanceof Number) driverMap.put(((Number) num).intValue(), d);
         }
 
-        // Fetch laps (exclude pit-out laps)
-        String lapsUrl = OPENF1_BASE + "/laps?session_key=" + sessionKey + "&is_pit_out_lap=false";
-        List<Map<String, Object>> laps;
-        try {
-            laps = restTemplate.getForObject(lapsUrl, List.class);
-        } catch (Exception e) {
-            log.warn("[Sessions] Failed to fetch laps for session {}: {}", sessionKey, e.getMessage());
-            return List.of();
-        }
-        if (laps == null) laps = List.of();
-
-        // Group laps by driver, find fastest
         Map<Integer, List<Double>> lapsByDriver = new HashMap<>();
         for (Map<String, Object> lap : laps) {
             Object durObj = lap.get("lap_duration");
             Object numObj = lap.get("driver_number");
             if (durObj == null || numObj == null) continue;
             double dur = ((Number) durObj).doubleValue();
-            if (dur <= 0 || dur > 600) continue; // filter invalid laps
+            if (dur <= 0 || dur > 600) continue;
             int num = ((Number) numObj).intValue();
             lapsByDriver.computeIfAbsent(num, k -> new ArrayList<>()).add(dur);
         }
@@ -168,7 +194,7 @@ public class OpenF1SessionService {
             List<Double> driverLaps = entry.getValue();
 
             double fastest = driverLaps.stream().mapToDouble(Double::doubleValue).min().orElse(0);
-            double avg = driverLaps.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+            double avg     = driverLaps.stream().mapToDouble(Double::doubleValue).average().orElse(0);
 
             Map<String, Object> driverInfo = driverMap.getOrDefault(driverNum, Map.of());
 
@@ -184,12 +210,16 @@ public class OpenF1SessionService {
             results.add(row);
         }
 
-        // Sort by fastest lap ascending
         results.sort(Comparator.comparingDouble(r -> ((Number) r.get("fastestLap")).doubleValue()));
-
-        // Add position
         for (int i = 0; i < results.size(); i++) results.get(i).put("position", i + 1);
 
+        sessionResultsCache.put(sessionKey, results);
         return results;
+    }
+
+    public void clearCache() {
+        sessionResultsCache.clear();
+        sessionListCache.clear();
+        log.info("[Sessions] Cache cleared");
     }
 }
