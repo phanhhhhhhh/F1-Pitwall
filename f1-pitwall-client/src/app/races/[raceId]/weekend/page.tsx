@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { authFetch, getAccessToken } from "../../../lib/pitwall-auth";
@@ -100,12 +100,11 @@ function PracticeTable({ results, loading, accent }: { results: SessionResult[];
         return (
           <motion.div
             key={r.driverNumber}
-            className="grid grid-cols-[44px_1fr_auto_auto_auto_auto] items-center px-4 sm:px-6 py-3 border-b transition-colors"
+            className="grid grid-cols-[44px_1fr_auto_auto_auto_auto] items-center px-4 sm:px-6 py-3 border-b transition-colors hover:bg-white/[0.02]"
             style={{ borderColor: "rgba(255,255,255,.04)", background: isP1 ? `${accent}08` : "transparent" }}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: idx * 0.025 }}
-            whileHover={{ backgroundColor: "rgba(255,255,255,.03)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.15) }}
           >
             {/* Position */}
             <span className="f-cond font-black text-xl leading-none"
@@ -170,9 +169,7 @@ export default function RaceWeekendPage() {
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [loadingPage, setLoadingPage] = useState(true);
-  const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingResults, setLoadingResults] = useState(false);
-  const [sessionCache, setSessionCache] = useState<Record<number, SessionResult[]>>({});
 
   useEffect(() => {
     if (!getAccessToken()) { router.push("/login"); return; }
@@ -185,9 +182,10 @@ export default function RaceWeekendPage() {
         authFetch(`${API}/api/races/${raceId}`),
         authFetch(`${API}/api/openf1/race/${raceId}/sessions`),
       ]);
-      const [raceData, sessionsData] = await Promise.all([raceRes.json(), sessionsRes.json()]);
+      const [raceData, sessionsData]: [any, Session[]] = await Promise.all([raceRes.json(), sessionsRes.json()]);
       setRace(raceData);
       setSessions(sessionsData);
+
       if (sessionsData.length > 0) {
         setActiveSession(sessionsData[0]);
       }
@@ -195,19 +193,15 @@ export default function RaceWeekendPage() {
     finally { setLoadingPage(false); }
   };
 
-  const loadResults = useCallback(async (session: Session) => {
-    // Practice/Qualifying only — Race results come from our own DB
-    if (session.name === "Race") {
-      router.push(`/races/${raceId}/results`);
-      return;
-    }
-    if (session.name === "Qualifying") {
-      router.push(`/races/${raceId}/qualifying`);
-      return;
-    }
+  const sessionCacheRef = useRef<Record<number, SessionResult[]>>({});
 
-    if (sessionCache[session.sessionKey]) {
-      setResults(sessionCache[session.sessionKey]);
+  const loadResults = useCallback(async (session: Session) => {
+    if (session.name === "Race") { router.push(`/races/${raceId}/results`); return; }
+    if (session.name === "Qualifying") { router.push(`/races/${raceId}/qualifying`); return; }
+
+    const cached = sessionCacheRef.current[session.sessionKey];
+    if (cached) {
+      setResults(cached);
       return;
     }
 
@@ -215,19 +209,19 @@ export default function RaceWeekendPage() {
     try {
       const res = await authFetch(`${API}/api/openf1/session/${session.sessionKey}/results`);
       const data: SessionResult[] = await res.json();
+      sessionCacheRef.current[session.sessionKey] = data;
       setResults(data);
-      setSessionCache(prev => ({ ...prev, [session.sessionKey]: data }));
     } catch (err) {
       console.error(err);
       setResults([]);
     } finally {
       setLoadingResults(false);
     }
-  }, [raceId, router, sessionCache]);
+  }, [raceId, router]);
 
   useEffect(() => {
     if (activeSession) loadResults(activeSession);
-  }, [activeSession]);
+  }, [activeSession, loadResults]);
 
   const accent = activeSession ? SESSION_ACCENT[activeSession.name] ?? F1.red : F1.red;
   const countryFlag = flagForCountry(race?.circuit?.country);
@@ -310,14 +304,14 @@ export default function RaceWeekendPage() {
             </motion.div>
 
             {/* Session meta */}
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               {activeSession && (
                 <motion.div
                   key={activeSession.sessionKey}
-                  initial={{ opacity: 0, y: 6 }}
+                  initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.25 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
                 >
                   {/* Session info bar */}
                   <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
