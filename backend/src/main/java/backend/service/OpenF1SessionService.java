@@ -8,6 +8,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.*;
@@ -42,6 +43,7 @@ public class OpenF1SessionService {
 
     // ─── Sessions for a race weekend ──────────────────────────────────────────
 
+    @Transactional
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getSessionsForRace(Long raceId) {
         if (sessionListCache.containsKey(raceId)) {
