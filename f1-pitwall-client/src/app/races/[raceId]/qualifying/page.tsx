@@ -1,23 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { authFetch, getAccessToken } from "../../../lib/pitwall-auth";
+import { useParams } from "next/navigation";
+import { authFetch } from "../../../lib/pitwall-auth";
 import Navbar from "../../../components/Navbar";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
 import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import type { QualifyingResult } from "../../../types/f1";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-interface QualifyingResult {
-    id: number; gridPosition: number; driverName: string; teamName: string; teamColor: string;
-    carNumber: number; q1Time: string | null; q2Time: string | null; q3Time: string | null; bestTime: string | null;
-    eliminatedQ1: boolean; eliminatedQ2: boolean;
-    q1TimeRaw: number | null; q2TimeRaw: number | null; q3TimeRaw: number | null;
-}
 
 function TimeDelta({ time, best, highlight }: { time: number | null; best: number | null; highlight?: boolean }) {
     if (!time || !best) return <span className="text-zinc-700 f-mono text-xs">—</span>;
@@ -61,7 +55,6 @@ function getSegment(r: QualifyingResult): QSeg {
 }
 
 export default function QualifyingPage() {
-    const router = useRouter();
     const params = useParams();
     const raceId = params?.raceId as string;
 
@@ -76,7 +69,6 @@ export default function QualifyingPage() {
     const [feedback, setFeedback] = useState("");
 
     useEffect(() => {
-        if (!getAccessToken()) { router.push("/login"); return; }
         fetchData(); fetchRaceInfo();
     }, [raceId]);
 

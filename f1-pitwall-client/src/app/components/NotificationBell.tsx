@@ -4,16 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
-
-interface Notification {
-  id: number;
-  type: string;
-  title: string;
-  message: string;
-  icon: string;
-  read: boolean;
-  createdAt: string;
-}
+import type { NotificationItem } from "../types/f1";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -34,7 +25,7 @@ const TYPE_ACCENT: Record<string, string> = {
 };
 
 export default function NotificationBell() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount,   setUnreadCount]   = useState(0);
   const [open,          setOpen]          = useState(false);
   const [loading,       setLoading]       = useState(false);
@@ -94,7 +85,7 @@ export default function NotificationBell() {
       client.connect({}, () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         client.subscribe("/topic/notifications", (msg: any) => {
-          const notif: Notification = JSON.parse(msg.body);
+          const notif: NotificationItem = JSON.parse(msg.body);
           setNotifications(prev => [notif, ...prev].slice(0, 50));
           setUnreadCount(prev => prev + 1);
           if (Notification.permission === "granted") {

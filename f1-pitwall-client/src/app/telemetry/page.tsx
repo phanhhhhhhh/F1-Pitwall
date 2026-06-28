@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
 import PitwallBackground from "../components/PitwallBackground";
 import Navbar from "../components/Navbar";
+import type { TelemetryData, LiveTyreData, LiveStatus } from "../types/f1";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -30,27 +30,6 @@ interface StompClient {
   disconnect: (callback?: () => void) => void;
 }
 interface StompFactory { over: (webSocketFactory: () => unknown) => StompClient; }
-
-interface TelemetryData {
-  driverName: string; teamName: string; teamColor: string;
-  carNumber: number; lap: number; speed: number; rpm: number;
-  gear: number; throttle: number; brake: number; drsActive: boolean;
-  fuelLoad: number; tyreType: string; tyreTemp: number;
-  lapTime: number; gap: number; position: number; timestamp: number;
-}
-
-interface LiveTyreData {
-  driverNumber: number; driverName: string; teamName: string;
-  teamColor: string; tyreCompound: string; tyreAge: number;
-  lapStart: number; stintNumber: number; position: number;
-  isLive: boolean; sessionName: string;
-}
-
-interface LiveStatus {
-  isLive: boolean; sessionName: string; sessionType: string;
-  circuitName: string; countryName: string; sessionEmoji: string;
-  driversCount: number;
-}
 
 const MAX_HISTORY = 40;
 
@@ -225,7 +204,6 @@ const STAGGER = { hidden: { opacity: 0, y: 14 }, show: (i: number) => ({ opacity
 const PANEL = { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 }, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] as const } };
 
 export default function TelemetryPage() {
-  const router = useRouter();
   const [connected, setConnected] = useState(false);
   const [drivers, setDrivers] = useState<TelemetryData[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -239,7 +217,6 @@ export default function TelemetryPage() {
   const stompRef = useRef<StompClient | null>(null);
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     const connect = () => {
       const stompFactory = window.Stomp ?? window.StompJs?.Stomp;
       if (!stompFactory) { setTimeout(connect, 500); return; }
@@ -270,7 +247,7 @@ export default function TelemetryPage() {
       s2.onload = () => setTimeout(connect, 100);
     };
     return () => { stompRef.current?.disconnect(); };
-  }, [router]);
+  }, []);
 
   const checkLiveStatus = async () => {
     try {

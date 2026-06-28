@@ -1,27 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import Navbar from "../components/Navbar";
 import RaceWeekendWidget from "../components/RaceWeekendWidget";
 import Link from "next/link";
 import { BASE_URL as API } from "../lib/api-client";
 import { SkeletonTable } from "../components/LoadingSkeleton";
-
-const COUNTRY_FLAGS: Record<string, string> = {
-    "Australia": "🇦🇺", "China": "🇨🇳", "Japan": "🇯🇵", "Bahrain": "🇧🇭",
-    "Saudi Arabia": "🇸🇦", "United States": "🇺🇸", "Canada": "🇨🇦",
-    "Monaco": "🇲🇨", "Spain": "🇪🇸", "Austria": "🇦🇹", "United Kingdom": "🇬🇧",
-    "Belgium": "🇧🇪", "Hungary": "🇭🇺", "Netherlands": "🇳🇱", "Italy": "🇮🇹",
-    "Azerbaijan": "🇦🇿", "Singapore": "🇸🇬", "Mexico": "🇲🇽", "Brazil": "🇧🇷",
-    "UAE": "🇦🇪", "Qatar": "🇶🇦",
-};
+import { COUNTRY_FLAGS } from "../lib/f1-theme";
 
 interface RaceWinner { driver: string; team: string; }
 
 export default function RacesPage() {
-    const router = useRouter();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [races, setRaces] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -29,7 +19,6 @@ export default function RacesPage() {
     const [raceWinners, setRaceWinners] = useState<Record<string, RaceWinner>>({});
 
     useEffect(() => {
-        if (!getAccessToken()) { router.push("/login"); return; }
         fetchData();
     }, []);
 

@@ -1,22 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import { useCountUp } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
+import type { AdminUser, AdminStats, SyncResult } from "../types/f1";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-interface User { id: number; username: string; email: string; role: "ADMIN" | "ENGINEER" | "VIEWER"; }
-interface Stats {
-  totalUsers: number; totalDrivers: number; totalTeams: number; totalRaces: number;
-  totalRaceResults: number; totalNotifications: number; unreadNotifications: number;
-  usersByRole: { ADMIN: number; ENGINEER: number; VIEWER: number };
-}
-interface SyncResult { synced: string[]; skipped: string[]; errors: string[]; total: number; }
 
 const ROLE_COLORS = {
   ADMIN:    "text-red-400 bg-red-500/10  border-red-500/30",
@@ -49,9 +41,8 @@ function StatTile({ label, value, color, delay }: { label: string; value: number
 }
 
 export default function AdminPage() {
-  const router = useRouter();
-  const [stats,       setStats]       = useState<Stats | null>(null);
-  const [users,       setUsers]       = useState<User[]>([]);
+  const [stats,       setStats]       = useState<AdminStats | null>(null);
+  const [users,       setUsers]       = useState<AdminUser[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState<"stats" | "users" | "data">("stats");
   const [syncing,     setSyncing]     = useState(false);
@@ -59,12 +50,11 @@ export default function AdminPage() {
   const [showCreate,  setShowCreate]  = useState(false);
   const [newUser,     setNewUser]     = useState({ username: "", email: "", password: "", role: "VIEWER" });
   const [createError, setCreateError] = useState("");
-  const [resetUser,   setResetUser]   = useState<User | null>(null);
+  const [resetUser,   setResetUser]   = useState<AdminUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [feedback,    setFeedback]    = useState("");
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -75,7 +65,7 @@ export default function AdminPage() {
         authFetch(`${API}/api/admin/stats`),
         authFetch(`${API}/api/admin/users`),
       ]);
-      if (sRes.status === 403) { router.push("/"); return; }
+      if (sRes.status === 403) { return; }
       setStats(await sRes.json());
       setUsers(await uRes.json());
     } catch (err) { console.error(err); }
@@ -102,12 +92,12 @@ export default function AdminPage() {
   const updateRole = async (userId: number, role: string) => {
     const res = await authFetch(`${API}/api/admin/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) });
     if (res.ok) {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: role as User["role"] } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: role as AdminUser["role"] } : u));
       showFeedback("Role updated");
     }
   };
 
-  const deleteUser = async (user: User) => {
+  const deleteUser = async (user: AdminUser) => {
     if (!confirm(`Delete user "${user.username}"?`)) return;
     const res = await authFetch(`${API}/api/admin/users/${user.id}`, { method: "DELETE" });
     if (res.ok) {

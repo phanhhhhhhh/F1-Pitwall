@@ -4,27 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { flagForCountry } from "../lib/f1-theme";
+import type { WidgetSession, WeekendData } from "../types/f1";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-interface Session {
-  sessionKey: number;
-  name: string;
-  dateStart: string;
-  dateEnd: string;
-  status: "LIVE" | "UPCOMING" | "COMPLETED";
-  startsIn?: number;
-  endsIn?: number;
-}
-
-interface WeekendData {
-  countryName: string;
-  circuitName: string;
-  sessions: Session[];
-  currentSession: Session | null;
-  nextSession: Session | null;
-  error?: string;
-}
 
 const SESSION_COLORS: Record<string, string> = {
   "Practice 1":        "#3b82f6",
@@ -133,7 +115,7 @@ export default function RaceWeekendWidget() {
 
   /* ── Derive live/upcoming status client-side ─────────────────────────── */
   const now = Date.now();
-  const sessions = data.sessions.map(s => {
+  const sessions = data.sessions.map((s: WidgetSession) => {
     const start = s.dateStart ? new Date(s.dateStart).getTime() : 0;
     const end   = s.dateEnd   ? new Date(s.dateEnd).getTime()   : start + 3600000;
     let status: "LIVE" | "UPCOMING" | "COMPLETED" = s.status;

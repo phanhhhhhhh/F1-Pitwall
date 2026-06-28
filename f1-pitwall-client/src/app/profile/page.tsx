@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { authFetch, getAccessToken, clearTokens, isApiError } from "../lib/pitwall-auth";
+import { authFetch, clearTokens, isApiError } from "../lib/pitwall-auth";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
@@ -66,7 +66,7 @@ export default function ProfilePage() {
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdFeedback, setPwdFeedback] = useState({ msg: "", ok: true });
 
-  useEffect(() => { if (!getAccessToken()) router.push("/login"); }, [router]);
+  useEffect(() => { }, []);
 
   useEffect(() => {
     if (user) {

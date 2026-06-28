@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import { F1, tyre } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
 import { SkeletonCard } from "../components/LoadingSkeleton";
+import type { CircuitRef } from "../types/f1";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -27,7 +27,6 @@ const STRATEGY_NAMES = ["Strategy A", "Strategy B", "Strategy C", "Strategy D", 
 
 interface Stint    { id: string; tyre: TyreType; laps: number; }
 interface Strategy { id: string; name: string; color: string; stints: Stint[]; }
-interface Circuit  { id: number; name: string; totalLaps: number; lapRecordSec: number; country: string; }
 
 // ─── pure helpers ─────────────────────────────────────────────────────────────
 function calcRaceTime(stints: Stint[], base: number): number {
@@ -178,9 +177,8 @@ function CompoundChip({ tyreKey }: { tyreKey: string }) {
 
 // ─── main page ────────────────────────────────────────────────────────────────
 export default function StrategyPage() {
-  const router = useRouter();
-  const [circuits, setCircuits] = useState<Circuit[]>([]);
-  const [selectedCircuit, setSelectedCircuit] = useState<Circuit | null>(null);
+  const [circuits, setCircuits] = useState<CircuitRef[]>([]);
+  const [selectedCircuit, setSelectedCircuit] = useState<CircuitRef | null>(null);
   const [strategies, setStrategies] = useState<Strategy[]>([
     {
       id: "s1", name: "Strategy A", color: STRATEGY_COLORS[0],
@@ -196,16 +194,15 @@ export default function StrategyPage() {
 
   // ── auth + data fetch (preserved exactly) ──────────────────────────────────
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     authFetch(`${API}/api/circuits`)
       .then(r => r.json())
-      .then((data: Circuit[]) => {
+      .then((data: CircuitRef[]) => {
         setCircuits(data);
-        setSelectedCircuit(data.find((c: Circuit) => c.name.includes("Albert")) || data[0]);
+        setSelectedCircuit(data.find((c: CircuitRef) => c.name.includes("Albert")) || data[0]);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [router]);
+  }, []);
 
   // ── derived values ─────────────────────────────────────────────────────────
   const totalLaps = selectedCircuit?.totalLaps || 57;

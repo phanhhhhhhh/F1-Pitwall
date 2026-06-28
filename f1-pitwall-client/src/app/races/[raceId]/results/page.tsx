@@ -1,27 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { authFetch, getAccessToken } from "../../../lib/pitwall-auth";
+import { useParams } from "next/navigation";
+import { authFetch } from "../../../lib/pitwall-auth";
 import Navbar from "../../../components/Navbar";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable, SkeletonCard } from "../../../components/LoadingSkeleton";
 import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import type { DriverRef, ResultRow, RaceResultResponse } from "../../../types/f1";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-interface Driver { id: number; name: string; carNumber: number; team: { name: string; colorHex: string }; }
-interface ResultRow {
-  driverId: number; driverName: string; teamName: string; teamColor: string;
-  carNumber: number; startPosition: number; finishPosition: number;
-  hasFastestLap: boolean; fastestLapTime: number; dnfReason: string;
-}
-interface RaceResultResponse {
-  id: number; finishPosition: number; driverName: string; teamName: string;
-  teamColor: string; points: number; hasFastestLap: boolean; dnfReason: string;
-}
 
 // ── Podium stand heights (px) for P1/P2/P3 visual
 const PODIUM_HEIGHT = { 1: 140, 2: 108, 3: 88 } as const;
@@ -109,13 +99,12 @@ function PodiumBlock({ result, pos, delay }: { result: RaceResultResponse; pos: 
 }
 
 export default function RaceResultsPage() {
-  const router = useRouter();
   const params = useParams();
   const raceId = params.raceId as string;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [race, setRace] = useState<any>(null);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<DriverRef[]>([]);
   const [rows, setRows] = useState<ResultRow[]>([]);
   const [existingResults, setExistingResults] = useState<RaceResultResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,7 +115,6 @@ export default function RaceResultsPage() {
   const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     fetchData();
   }, [raceId]);
 
@@ -145,7 +133,7 @@ export default function RaceResultsPage() {
     finally { setLoading(false); }
   };
 
-  const initRows = (d: Driver[]) => {
+  const initRows = (d: DriverRef[]) => {
     const sorted = [...d].sort((a, b) => a.carNumber - b.carNumber);
     setRows(sorted.map((dr, i) => ({
       driverId: dr.id, driverName: dr.name, teamName: dr.team?.name || "", teamColor: dr.team?.colorHex || "#666",

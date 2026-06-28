@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import {
   downloadDriverStandingsCsv,
@@ -14,21 +13,11 @@ import ExportButton from "../components/ExportButton";
 import Link from "next/link";
 import { SkeletonTable } from "../components/LoadingSkeleton";
 import dynamic from "next/dynamic";
+import type { DriverStanding, ConstructorStanding } from "../types/f1";
 
 // Dynamic import of the whole chart (recharts must be statically imported
 // inside it so Bar recognizes its Cell children) — avoids SSR issues
 const GapToLeaderChart = dynamic(() => import("../components/GapToLeaderChart"), { ssr: false });
-
-interface DriverStanding {
-  position: number; driverId: number; driverName: string; carNumber: number;
-  nationality: string; teamName: string; teamColor: string; totalPoints: number;
-  wins: number; podiums: number; fastestLaps: number; gapToLeader: number; gapToAhead: number;
-}
-interface ConstructorStanding {
-  position: number; teamId: number; teamName: string; teamColor: string; country: string;
-  totalPoints: number; wins: number; podiums: number; gapToLeader: number;
-  driver1Name: string; driver2Name: string; driver1Points: number; driver2Points: number;
-}
 
 function useCountUp(target: number, duration = 1000, delay = 0) {
   const [v, setV] = useState(0);
@@ -55,7 +44,6 @@ const MEDAL = ["#FFD23F", "#C8CDD4", "#D8853B"];
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StandingsPage() {
-  const router = useRouter();
   const [tab, setTab] = useState<"drivers" | "constructors">("drivers");
   const [drivers, setDrivers] = useState<DriverStanding[]>([]);
   const [constructors, setConstructors] = useState<ConstructorStanding[]>([]);
@@ -65,7 +53,6 @@ export default function StandingsPage() {
   const [showChart, setShowChart] = useState(false);
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     (async () => {
       try {
         const [d, c] = await Promise.all([

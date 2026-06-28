@@ -10,22 +10,9 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
+import type { DriverStanding, ConstructorStanding } from "../types/f1";
 
-export interface DriverStandingEntry {
-  position: number;
-  driverName: string;
-  totalPoints: number;
-  teamColor: string;
-  gapToLeader: number;
-}
-
-export interface ConstructorStandingEntry {
-  position: number;
-  teamName: string;
-  totalPoints: number;
-  teamColor: string;
-  gapToLeader: number;
-}
+export type { DriverStanding, ConstructorStanding };
 
 interface ChartEntry {
   name: string;
@@ -58,15 +45,15 @@ const GapToLeaderTooltip = memo(function GapToLeaderTooltip({ active, payload }:
 });
 
 interface GapChartProps {
-  drivers: DriverStandingEntry[];
-  constructors: ConstructorStandingEntry[];
+  drivers: DriverStanding[];
+  constructors: ConstructorStanding[];
   tab: "drivers" | "constructors";
 }
 
 const GapToLeaderChart = memo(function GapToLeaderChart({ drivers, constructors, tab }: GapChartProps) {
   const isDrivers = tab === "drivers";
 
-  const driverData: ChartEntry[] = drivers.map((d) => ({
+  const driverData: ChartEntry[] = drivers.map((d: DriverStanding) => ({
     name: d.driverName,
     shortName: d.driverName.split(" ").pop() ?? d.driverName,
     points: Math.round(d.totalPoints),
@@ -76,7 +63,7 @@ const GapToLeaderChart = memo(function GapToLeaderChart({ drivers, constructors,
     position: d.position,
   }));
 
-  const constructorData: ChartEntry[] = constructors.map((c) => ({
+  const constructorData: ChartEntry[] = constructors.map((c: ConstructorStanding) => ({
     name: c.teamName,
     shortName: c.teamName.split(" ").slice(-1)[0] ?? c.teamName,
     points: Math.round(c.totalPoints),

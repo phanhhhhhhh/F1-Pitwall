@@ -1,25 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonCard } from "../components/LoadingSkeleton";
-
-const NATIONALITY_FLAGS: Record<string, string> = {
-  "British": "🇬🇧", "Australian": "🇦🇺", "Dutch": "🇳🇱", "French": "🇫🇷",
-  "German": "🇩🇪", "Spanish": "🇪🇸", "Finnish": "🇫🇮", "Canadian": "🇨🇦",
-  "Mexican": "🇲🇽", "Brazilian": "🇧🇷", "Italian": "🇮🇹", "Monegasque": "🇲🇨",
-  "Thai": "🇹🇭", "New Zealander": "🇳🇿", "Argentine": "🇦🇷",
-};
-const COUNTRY_FLAGS: Record<string, string> = {
-  "United Kingdom": "🇬🇧", "Italy": "🇮🇹", "Austria": "🇦🇹", "Germany": "🇩🇪",
-  "France": "🇫🇷", "United States": "🇺🇸", "Switzerland": "🇨🇭",
-};
-
-interface Driver { id: number; name: string; carNumber: number; nationality: string; team?: { name: string }; }
-interface Team { id: number; name: string; country: string; colorHex: string; championships: number; annualBudgetM: number; base: string; foundedYear: number; }
+import { NATIONALITY_FLAGS, COUNTRY_FLAGS } from "../lib/f1-theme";
+import type { TeamInfo, DriverCard } from "../types/f1";
 
 function useCountUp(target: number, delay = 0) {
   const [v, setV] = useState(0);
@@ -32,7 +19,7 @@ function useCountUp(target: number, delay = 0) {
   return v;
 }
 
-function TeamCard({ team, drivers, idx }: { team: Team; drivers: Driver[]; idx: number }) {
+function TeamCard({ team, drivers, idx }: { team: TeamInfo; drivers: DriverCard[]; idx: number }) {
   const [hov, setHov] = useState(false);
   const col = team.colorHex || "#666";
   const td = drivers.filter((d) => d.team?.name === team.name);
@@ -89,13 +76,11 @@ function TeamCard({ team, drivers, idx }: { team: Team; drivers: Driver[]; idx: 
 }
 
 export default function TeamsPage() {
-  const router = useRouter();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [teams, setTeams] = useState<TeamInfo[]>([]);
+  const [drivers, setDrivers] = useState<DriverCard[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     Promise.all([authFetch(`${API}/api/teams`).then(r => r.json()), authFetch(`${API}/api/drivers`).then(r => r.json())])
       .then(([t, d]) => { setTeams(t); setDrivers(d); }).catch(console.error).finally(() => setLoading(false));
   }, []);
