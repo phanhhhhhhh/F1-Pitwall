@@ -1,12 +1,16 @@
 package backend.service;
 
-import lombok.Getter;
+import backend.model.LivePosition;
+import backend.repository.LivePositionRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -17,6 +21,11 @@ public class OpenF1LiveService {
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
     private final RestTemplate restTemplate = createRestTemplate();
+    private final LivePositionRepository livePositionRepository;
+
+    public OpenF1LiveService(LivePositionRepository livePositionRepository) {
+        this.livePositionRepository = livePositionRepository;
+    }
 
     private static RestTemplate createRestTemplate() {
         var factory = new SimpleClientHttpRequestFactory();
@@ -40,28 +49,17 @@ public class OpenF1LiveService {
             "Practice 3", "🔧"
     );
 
-    private volatile List<Map<String, Object>> cachedLiveData = new ArrayList<>();
-    private volatile Integer cachedSessionKey = null;
-    private volatile String cachedSessionName = null;
-    private volatile String cachedSessionType = null;
-    private volatile String cachedCircuitName = null;
-    private volatile String cachedCountryName = null;
-    @Getter
-    private volatile boolean isSessionLive = false;
+    // ─── Internal computation methods (not cached, called by scheduled task and force-fetch) ───
 
-    @Scheduled(fixedRate = 30000)
-    public void checkAndFetchLiveData() {
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> computeLiveSessionStatus() {
         try {
             Map<String, Object> liveSession = getLiveSession();
 
             if (liveSession == null) {
-                if (isSessionLive) {
-                    log.info("🏁 [OpenF1Live] Session ended — switching back to simulator");
-                    isSessionLive = false;
-                    cachedSessionKey = null;
-                    cachedSessionName = null;
-                }
-                return;
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("isLive", false);
+                return result;
             }
 
             Integer sessionKey = toInt(liveSession.get("session_key"));
@@ -69,18 +67,20 @@ public class OpenF1LiveService {
             String circuitName = String.valueOf(liveSession.get("circuit_short_name"));
             String countryName = String.valueOf(liveSession.get("country_name"));
 
-            isSessionLive = true;
-            cachedSessionKey = sessionKey;
-            cachedSessionName = sessionName;
-            cachedSessionType = sessionName;
-            cachedCircuitName = circuitName;
-            cachedCountryName = countryName;
-
-            fetchTyreData(sessionKey);
-            log.info("🔴 [OpenF1Live] Live: {} {} — session: {}", countryName, sessionName, sessionKey);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("isLive", true);
+            result.put("sessionKey", sessionKey);
+            result.put("sessionName", sessionName);
+            result.put("sessionType", sessionName);
+            result.put("circuitName", circuitName);
+            result.put("countryName", countryName);
+            return result;
 
         } catch (Exception e) {
             log.warn("⚠️ [OpenF1Live] Fetch failed: {}", e.getMessage());
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("isLive", false);
+            return result;
         }
     }
 
@@ -123,7 +123,7 @@ public class OpenF1LiveService {
     }
 
     @SuppressWarnings("unchecked")
-    private void fetchTyreData(int sessionKey) {
+    private List<Map<String, Object>> computeLiveTyreData(int sessionKey) {
         try {
             String stintUrl = OPENF1_BASE + "/stints?session_key=" + sessionKey;
             String posUrl = OPENF1_BASE + "/position?session_key=" + sessionKey;
@@ -133,7 +133,7 @@ public class OpenF1LiveService {
             List<Map<String, Object>> positions = restTemplate.getForObject(posUrl, List.class);
             List<Map<String, Object>> drivers = restTemplate.getForObject(driversUrl, List.class);
 
-            if (stints == null || drivers == null) return;
+            if (stints == null || drivers == null) return List.of();
 
             Map<Integer, Map<String, Object>> latestStint = new HashMap<>();
             for (Map<String, Object> stint : stints) {
@@ -174,6 +174,9 @@ public class OpenF1LiveService {
                 String teamColour = String.valueOf(driver.getOrDefault("team_colour", "FFFFFF"));
                 if (!teamColour.startsWith("#")) teamColour = "#" + teamColour;
 
+                Map<String, Object> sessionStatus = getLiveSessionStatus();
+                String sessionName = sessionStatus != null ? (String) sessionStatus.get("sessionName") : "";
+
                 Map<String, Object> data = new LinkedHashMap<>();
                 data.put("driverNumber", driverNum);
                 data.put("driverName", driver.getOrDefault("full_name", "Driver #" + driverNum));
@@ -187,12 +190,12 @@ public class OpenF1LiveService {
                 data.put("stintNumber", stint.getOrDefault("stint_number", 1));
                 data.put("position", position);
                 data.put("isLive", true);
-                data.put("sessionName", cachedSessionName);
+                data.put("sessionName", sessionName);
                 result.add(data);
             }
 
             result.sort(Comparator.comparingInt(m -> (Integer) m.getOrDefault("position", 99)));
-            cachedLiveData = result;
+            return result;
 
         } catch (Exception e) {
             if (e.getMessage() != null && e.getMessage().contains("No results found")) {
@@ -200,36 +203,148 @@ public class OpenF1LiveService {
             } else {
                 log.warn("[OpenF1Live] Error fetching tyre data: {}", e.getMessage());
             }
+            return List.of();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void fetchAndPersistPositions(int sessionKey) {
+        try {
+            String posUrl = OPENF1_BASE + "/position?session_key=" + sessionKey;
+            List<Map<String, Object>> positions = restTemplate.getForObject(posUrl, List.class);
+            if (positions == null || positions.isEmpty()) return;
+
+            livePositionRepository.deleteBySessionKey(sessionKey);
+
+            List<LivePosition> entities = new ArrayList<>();
+            Instant now = Instant.now();
+            for (Map<String, Object> pos : positions) {
+                Integer driverNum = toInt(pos.get("driver_number"));
+                Integer position = toInt(pos.get("position"));
+                if (driverNum == null || position == null) continue;
+
+                entities.add(LivePosition.builder()
+                        .sessionKey(sessionKey)
+                        .driverNumber(driverNum)
+                        .position(position)
+                        .timestamp(now)
+                        .build());
+            }
+
+            if (!entities.isEmpty()) {
+                livePositionRepository.saveAll(entities);
+            }
+
+        } catch (Exception e) {
+            log.warn("[OpenF1Live] Error persisting positions: {}", e.getMessage());
+        }
+    }
+
+    // ─── Cacheable facades (called from outside / controllers) ───
+
+    @Cacheable("liveSessionStatus")
+    public Map<String, Object> getLiveSessionStatus() {
+        return computeLiveSessionStatus();
+    }
+
+    @Cacheable(value = "liveTyreData", key = "#sessionKey")
+    public List<Map<String, Object>> getLiveTyreData(Integer sessionKey) {
+        return computeLiveTyreData(sessionKey);
+    }
+
+    // ─── Scheduled refresh (30s) — calls internal methods directly, evicts cache ───
+
+    @Scheduled(fixedRate = 30000)
+    public void checkAndFetchLiveData() {
+        try {
+            Map<String, Object> session = computeLiveSessionStatus();
+
+            if (session == null || !Boolean.TRUE.equals(session.get("isLive"))) {
+                return;
+            }
+
+            Integer sessionKey = toInt(session.get("sessionKey"));
+            String sessionName = (String) session.get("sessionName");
+            String countryName = (String) session.get("countryName");
+
+            if (sessionKey != null) {
+                computeLiveTyreData(sessionKey);
+                fetchAndPersistPositions(sessionKey);
+                log.info("🔴 [OpenF1Live] Live: {} {} — session: {}", countryName, sessionName, sessionKey);
+            }
+
+        } catch (Exception e) {
+            log.warn("⚠️ [OpenF1Live] Fetch failed: {}", e.getMessage());
+        }
+    }
+
+    // ─── Getters (delegate to @Cacheable facades) ───
+
+    public boolean isSessionLive() {
+        Map<String, Object> status = getLiveSessionStatus();
+        return status != null && Boolean.TRUE.equals(status.get("isLive"));
+    }
+
+    public Integer getSessionKey() {
+        Map<String, Object> status = getLiveSessionStatus();
+        return status != null ? toInt(status.get("sessionKey")) : null;
+    }
+
+    public String getSessionName() {
+        Map<String, Object> status = getLiveSessionStatus();
+        return status != null ? (String) status.get("sessionName") : "";
+    }
+
+    public String getSessionType() {
+        Map<String, Object> status = getLiveSessionStatus();
+        return status != null ? (String) status.get("sessionType") : "";
+    }
+
+    public String getCircuitName() {
+        Map<String, Object> status = getLiveSessionStatus();
+        return status != null ? (String) status.get("circuitName") : "";
+    }
+
+    public String getCountryName() {
+        Map<String, Object> status = getLiveSessionStatus();
+        return status != null ? (String) status.get("countryName") : "";
+    }
+
+    public String getSessionEmoji() {
+        String type = getSessionType();
+        return SESSION_EMOJI.getOrDefault(type != null ? type : "", "🏎️");
+    }
+
+    public List<Map<String, Object>> getLiveData() {
+        Integer sessionKey = getSessionKey();
+        if (sessionKey == null) return List.of();
+        return getLiveTyreData(sessionKey);
+    }
+
+    // ─── Force fetch ───
+
+    @CacheEvict(value = {"liveSessionStatus", "liveTyreData"}, allEntries = true)
+    public Map<String, Object> forceFetch() {
+        Map<String, Object> session = computeLiveSessionStatus();
+        boolean isLive = session != null && Boolean.TRUE.equals(session.get("isLive"));
+        Integer sessionKey = isLive ? toInt(session.get("sessionKey")) : null;
+        List<Map<String, Object>> data = sessionKey != null ? computeLiveTyreData(sessionKey) : List.of();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("isLive", isLive);
+        result.put("sessionKey", sessionKey);
+        result.put("sessionName", isLive ? session.get("sessionName") : "");
+        result.put("sessionType", isLive ? session.get("sessionType") : "");
+        result.put("circuitName", isLive ? session.get("circuitName") : "");
+        result.put("countryName", isLive ? session.get("countryName") : "");
+        result.put("driversCount", data.size());
+        result.put("data", data);
+        return result;
     }
 
     private Integer toInt(Object o) {
         if (o == null) return null;
         if (o instanceof Number) return ((Number) o).intValue();
         try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
-    }
-
-    public List<Map<String, Object>> getLiveData() { return cachedLiveData; }
-    public Integer getSessionKey() { return cachedSessionKey; }
-    public String getSessionName() { return cachedSessionName; }
-    public String getSessionType() { return cachedSessionType; }
-    public String getCircuitName() { return cachedCircuitName; }
-    public String getCountryName() { return cachedCountryName; }
-    public String getSessionEmoji() {
-        return SESSION_EMOJI.getOrDefault(cachedSessionType, "🏎️");
-    }
-
-    public Map<String, Object> forceFetch() {
-        checkAndFetchLiveData();
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("isLive", isSessionLive);
-        result.put("sessionKey", cachedSessionKey);
-        result.put("sessionName", cachedSessionName);
-        result.put("sessionType", cachedSessionType);
-        result.put("circuitName", cachedCircuitName);
-        result.put("countryName", cachedCountryName);
-        result.put("driversCount", cachedLiveData.size());
-        result.put("data", cachedLiveData);
-        return result;
     }
 }

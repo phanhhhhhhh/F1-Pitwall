@@ -1,6 +1,8 @@
 package backend.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,11 +27,6 @@ public class OpenF1WeekendService {
         return new RestTemplate(factory);
     }
 
-    // Cache weekend data — refresh mỗi 30 phút
-    private volatile Map<String, Object> cachedWeekend = null;
-    private volatile long lastFetchTime = 0;
-    private static final long CACHE_TTL_MS = 30 * 60 * 1000; // 30 phút
-
     // Thứ tự ưu tiên session
     private static final List<String> SESSION_ORDER = List.of(
         "Practice 1", "Practice 2", "Practice 3",
@@ -37,35 +34,24 @@ public class OpenF1WeekendService {
         "Qualifying", "Race"
     );
 
+    @CacheEvict(value = "weekendSchedule", allEntries = true)
     @Scheduled(fixedRate = 1800000) // refresh mỗi 30 phút
     public void refreshCache() {
-        try {
-            cachedWeekend = fetchWeekendData();
-            lastFetchTime = System.currentTimeMillis();
-            log.info("[Weekend] Cache refreshed");
-        } catch (Exception e) {
-            log.warn("[Weekend] Cache refresh failed: {}", e.getMessage());
-        }
+        log.info("[Weekend] Cache evicted");
     }
 
     public Map<String, Object> getWeekend() {
-        // Return cache nếu còn mới
-        if (cachedWeekend != null &&
-            System.currentTimeMillis() - lastFetchTime < CACHE_TTL_MS) {
-            return enrichWithStatus(cachedWeekend);
-        }
         try {
-            cachedWeekend = fetchWeekendData();
-            lastFetchTime = System.currentTimeMillis();
-            return enrichWithStatus(cachedWeekend);
+            return enrichWithStatus(fetchWeekendData());
         } catch (Exception e) {
             log.warn("[Weekend] Fetch failed: {}", e.getMessage());
             return Map.of("error", "Unable to fetch weekend data");
         }
     }
 
+    @Cacheable("weekendSchedule")
     @SuppressWarnings("unchecked")
-    private Map<String, Object> fetchWeekendData() {
+    public Map<String, Object> fetchWeekendData() {
         int year = LocalDate.now().getYear();
 
         // Lấy sessions trong vòng 14 ngày tới + 3 ngày qua (để cover weekend đang diễn ra)
