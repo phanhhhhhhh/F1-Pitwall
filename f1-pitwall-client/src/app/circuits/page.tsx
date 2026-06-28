@@ -1,17 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonTable } from "../components/LoadingSkeleton";
 import { flagForCountry } from "../lib/f1-theme";
-
-interface Circuit {
-  id: number; name: string; country: string; city: string; type: string;
-  totalLaps: number; lengthKm: number; lapRecordSec: number; lapRecordHolder: string; turnCount: number;
-}
+import type { CircuitInfo } from "../types/f1";
 
 const typeConfig: Record<string, { color: string; label: string }> = {
   PERMANENT: { color: "#3B82F6", label: "PERMANENT" },
@@ -66,7 +61,7 @@ function TrackMotif({ type, color }: { type: string; color: string }) {
 }
 
 // ─── Key Stats Grid ───────────────────────────────────────────────────────────
-function KeyStatsGrid({ circuit, color }: { circuit: Circuit; color: string }) {
+function KeyStatsGrid({ circuit, color }: { circuit: CircuitInfo; color: string }) {
   // Total race distance = laps × length
   const raceDistanceKm = (circuit.totalLaps * circuit.lengthKm).toFixed(1);
 
@@ -95,7 +90,7 @@ function KeyStatsGrid({ circuit, color }: { circuit: Circuit; color: string }) {
 }
 
 // ─── Circuit Card ─────────────────────────────────────────────────────────────
-function CircuitCard({ circuit, idx }: { circuit: Circuit; idx: number }) {
+function CircuitCard({ circuit, idx }: { circuit: CircuitInfo; idx: number }) {
   const [hov, setHov] = useState(false);
   const cfg = typeConfig[circuit.type] || { color: "#71717a", label: circuit.type };
   const col = cfg.color;
@@ -149,14 +144,12 @@ function CircuitCard({ circuit, idx }: { circuit: Circuit; idx: number }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CircuitsPage() {
-  const router = useRouter();
-  const [circuits, setCircuits] = useState<Circuit[]>([]);
+  const [circuits, setCircuits] = useState<CircuitInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     authFetch(`${API}/api/circuits`).then(r => r.json()).then(setCircuits).catch(console.error).finally(() => setLoading(false));
   }, []);
 

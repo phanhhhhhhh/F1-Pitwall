@@ -1,19 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authFetch, getAccessToken } from "./lib/pitwall-auth";
+import { authFetch } from "./lib/pitwall-auth";
 import { BASE_URL as API } from "./lib/api-client";
 import Navbar from "./components/Navbar";
 import RaceWeekendWidget from "./components/RaceWeekendWidget";
 import Link from "next/link";
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  "Australia": "🇦🇺", "China": "🇨🇳", "Japan": "🇯🇵", "Bahrain": "🇧🇭", "Saudi Arabia": "🇸🇦",
-  "United States": "🇺🇸", "Canada": "🇨🇦", "Monaco": "🇲🇨", "Spain": "🇪🇸", "Austria": "🇦🇹",
-  "United Kingdom": "🇬🇧", "Belgium": "🇧🇪", "Hungary": "🇭🇺", "Netherlands": "🇳🇱", "Italy": "🇮🇹",
-  "Azerbaijan": "🇦🇿", "Singapore": "🇸🇬", "Mexico": "🇲🇽", "Brazil": "🇧🇷", "UAE": "🇦🇪", "Qatar": "🇶🇦",
-};
+import { COUNTRY_FLAGS } from "./lib/f1-theme";
 
 function useCountUp(target: number, duration = 1100, delay = 0) {
   const [value, setValue] = useState(0);
@@ -36,7 +29,6 @@ function useCountUp(target: number, duration = 1100, delay = 0) {
 }
 
 export default function Home() {
-  const router = useRouter();
   const [stats, setStats] = useState({ drivers: 0, teams: 0, circuits: 0 });
   const [sprintCount, setSprintCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -51,7 +43,6 @@ export default function Home() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     fetchData();
   }, []);
 

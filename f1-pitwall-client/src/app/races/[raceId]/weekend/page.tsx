@@ -3,34 +3,15 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { authFetch, getAccessToken } from "../../../lib/pitwall-auth";
+import { authFetch } from "../../../lib/pitwall-auth";
 import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Navbar from "../../../components/Navbar";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
 import Link from "next/link";
+import type { SessionInfo, SessionResult } from "../../../types/f1";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-interface Session {
-  sessionKey: number;
-  name: string;
-  type: string;
-  dateStart: string;
-  dateEnd: string;
-}
-
-interface SessionResult {
-  position: number;
-  driverNumber: number;
-  driverName: string;
-  teamName: string;
-  teamColor: string;
-  nameAcronym: string;
-  fastestLap: number;
-  avgLap: number;
-  lapsCompleted: number;
-}
 
 const SESSION_ACCENT: Record<string, string> = {
   "Practice 1":       "#3b82f6",
@@ -165,14 +146,13 @@ export default function RaceWeekendPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [race, setRace] = useState<any>(null);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [activeSession, setActiveSession] = useState<SessionInfo | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [loadingPage, setLoadingPage] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     fetchPageData();
   }, [raceId]);
 
@@ -182,7 +162,7 @@ export default function RaceWeekendPage() {
         authFetch(`${API}/api/races/${raceId}`),
         authFetch(`${API}/api/openf1/race/${raceId}/sessions`),
       ]);
-      const [raceData, sessionsData]: [any, Session[]] = await Promise.all([raceRes.json(), sessionsRes.json()]);
+      const [raceData, sessionsData]: [any, SessionInfo[]] = await Promise.all([raceRes.json(), sessionsRes.json()]);
       setRace(raceData);
       setSessions(sessionsData);
 
@@ -195,7 +175,7 @@ export default function RaceWeekendPage() {
 
   const sessionCacheRef = useRef<Record<number, SessionResult[]>>({});
 
-  const loadResults = useCallback(async (session: Session) => {
+  const loadResults = useCallback(async (session: SessionInfo) => {
     if (session.name === "Race") { router.push(`/races/${raceId}/results`); return; }
     if (session.name === "Qualifying") { router.push(`/races/${raceId}/qualifying`); return; }
 

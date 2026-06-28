@@ -1,24 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonCard } from "../components/LoadingSkeleton";
-
-const NATIONALITY_FLAGS: Record<string, string> = {
-  "British": "🇬🇧", "Australian": "🇦🇺", "Dutch": "🇳🇱", "French": "🇫🇷",
-  "German": "🇩🇪", "Spanish": "🇪🇸", "Finnish": "🇫🇮", "Canadian": "🇨🇦",
-  "Mexican": "🇲🇽", "Brazilian": "🇧🇷", "Italian": "🇮🇹", "Monegasque": "🇲🇨",
-  "Thai": "🇹🇭", "New Zealander": "🇳🇿", "Argentine": "🇦🇷", "New Zealand": "🇳🇿",
-};
-
-interface Driver {
-  id: number; name: string; carNumber: number; nationality: string;
-  careerPoints: number; careerWins: number; careerPoles: number;
-  team: { id: number; name: string; colorHex: string };
-}
+import { NATIONALITY_FLAGS } from "../lib/f1-theme";
+import type { DriverCareer } from "../types/f1";
 
 function useCountUp(target: number, delay = 0) {
   const [v, setV] = useState(0);
@@ -35,7 +23,7 @@ function useCountUp(target: number, delay = 0) {
   return v;
 }
 
-function DriverCard({ driver, idx }: { driver: Driver; idx: number }) {
+function DriverCard({ driver, idx }: { driver: DriverCareer; idx: number }) {
   const [hov, setHov] = useState(false);
   const isChamp = driver.carNumber === 1;
   const col = driver.team?.colorHex || "#666";
@@ -83,8 +71,7 @@ function DriverCard({ driver, idx }: { driver: Driver; idx: number }) {
 }
 
 export default function DriversPage() {
-  const router = useRouter();
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<DriverCareer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -92,7 +79,6 @@ export default function DriversPage() {
   const [sortBy, setSortBy] = useState<"number" | "wins" | "points">("number");
 
   useEffect(() => {
-    if (!getAccessToken()) { router.push("/login"); return; }
     authFetch(`${API}/api/drivers`)
       .then(r => r.json())
       .then(setDrivers)

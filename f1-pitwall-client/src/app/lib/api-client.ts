@@ -39,12 +39,7 @@ export const api = {
   admin: {
     users: () => authFetch(`${BASE_URL}/api/admin/users`),
   },
-  strategy: {
-    getByRace: (raceId: string | number) => authFetch(`${BASE_URL}/api/strategy/${raceId}`),
-  },
-  telemetry: {
-    getByRace: (raceId: string | number) => authFetch(`${BASE_URL}/api/telemetry/${raceId}`),
-  },
+
   notifications: {
     getAll: () => authFetch(`${BASE_URL}/api/notifications`),
     markRead: (id: number) =>
