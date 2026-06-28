@@ -22,6 +22,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -37,6 +38,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String jwt = authHeader.substring(7);
+
+        if (tokenBlacklistService.isBlacklisted(jwt)) {
+            response.setContentType("application/json");
+            response.setStatus(401);
+            response.getWriter().write("{\"error\":\"Token revoked\",\"message\":\"This token has been revoked. Please login again.\"}");
+            return;
+        }
 
         try {
             final String username = jwtService.extractUsername(jwt);

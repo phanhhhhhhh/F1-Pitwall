@@ -11,6 +11,12 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    private final AuthHandshakeInterceptor authHandshakeInterceptor;
+
+    public WebSocketConfig(AuthHandshakeInterceptor authHandshakeInterceptor) {
+        this.authHandshakeInterceptor = authHandshakeInterceptor;
+    }
+
     @Value("${allowed.origins:http://localhost:3000}")
     private String[] allowedOrigins;
 
@@ -24,6 +30,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns(allowedOrigins)
+                .addInterceptors(authHandshakeInterceptor)
                 .withSockJS();
     }
 }
