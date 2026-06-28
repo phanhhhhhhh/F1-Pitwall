@@ -30,4 +30,9 @@ public class QualifyingController {
     public ResponseEntity<Map<String, Object>> syncAll() {
         return ResponseEntity.ok(qualifyingService.syncAllQualifying());
     }
+
+    @PostMapping("/sync/sprint/race/{raceId}")
+    public ResponseEntity<Map<String, Object>> syncSprintQualifying(@PathVariable Long raceId) {
+        return ResponseEntity.ok(qualifyingService.syncSprintQualifying(raceId));
+    }
 }
