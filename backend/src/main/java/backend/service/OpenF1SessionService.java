@@ -4,6 +4,8 @@ import backend.model.Race;
 import backend.repository.RaceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -26,10 +28,6 @@ public class OpenF1SessionService {
         Map.entry("USA", "United States")
     );
 
-    // Past session data never changes — cache indefinitely
-    private final Map<Long, List<Map<String, Object>>> sessionResultsCache = new ConcurrentHashMap<>();
-    private final Map<Long, List<Map<String, Object>>> sessionListCache = new ConcurrentHashMap<>();
-
     private final RaceRepository raceRepository;
 
     private final RestTemplate restTemplate = createRestTemplate();
@@ -44,12 +42,9 @@ public class OpenF1SessionService {
     // ─── Sessions for a race weekend ──────────────────────────────────────────
 
     @Transactional
+    @Cacheable(value = "sessionList", key = "#raceId")
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getSessionsForRace(Long raceId) {
-        if (sessionListCache.containsKey(raceId)) {
-            return sessionListCache.get(raceId);
-        }
-
         Race race = raceRepository.findById(raceId)
             .orElseThrow(() -> new RuntimeException("Race not found: " + raceId));
 
@@ -124,19 +119,14 @@ public class OpenF1SessionService {
             })
             .collect(Collectors.toList());
 
-        sessionListCache.put(raceId, result);
         return result;
     }
 
     // ─── Practice session results (fastest lap per driver) ────────────────────
 
+    @Cacheable(value = "sessionResults", key = "#sessionKey")
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getSessionResults(Long sessionKey) {
-        if (sessionResultsCache.containsKey(sessionKey)) {
-            log.debug("[Sessions] Cache hit for session {}", sessionKey);
-            return sessionResultsCache.get(sessionKey);
-        }
-
         // Fetch drivers and laps in parallel
         String driversUrl = OPENF1_BASE + "/drivers?session_key=" + sessionKey;
         String lapsUrl    = OPENF1_BASE + "/laps?session_key=" + sessionKey + "&is_pit_out_lap=false";
@@ -214,13 +204,11 @@ public class OpenF1SessionService {
         results.sort(Comparator.comparingDouble(r -> ((Number) r.get("fastestLap")).doubleValue()));
         for (int i = 0; i < results.size(); i++) results.get(i).put("position", i + 1);
 
-        sessionResultsCache.put(sessionKey, results);
         return results;
     }
 
+    @CacheEvict(value = {"sessionResults", "sessionList"}, allEntries = true)
     public void clearCache() {
-        sessionResultsCache.clear();
-        sessionListCache.clear();
         log.info("[Sessions] Cache cleared");
     }
 }
