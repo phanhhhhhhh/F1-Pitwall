@@ -4,7 +4,9 @@ import backend.dto.*;
 import backend.model.OtpToken;
 import backend.model.User;
 import backend.repository.UserRepository;
+import backend.security.AccountLockoutService;
 import backend.security.JwtService;
+import backend.security.TokenBlacklistService;
 import backend.service.OtpService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,16 +40,30 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
+    private final AccountLockoutService accountLockoutService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Value("${app.jwt.access-token-expiration}")
     private long accessTokenExpiration;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        String username = request.getUsername();
+
+        if (accountLockoutService.isLocked(username)) {
+            long unlockSeconds = accountLockoutService.getUnlockSeconds(username);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "error", "Account locked",
+                    "message", "Too many failed attempts. Try again in " + unlockSeconds + " seconds.",
+                    "unlockInSeconds", unlockSeconds
+            ));
+        }
+
         try {
-            authManager.authenticate(new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-            UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-            User user = userRepository.findByUsername(request.getUsername()).orElseThrow();
+            authManager.authenticate(new UsernamePasswordAuthenticationToken(username, request.getPassword()));
+            accountLockoutService.loginSucceeded(username);
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            User user = userRepository.findByUsername(username).orElseThrow();
             String accessToken = jwtService.generateAccessToken(userDetails, user.getRole().name());
             String refreshToken = jwtService.generateRefreshToken(userDetails);
             return ResponseEntity.ok(AuthResponse.builder()
@@ -55,7 +71,13 @@ public class AuthController {
                     .username(user.getUsername()).role(user.getRole().name())
                     .expiresIn(accessTokenExpiration / 1000).build());
         } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid username or password"));
+            accountLockoutService.loginFailed(username);
+            int remaining = accountLockoutService.getRemainingAttempts(username);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "error", "Invalid username or password",
+                    "message", "Invalid credentials. " + remaining + " attempt(s) remaining before account lockout.",
+                    "remainingAttempts", remaining
+            ));
         }
     }
 
@@ -171,6 +193,25 @@ public class AuthController {
         userRepository.save(user);
         log.info("[Auth] Password changed for user: {}", username);
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
+
+    // ── Logout ─────────────────────────────────────────────────────────────────
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Missing or invalid Authorization header"));
+        }
+        String token = authHeader.substring(7);
+        try {
+            long remainingExpirationMs = jwtService.extractExpiration(token).getTime() - System.currentTimeMillis();
+            if (remainingExpirationMs > 0) {
+                tokenBlacklistService.blacklist(token, remainingExpirationMs);
+            }
+        } catch (Exception e) {
+            log.warn("[Auth] Logout: could not extract expiration for token: {}", e.getMessage());
+        }
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
     // ── Forgot password ──────────────────────────────────────────────────────
