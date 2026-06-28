@@ -26,5 +26,8 @@ application-local.yml
 recovery-codes.txt
 secrets.txt
 
+# Claude Code (không push lên repo)
+.claude/
+
 # OMC runtime state (không cần track)
 .omc/state/
