@@ -1,12 +1,20 @@
 package backend.service;
 
 import backend.model.Driver;
+import backend.model.LapTelemetry;
+import backend.model.PitStop;
 import backend.model.Race;
 import backend.model.RaceResult;
+import backend.model.WeatherCondition;
 import backend.model.enums.RaceStatus;
+import backend.model.enums.TyreType;
+import backend.model.enums.WeatherType;
 import backend.repository.DriverRepository;
+import backend.repository.LapTelemetryRepository;
+import backend.repository.PitStopRepository;
 import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
+import backend.repository.WeatherConditionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -27,6 +35,9 @@ public class OpenF1SyncService {
     private final RaceResultRepository raceResultRepo;
     private final DriverRepository driverRepo;
     private final NotificationService notificationService;
+    private final PitStopRepository pitStopRepo;
+    private final LapTelemetryRepository lapTelemetryRepo;
+    private final WeatherConditionRepository weatherConditionRepo;
 
     private static final String JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
@@ -258,6 +269,149 @@ public class OpenF1SyncService {
             return false;
         }
         return syncRaceByRound(raceOpt.get(), isSprint);
+    }
+
+    // ─── Sync Pit Stops from OpenF1 ──────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public void syncPitStops(int sessionKey) {
+        try {
+            String url = OPENF1_BASE + "/stints?session_key=" + sessionKey;
+            List<Map<String, Object>> stints = restTemplate.getForObject(url, List.class);
+            if (stints == null || stints.isEmpty()) {
+                log.debug("[Sync] No stints data for session {}", sessionKey);
+                return;
+            }
+
+            List<PitStop> pitStops = new ArrayList<>();
+            for (Map<String, Object> stint : stints) {
+                Integer driverNumber = toInt(stint.get("driver_number"));
+                Integer lapStart = toInt(stint.get("lap_start"));
+                String compound = String.valueOf(stint.getOrDefault("compound", ""));
+
+                if (driverNumber == null || lapStart == null) continue;
+
+                TyreType tyreOut = mapCompoundToTyreType(compound);
+
+                pitStops.add(PitStop.builder()
+                        .lapNumber(lapStart)
+                        .durationSec(0f) // not available from stints endpoint
+                        .tyreOut(tyreOut)
+                        .crewSize(0) // not available
+                        .underSafetyCar(false) // not available
+                        .build());
+            }
+
+            if (!pitStops.isEmpty()) {
+                pitStopRepo.saveAll(pitStops);
+                log.info("✅ [Sync] Synced {} pit stops for session {}", pitStops.size(), sessionKey);
+            }
+        } catch (Exception e) {
+            log.warn("[Sync] Failed to sync pit stops for session {}: {}", sessionKey, e.getMessage());
+        }
+    }
+
+    // ─── Sync Lap Times from OpenF1 ──────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public void syncLapTimes(int sessionKey) {
+        try {
+            String url = OPENF1_BASE + "/laps?session_key=" + sessionKey;
+            List<Map<String, Object>> laps = restTemplate.getForObject(url, List.class);
+            if (laps == null || laps.isEmpty()) {
+                log.debug("[Sync] No laps data for session {}", sessionKey);
+                return;
+            }
+
+            List<LapTelemetry> telemetries = new ArrayList<>();
+            for (Map<String, Object> lap : laps) {
+                Integer driverNumber = toInt(lap.get("driver_number"));
+                Integer lapNumber = toInt(lap.get("lap_number"));
+                Object lapDuration = lap.get("lap_duration");
+
+                if (driverNumber == null || lapNumber == null || lapDuration == null) continue;
+
+                float lapTimeSec = ((Number) lapDuration).floatValue();
+                if (lapTimeSec <= 0 || lapTimeSec > 600) continue;
+
+                telemetries.add(LapTelemetry.builder()
+                        .lapNumber(lapNumber)
+                        .lapTimeSec(lapTimeSec)
+                        .speedKmh(0f)    // not available from laps endpoint
+                        .rpm(0)           // not available
+                        .gear(0)          // not available
+                        .throttlePct(0f)  // not available
+                        .brakePct(0f)     // not available
+                        .drsActive(false) // not available
+                        .fuelLoad(0f)     // not available
+                        .build());
+            }
+
+            if (!telemetries.isEmpty()) {
+                lapTelemetryRepo.saveAll(telemetries);
+                log.info("✅ [Sync] Synced {} lap telemetries for session {}", telemetries.size(), sessionKey);
+            }
+        } catch (Exception e) {
+            log.warn("[Sync] Failed to sync lap times for session {}: {}", sessionKey, e.getMessage());
+        }
+    }
+
+    // ─── Sync Weather from OpenF1 ────────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public void syncWeather(int sessionKey) {
+        try {
+            String url = OPENF1_BASE + "/weather?session_key=" + sessionKey;
+            List<Map<String, Object>> weatherData = restTemplate.getForObject(url, List.class);
+            if (weatherData == null || weatherData.isEmpty()) {
+                log.debug("[Sync] No weather data for session {}", sessionKey);
+                return;
+            }
+
+            List<WeatherCondition> conditions = new ArrayList<>();
+            for (Map<String, Object> w : weatherData) {
+                Object airTemp = w.get("air_temperature");
+                Object trackTemp = w.get("track_temperature");
+                Object humidity = w.get("humidity");
+                Object windSpeed = w.get("wind_speed");
+                Object rainfall = w.get("rainfall");
+
+                if (airTemp == null || trackTemp == null) continue;
+
+                WeatherType weatherType = (rainfall instanceof Boolean && (Boolean) rainfall)
+                        ? WeatherType.WET : WeatherType.DRY;
+
+                conditions.add(WeatherCondition.builder()
+                        .airTempC(((Number) airTemp).floatValue())
+                        .trackTempC(((Number) trackTemp).floatValue())
+                        .humidityPct(humidity != null ? ((Number) humidity).floatValue() : 0f)
+                        .windSpeedKmh(windSpeed != null ? ((Number) windSpeed).floatValue() : 0f)
+                        .condition(weatherType)
+                        .build());
+            }
+
+            if (!conditions.isEmpty()) {
+                weatherConditionRepo.saveAll(conditions);
+                log.info("✅ [Sync] Synced {} weather records for session {}", conditions.size(), sessionKey);
+            }
+        } catch (Exception e) {
+            log.warn("[Sync] Failed to sync weather for session {}: {}", sessionKey, e.getMessage());
+        }
+    }
+
+    private TyreType mapCompoundToTyreType(String compound) {
+        if (compound == null) return null;
+        return switch (compound.toUpperCase()) {
+            case "SOFT" -> TyreType.SOFT;
+            case "MEDIUM" -> TyreType.MEDIUM;
+            case "HARD" -> TyreType.HARD;
+            case "INTERMEDIATE" -> TyreType.INTERMEDIATE;
+            case "WET" -> TyreType.WET;
+            default -> null;
+        };
     }
 
     private Optional<Driver> findDriver(String fullName, List<Driver> allDrivers) {

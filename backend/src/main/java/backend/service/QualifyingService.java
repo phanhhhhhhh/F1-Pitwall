@@ -205,6 +205,28 @@ public class QualifyingService {
         return String.format("%d:%06.3f", mins, secs);
     }
 
+    @Transactional
+    public Map<String, Object> syncSprintQualifying(Long raceId) {
+        Race race = raceRepo.findById(raceId)
+                .orElseThrow(() -> new RuntimeException("Race not found: " + raceId));
+
+        if (!isSprintRace(race)) {
+            return Map.of("success", false, "message", "Only sprint races supported for sprint qualifying sync");
+        }
+        Integer round = race.getRoundNumber() > 0 ? race.getRoundNumber() : null;
+        if (round == null) {
+            return Map.of("success", false, "message", "No round number found for " + race.getName());
+        }
+
+        boolean success = syncFromJolpica(round, race);
+        return Map.of(
+                "success", success,
+                "raceId", raceId,
+                "raceName", race.getName(),
+                "round", round
+        );
+    }
+
     private boolean isSprintRace(Race race) {
         return race.getName().toLowerCase().contains("sprint");
     }
