@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "task": "Audit README.md against actual codebase and rewrite to match reality",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Fix backend .env.example to match actual code",
+      "description": "Replace non-functional DB_URL/DB_USERNAME/DB_PASSWORD with the actual hardcoded values note. Replace SMTP MAIL_USERNAME/MAIL_PASSWORD with RESEND_API_KEY and RESEND_FROM. Add note that local dev uses hardcoded postgres/postgres.",
+      "acceptanceCriteria": [
+        ".env.example no longer references DB_URL, DB_USERNAME, DB_PASSWORD as env vars that work locally",
+        ".env.example documents RESEND_API_KEY and RESEND_FROM instead of MAIL_USERNAME/MAIL_PASSWORD",
+        ".env.example clearly states that local DB config is hardcoded in application.properties",
+        "SPRING_PROFILES_ACTIVE value is documented accurately (dev is harmless but has no dedicated properties file)"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Rewrite README.md to match actual codebase",
+      "description": "Rewrite the README to accurately reflect: (1) all features that actually exist, (2) correct tech stack without fabricated versions, (3) correct setup instructions matching actual files, (4) remove features that don't exist, (5) add features that exist but aren't documented",
+      "acceptanceCriteria": [
+        "All features listed are verified to exist in the codebase with working endpoints",
+        "Pit Strategy Simulator removed or marked 'Coming soon' since no controller/service exists",
+        "Supabase correctly described as avatar storage only, not primary database",
+        "Spring Security/WebSocket version '7' removed — only Spring Boot 4.0.5 mentioned",
+        "README setup instructions match actual docker-compose.full.yml filename",
+        "README includes all existing feature groups: OTP auth, Weekend Hub, Qualifying, Notifications, Export, Auto-sync",
+        "Tech stack versions verified against actual pom.xml and package.json",
+        "Environment variables section matches actual .env.example files",
+        "Swagger UI path is /swagger-ui/index.html (correct)"
+      ],
+      "passes": true
+    }
+  ]
+}
