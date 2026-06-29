@@ -10,6 +10,7 @@ import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DriverRef, ResultRow, RaceResultResponse } from "../../../types/f1";
+import SessionTimeline from "../../../components/SessionTimeline";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -345,6 +346,11 @@ export default function RaceResultsPage() {
                 </div>
               </div>
             )}
+
+            {/* Session event timeline */}
+            <div className="mb-8">
+              <SessionTimeline raceId={raceId} />
+            </div>
 
             {/* Full classification table */}
             <div>

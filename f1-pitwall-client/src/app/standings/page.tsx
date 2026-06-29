@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
+import { useSeason } from "../context/SeasonContext";
 import {
   downloadDriverStandingsCsv,
   downloadConstructorStandingsCsv,
@@ -44,6 +45,7 @@ const MEDAL = ["#FFD23F", "#C8CDD4", "#D8853B"];
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StandingsPage() {
+  const { season } = useSeason();
   const [tab, setTab] = useState<"drivers" | "constructors">("drivers");
   const [drivers, setDrivers] = useState<DriverStanding[]>([]);
   const [constructors, setConstructors] = useState<ConstructorStanding[]>([]);
@@ -56,8 +58,8 @@ export default function StandingsPage() {
     (async () => {
       try {
         const [d, c] = await Promise.all([
-          authFetch(`${API}/api/race-results/standings/drivers/2026`),
-          authFetch(`${API}/api/race-results/standings/constructors/2026`),
+          authFetch(`${API}/api/race-results/standings/drivers/${season}`),
+          authFetch(`${API}/api/race-results/standings/constructors/${season}`),
         ]);
         setDrivers(await d.json());
         setConstructors(await c.json());
@@ -109,7 +111,7 @@ export default function StandingsPage() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="inline-block w-8 h-[3px] bg-[#E10600]" />
-              <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">2026 SEASON · LIVE STANDINGS</span>
+              <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">{season} SEASON · LIVE STANDINGS</span>
             </div>
             <h1 className="f-cond font-black tracking-tight leading-[0.82]" style={{ fontSize: "clamp(48px,7vw,84px)" }}>
               <span className="block text-white">CHAMPIONSHIP</span>
@@ -123,8 +125,8 @@ export default function StandingsPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <ExportButton label="CSV" variant="csv" onClick={() => tab === "drivers" ? downloadDriverStandingsCsv(2026) : downloadConstructorStandingsCsv(2026)} />
-            <ExportButton label="PDF Report" variant="pdf" onClick={() => downloadStandingsPdf(2026)} />
+            <ExportButton label="CSV" variant="csv" onClick={() => tab === "drivers" ? downloadDriverStandingsCsv(season) : downloadConstructorStandingsCsv(season)} />
+            <ExportButton label="PDF Report" variant="pdf" onClick={() => downloadStandingsPdf(season)} />
             <Link href="/races" className="f-mono text-[11px] text-zinc-500 hover:text-[#E10600] border border-white/10 hover:border-[#E10600]/50 px-4 py-2 rounded-lg transition-all">← RACES</Link>
           </div>
         </div>

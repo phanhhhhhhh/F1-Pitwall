@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { clearTokens } from "../lib/pitwall-auth";
 import { useAuth } from "../context/AuthContext";
+import { useSeason } from "../context/SeasonContext";
 import NotificationBell from "./NotificationBell";
+import SeasonSelector from "./SeasonSelector";
 
 interface NavItem { href: string; label: string; live?: boolean; }
 
@@ -31,6 +33,7 @@ const navGroups: { label: string; items: NavItem[]; roles: string[] }[] = [
   {
     label: "TOOLS",
     items: [
+      { href: "/live", label: "Live Timing", live: true },
       { href: "/strategy", label: "Pit Strategy" },
       { href: "/telemetry", label: "Live Telemetry", live: true },
     ],
@@ -106,6 +109,7 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
 export default function Navbar() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { season } = useSeason();
   const [imgError, setImgError] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileRef = useRef<HTMLDivElement>(null);
@@ -142,7 +146,7 @@ export default function Navbar() {
           <span className="f-cond text-white font-black tracking-widest text-base sm:text-lg">
             <span className="text-[#E10600]">PIT</span>WALL
           </span>
-          <span className="f-mono text-zinc-600 text-[10px] tracking-widest hidden lg:block border border-white/10 rounded px-1.5 py-0.5">F1 · 2026</span>
+          <span className="f-mono text-zinc-600 text-[10px] tracking-widest hidden lg:block border border-white/10 rounded px-1.5 py-0.5">F1 · {season}</span>
         </Link>
 
         {/* Desktop nav */}
@@ -154,6 +158,9 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Season selector */}
+          <SeasonSelector />
+
           {/* Live indicator — desktop only */}
           <div className="hidden sm:flex items-center gap-1.5 mr-1">
             <span className="relative flex h-2 w-2">

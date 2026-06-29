@@ -286,3 +286,35 @@ export interface RaceWinner {
   driver: string;
   team: string;
 }
+
+/* ── Session event timeline ─────────────────────────────────────────────── */
+export interface PitStopEvent {
+  id: number;
+  driverName: string;
+  teamName: string;
+  teamColor: string;
+  lap: number;
+  tyreCompound: string;
+  durationMs: number;
+}
+
+export interface RaceIncident {
+  id: number;
+  lap: number;
+  driverName: string;
+  teamName: string;
+  type: "RETIREMENT" | "ACCIDENT" | "YELLOW_FLAG" | "RED_FLAG" | "SAFETY_CAR" | "VIRTUAL_SAFETY_CAR";
+  description: string;
+}
+
+export interface WeatherChange {
+  lap: number;
+  condition: "DRY" | "WET" | "INTERMEDIATE" | "MIXED";
+  trackTempC: number;
+}
+
+export type TimelineEvent =
+  | { kind: "pit-stop"; lap: number; data: PitStopEvent }
+  | { kind: "incident"; lap: number; data: RaceIncident }
+  | { kind: "weather"; lap: number; data: WeatherChange }
+  | { kind: "fastest-lap"; lap: number; driverName: string; teamColor: string; time: number };
