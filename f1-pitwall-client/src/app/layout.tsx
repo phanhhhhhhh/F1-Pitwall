@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
+import { SeasonProvider } from "./context/SeasonContext";
 import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
 
 const geistSans = Geist({
@@ -28,7 +29,9 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-zinc-950 text-white">
         <ErrorBoundaryWrapper>
-          <AuthProvider>{children}</AuthProvider>
+          <SeasonProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </SeasonProvider>
         </ErrorBoundaryWrapper>
       </body>
     </html>

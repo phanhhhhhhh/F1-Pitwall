@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authFetch } from "../lib/pitwall-auth";
+import { useSeason } from "../context/SeasonContext";
 import Navbar from "../components/Navbar";
 import RaceWeekendWidget from "../components/RaceWeekendWidget";
 import Link from "next/link";
@@ -12,6 +13,7 @@ import { COUNTRY_FLAGS } from "../lib/f1-theme";
 interface RaceWinner { driver: string; team: string; }
 
 export default function RacesPage() {
+    const { season } = useSeason();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [races, setRaces] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,11 +26,11 @@ export default function RacesPage() {
 
     const fetchData = async () => {
         try {
-            const res = await authFetch(`${API}/api/races/season/2026`);
+            const res = await authFetch(`${API}/api/races/season/${season}`);
             const racesData = await res.json();
             setRaces(racesData);
             try {
-                const wRes = await authFetch(`${API}/api/race-results/winners/2026`);
+                const wRes = await authFetch(`${API}/api/race-results/winners/${season}`);
                 const wData = await wRes.json();
                 const map: Record<string, RaceWinner> = {};
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -119,7 +121,7 @@ export default function RacesPage() {
                 <div className="mb-8 rise">
                     <div className="flex items-center gap-2 mb-3">
                         <span className="inline-block w-8 h-[3px] bg-[#E10600]" />
-                        <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">2026 SEASON · {mainRaces.length} GP · {sprintRaces.length} SPRINTS</span>
+                        <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">{season} SEASON · {mainRaces.length} GP · {sprintRaces.length} SPRINTS</span>
                     </div>
                     <h1 className="f-cond font-black tracking-tight leading-[0.82]" style={{ fontSize: "clamp(48px,8vw,84px)" }}>
                         <span className="block text-white">RACE</span>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "./lib/pitwall-auth";
 import { BASE_URL as API } from "./lib/api-client";
+import { useSeason } from "./context/SeasonContext";
 import Navbar from "./components/Navbar";
 import RaceWeekendWidget from "./components/RaceWeekendWidget";
 import Link from "next/link";
@@ -29,6 +30,7 @@ function useCountUp(target: number, duration = 1100, delay = 0) {
 }
 
 export default function Home() {
+  const { season } = useSeason();
   const [stats, setStats] = useState({ drivers: 0, teams: 0, circuits: 0 });
   const [sprintCount, setSprintCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -74,7 +76,7 @@ export default function Home() {
     const [driversRes, teamsRes, racesRes, circuitsRes] = await Promise.allSettled([
       authFetch(`${API}/api/drivers`),
       authFetch(`${API}/api/teams`),
-      authFetch(`${API}/api/races/season/2026`),
+      authFetch(`${API}/api/races/season/${season}`),
       authFetch(`${API}/api/circuits`),
     ]);
 
@@ -117,14 +119,14 @@ export default function Home() {
     if (errors.length) setFetchError(errors.join(" · "));
 
     try {
-      const w = await (await authFetch(`${API}/api/race-results/winners/2026`)).json();
+      const w = await (await authFetch(`${API}/api/race-results/winners/${season}`)).json();
       const m: Record<string, { driver: string; team: string }> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Object.entries(w).forEach(([n, v]: [string, any]) => { m[n] = { driver: v.driverLastName || v.driverName, team: v.teamName }; });
       setWinners(m);
     } catch { }
     try {
-      const st = await (await authFetch(`${API}/api/race-results/standings/drivers/2026`)).json();
+      const st = await (await authFetch(`${API}/api/race-results/standings/drivers/${season}`)).json();
       setStandings(Array.isArray(st) ? st.slice(0, 6) : []);
     } catch { }
     } catch (e) { console.error("[Overview] unexpected error:", e); }
@@ -191,7 +193,7 @@ export default function Home() {
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#E10600]" style={{ animation: "live 1.6s infinite" }} />
             <span className="text-[#E10600] font-bold">LIVE FEED</span>
             <span className="text-zinc-700">{"//"}</span>
-            <span className="text-zinc-500">FORMULA 1 · SEASON 2026</span>
+            <span className="text-zinc-500">FORMULA 1 · SEASON {season}</span>
           </div>
           <div className="hidden sm:flex items-center gap-4 text-zinc-600">
             <span>RND <span className="text-zinc-300">{nextRace?.roundNumber || gpDone}</span>/{totalGP}</span>
@@ -327,7 +329,7 @@ export default function Home() {
           {/* Stat tiles 2x2 */}
           <section className="grid grid-cols-2 gap-3 rise" style={{ animationDelay: "160ms" }}>
             {[
-              { label: "DRIVERS", value: dN, sub: "2026 grid", href: "/drivers", icon: "🏎" },
+              { label: "DRIVERS", value: dN, sub: `${season} grid`, href: "/drivers", icon: "🏎" },
               { label: "TEAMS", value: tN, sub: "constructors", href: "/teams", icon: "🏗" },
               { label: "GRAND PRIX", value: gN, sub: `${sprintCount} sprints`, href: "/races", icon: "🏁" },
               { label: "CIRCUITS", value: cN, sub: "worldwide", href: "/circuits", icon: "🗺" },
@@ -435,7 +437,7 @@ export default function Home() {
           </section>
         </div>
 
-        <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">F1 PITWALL · BROADCAST-GRADE TELEMETRY · SEASON 2026</p>
+        <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">F1 PITWALL · BROADCAST-GRADE TELEMETRY · SEASON {season}</p>
       </main>
     </div>
   );
