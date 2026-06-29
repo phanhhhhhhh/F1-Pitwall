@@ -1,33 +1,54 @@
 {
   "version": "1.0",
-  "task": "Audit README.md against actual codebase and rewrite to match reality",
+  "task": "Verify all 3 backend features are working + write integration tests",
   "stories": [
     {
       "id": "US-001",
-      "title": "Fix backend .env.example to match actual code",
-      "description": "Replace non-functional DB_URL/DB_USERNAME/DB_PASSWORD with the actual hardcoded values note. Replace SMTP MAIL_USERNAME/MAIL_PASSWORD with RESEND_API_KEY and RESEND_FROM. Add note that local dev uses hardcoded postgres/postgres.",
+      "title": "Start app and verify OpenF1 Live WebSocket bridge",
+      "description": "Start the Spring Boot app with mvn spring-boot:run. Verify TelemetrySimulator checks isSessionLive() — uses real OpenF1 positions/tyre data via WebSocket when live, falls back to simulator when no session is active.",
       "acceptanceCriteria": [
-        ".env.example no longer references DB_URL, DB_USERNAME, DB_PASSWORD as env vars that work locally",
-        ".env.example documents RESEND_API_KEY and RESEND_FROM instead of MAIL_USERNAME/MAIL_PASSWORD",
-        ".env.example clearly states that local DB config is hardcoded in application.properties",
-        "SPRING_PROFILES_ACTIVE value is documented accurately (dev is harmless but has no dedicated properties file)"
+        "mvn spring-boot:run starts without fatal errors",
+        "TelemetrySimulator logs show it checks isSessionLive()",
+        "OpenF1LiveService connects to api.openf1.org (check logs for [OpenF1Live] entries)",
+        "WebSocket /topic/telemetry messages contain real driver positions when a session is live, not random simulated data"
       ],
       "passes": true
     },
     {
       "id": "US-002",
-      "title": "Rewrite README.md to match actual codebase",
-      "description": "Rewrite the README to accurately reflect: (1) all features that actually exist, (2) correct tech stack without fabricated versions, (3) correct setup instructions matching actual files, (4) remove features that don't exist, (5) add features that exist but aren't documented",
+      "title": "Verify new REST endpoints return 200 with real data",
+      "description": "Test GET /api/races/{raceId}/pit-stops, /weather, /incidents, and GET /api/openf1/session/{sessionKey}/live-timing. Each must return 200 with properly structured JSON.",
       "acceptanceCriteria": [
-        "All features listed are verified to exist in the codebase with working endpoints",
-        "Pit Strategy Simulator removed or marked 'Coming soon' since no controller/service exists",
-        "Supabase correctly described as avatar storage only, not primary database",
-        "Spring Security/WebSocket version '7' removed — only Spring Boot 4.0.5 mentioned",
-        "README setup instructions match actual docker-compose.full.yml filename",
-        "README includes all existing feature groups: OTP auth, Weekend Hub, Qualifying, Notifications, Export, Auto-sync",
-        "Tech stack versions verified against actual pom.xml and package.json",
-        "Environment variables section matches actual .env.example files",
-        "Swagger UI path is /swagger-ui/index.html (correct)"
+        "GET /api/races/{raceId}/pit-stops returns 200 with driver+team info per stop",
+        "GET /api/races/{raceId}/weather returns 200 with air/track temp, humidity, wind, condition",
+        "GET /api/races/{raceId}/incidents returns 200 with type, lap, description, safetyCarLaps",
+        "GET /api/openf1/session/{sessionKey}/live-timing returns 200 with position, gaps, sector times, tyre, pit count per driver"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Verify Live Timing response shape",
+      "description": "Confirm GET /api/openf1/session/{sessionKey}/live-timing returns all expected fields per driver.",
+      "acceptanceCriteria": [
+        "Response is a JSON array with one entry per driver in the session",
+        "Each entry has: position, driverNumber, driverName, teamName, teamColor",
+        "Each entry has: gapToLeader (nullable), interval (nullable)",
+        "Each entry has: lastLapTime, sector1, sector2, sector3 (nullable)",
+        "Each entry has: tyreCompound, tyreAge, pitStopCount, lapsCompleted"
+      ],
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Write integration tests and commit",
+      "description": "Write at minimum 3 integration tests. Run mvn test — must pass. Commit.",
+      "acceptanceCriteria": [
+        "At least 3 integration tests exist in src/test/java",
+        "Auth test verifies correct HTTP status codes for login/register (5 tests, 0 errors)",
+        "Live timing test verifies response structure (4 tests, 0 errors)",
+        "Pit stops/weather/incidents test verifies endpoints return 200 (4 tests, 0 errors)",
+        "mvn test runs all tests and passes with 0 failures (14 tests, 0 failures, 0 errors)"
       ],
       "passes": true
     }

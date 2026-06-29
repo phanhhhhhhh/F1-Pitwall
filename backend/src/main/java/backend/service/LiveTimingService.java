@@ -36,15 +36,19 @@ public class LiveTimingService {
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getLiveTiming(int sessionKey) {
-        // ── Parallel fetch ─────────────────────────────────────────────
+        // ── Staggered fetch (respects OpenF1 3 req/s rate limit) ────────
         CompletableFuture<List<Map<String, Object>>> positionsF = fetchList(
                 OPENF1_BASE + "/position?session_key=" + sessionKey);
+        sleepMs(400);
         CompletableFuture<List<Map<String, Object>>> intervalsF = fetchList(
                 OPENF1_BASE + "/intervals?session_key=" + sessionKey);
+        sleepMs(400);
         CompletableFuture<List<Map<String, Object>>> lapsF = fetchList(
                 OPENF1_BASE + "/laps?session_key=" + sessionKey + "&is_pit_out_lap=false");
+        sleepMs(400);
         CompletableFuture<List<Map<String, Object>>> stintsF = fetchList(
                 OPENF1_BASE + "/stints?session_key=" + sessionKey);
+        sleepMs(400);
         CompletableFuture<List<Map<String, Object>>> driversF = fetchList(
                 OPENF1_BASE + "/drivers?session_key=" + sessionKey);
 
@@ -238,6 +242,10 @@ public class LiveTimingService {
             if (val instanceof Number n && n.doubleValue() > 0) return n.doubleValue();
         }
         return null;
+    }
+
+    private static void sleepMs(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 
     private static Integer toInt(Object o) {
