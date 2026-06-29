@@ -1,0 +1,41 @@
+# Ralph Progress Log — Backend Feature Verification + Integration Tests
+# Completed: 2026-06-29
+
+## Final Results
+
+### US-001: Live WebSocket bridge — VERIFIED ✅
+- App started on port 8080, detected LIVE Austrian GP (session 11315)
+- OpenF1LiveService logged: 🔴 [OpenF1Live] Live: Austria Race — session: 11315
+- TelemetrySimulator correctly routes to buildRealPayloads() during live sessions
+- Live timing endpoint returned real sector times for all 20 drivers
+
+### US-002: REST endpoints — VERIFIED ✅
+- GET /api/races/1/pit-stops → 200 (empty array, endpoint works)
+- GET /api/races/1/weather → 200 (empty array, endpoint works)
+- GET /api/races/1/incidents → 200 (empty array, endpoint works)
+- GET /api/openf1/session/11315/live-timing → 200 with REAL data
+
+### US-003: Live Timing shape — VERIFIED ✅
+All 14 required fields confirmed per driver entry
+
+### US-004: Integration tests — VERIFIED ✅
+14 tests, 0 failures, 0 errors across 4 test classes:
+- AuthIntegrationTest: 5 tests (login 200/401, register 201, protected 401, health 200)
+- BackendApplicationTests: 1 test (context loads)
+- LiveTimingIntegrationTest: 4 tests (200, array check, field validation, auth required)
+- RaceStoryIntegrationTest: 4 tests (pit-stops 200, weather 200, incidents 200, auth required)
+
+### Files Changed
+- backend/src/test/java/backend/AuthIntegrationTest.java (new)
+- backend/src/test/java/backend/LiveTimingIntegrationTest.java (new)
+- backend/src/test/java/backend/RaceStoryIntegrationTest.java (new)
+- backend/src/main/java/backend/service/LiveTimingService.java (rate-limit fix: staggered API calls)
+
+### Key Learnings
+1. Spring Boot 4.0.5 / Spring Framework 7:
+   - TestRestTemplate package (org.springframework.boot.test.web.client) doesn't exist
+   - DefaultResponseErrorHandler.handleError has different signature
+   - Workaround: catch HttpClientErrorException for 4xx assertions
+2. Bucket4j rate limit on /api/auth/login (5 req/min) requires PER_CLASS test lifecycle
+3. OpenF1 rate limit (3 req/s + 30 req/min) requires staggering parallel API calls (400ms)
+4. JUnit 5 creates new test instance per method by default — @TestInstance(PER_CLASS) needed for shared auth tokens
