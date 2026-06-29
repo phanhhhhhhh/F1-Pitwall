@@ -2,8 +2,8 @@ package backend.scheduler;
 
 import backend.model.Driver;
 import backend.repository.DriverRepository;
+import backend.service.OpenF1LiveService;
 import backend.websocket.TelemetryPayload;
-import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,11 +16,19 @@ import java.util.stream.Collectors;
 
 @Component
 @EnableScheduling
-@RequiredArgsConstructor
 public class TelemetrySimulator {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final DriverRepository driverRepository;
+    private final OpenF1LiveService openF1LiveService;
+
+    public TelemetrySimulator(SimpMessagingTemplate messagingTemplate,
+                              DriverRepository driverRepository,
+                              OpenF1LiveService openF1LiveService) {
+        this.messagingTemplate = messagingTemplate;
+        this.driverRepository = driverRepository;
+        this.openF1LiveService = openF1LiveService;
+    }
 
     private final Map<String, DriverState> driverStates = new LinkedHashMap<>();
 
@@ -115,6 +123,81 @@ public class TelemetrySimulator {
 
     @Scheduled(fixedRate = 1000)
     public void broadcastTelemetry() {
+        // ── Live session: broadcast real OpenF1 data ──────────────────────
+        if (openF1LiveService.isSessionLive()) {
+            List<TelemetryPayload> payloads = buildRealPayloads();
+            if (!payloads.isEmpty()) {
+                messagingTemplate.convertAndSend("/topic/telemetry", payloads);
+                for (TelemetryPayload p : payloads) {
+                    messagingTemplate.convertAndSend(
+                            "/topic/telemetry/" + p.getCarNumber(), p);
+                }
+                return;
+            }
+            // If real payloads are empty (no stint data yet), fall through to simulator
+        }
+        // ── No live session: use simulated telemetry ─────────────────────
+        broadcastSimulated();
+    }
+
+    /**
+     * Builds TelemetryPayload list from live OpenF1 data (positions + tyre compounds).
+     * Fields not available from the free OpenF1 API (speed, RPM, gear, brake, etc.)
+     * are left at sensible defaults — the frontend should treat these as unavailable.
+     */
+    @SuppressWarnings("unchecked")
+    private List<TelemetryPayload> buildRealPayloads() {
+        try {
+            List<Map<String, Object>> liveData = openF1LiveService.getLiveData();
+            if (liveData == null || liveData.isEmpty()) return List.of();
+
+            List<TelemetryPayload> payloads = new ArrayList<>();
+            for (Map<String, Object> d : liveData) {
+                int carNum = toIntSafe(d.get("driverNumber"));
+                int pos    = toIntSafe(d.get("position"));
+                int lap    = toIntSafe(d.get("lapStart"));
+
+                String compound = String.valueOf(d.getOrDefault("tyreCompound", ""));
+                // Normalise compound to SOFT/MEDIUM/HARD for the frontend tyre chip
+                String tyreType = compound.isBlank() ? "UNKNOWN" : compound.toUpperCase();
+
+                payloads.add(TelemetryPayload.builder()
+                        .driverName(String.valueOf(d.getOrDefault("driverName", "")))
+                        .teamName(String.valueOf(d.getOrDefault("teamName", "")))
+                        .teamColor(String.valueOf(d.getOrDefault("teamColor", "#FFFFFF")))
+                        .carNumber(carNum)
+                        .lap(lap)
+                        .speed(0)        // not in OpenF1 free tier
+                        .rpm(0)          // not in OpenF1 free tier
+                        .gear(0)         // not in OpenF1 free tier
+                        .throttle(0)     // not in OpenF1 free tier
+                        .brake(0)        // not in OpenF1 free tier
+                        .drsActive(false) // not in OpenF1 free tier
+                        .fuelLoad(0)     // not in OpenF1 free tier
+                        .tyreType(tyreType)
+                        .tyreTemp(0)     // not in OpenF1 free tier
+                        .lapTime(0)      // populated by live-timing endpoint
+                        .gap(0)          // populated by live-timing endpoint
+                        .position(pos)
+                        .timestamp(System.currentTimeMillis())
+                        .build());
+            }
+            return payloads;
+        } catch (Exception e) {
+            // If anything fails fetching live data, fall back to simulator silently
+            return List.of();
+        }
+    }
+
+    private static int toIntSafe(Object o) {
+        if (o instanceof Number n) return n.intValue();
+        if (o instanceof String s) {
+            try { return Integer.parseInt(s); } catch (NumberFormatException ignored) {}
+        }
+        return 0;
+    }
+
+    private void broadcastSimulated() {
         if (!initialized.get()) initialize();
 
         int tick = tickCount.incrementAndGet();

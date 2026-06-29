@@ -1,5 +1,6 @@
 package backend.controller;
 
+import backend.service.LiveTimingService;
 import backend.service.OpenF1LiveService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.Map;
 public class OpenF1LiveController {
 
     private final OpenF1LiveService openF1LiveService;
+    private final LiveTimingService liveTimingService;
 
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getStatus() {
@@ -37,5 +39,17 @@ public class OpenF1LiveController {
     @PostMapping("/fetch")
     public ResponseEntity<Map<String, Object>> forceFetch() {
         return ResponseEntity.ok(openF1LiveService.forceFetch());
+    }
+
+    /**
+     * Live timing tower — returns position, gaps, lap/sector times, tyre info,
+     * and pit-stop count for every driver in a session.
+     * <p>
+     * This is the single endpoint the frontend Live Timing screen consumes.
+     * Data is sourced from 5 OpenF1 endpoints fetched in parallel.
+     */
+    @GetMapping("/session/{sessionKey}/live-timing")
+    public ResponseEntity<List<Map<String, Object>>> getLiveTiming(@PathVariable int sessionKey) {
+        return ResponseEntity.ok(liveTimingService.getLiveTiming(sessionKey));
     }
 }

@@ -3,6 +3,7 @@ package backend.service;
 import backend.model.LivePosition;
 import backend.repository.LivePositionRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -22,9 +23,11 @@ public class OpenF1LiveService {
 
     private final RestTemplate restTemplate = createRestTemplate();
     private final LivePositionRepository livePositionRepository;
+    private final CacheManager cacheManager;
 
-    public OpenF1LiveService(LivePositionRepository livePositionRepository) {
+    public OpenF1LiveService(LivePositionRepository livePositionRepository, CacheManager cacheManager) {
         this.livePositionRepository = livePositionRepository;
+        this.cacheManager = cacheManager;
     }
 
     private static RestTemplate createRestTemplate() {
@@ -260,6 +263,8 @@ public class OpenF1LiveService {
             Map<String, Object> session = computeLiveSessionStatus();
 
             if (session == null || !Boolean.TRUE.equals(session.get("isLive"))) {
+                // Evict caches so status checks reflect session ended
+                evictLiveCaches();
                 return;
             }
 
@@ -273,9 +278,24 @@ public class OpenF1LiveService {
                 log.info("🔴 [OpenF1Live] Live: {} {} — session: {}", countryName, sessionName, sessionKey);
             }
 
+            // Evict caches so next isSessionLive()/getLiveData() calls
+            // hit @Cacheable methods and cache fresh results
+            evictLiveCaches();
+
         } catch (Exception e) {
             log.warn("⚠️ [OpenF1Live] Fetch failed: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Evicts live-data caches so the next read goes through the compute path.
+     * Called by the scheduler after each refresh cycle to keep WebSocket data fresh.
+     */
+    private void evictLiveCaches() {
+        var sessionCache = cacheManager.getCache("liveSessionStatus");
+        var tyreCache = cacheManager.getCache("liveTyreData");
+        if (sessionCache != null) sessionCache.clear();
+        if (tyreCache != null) tyreCache.clear();
     }
 
     // ─── Getters (delegate to @Cacheable facades) ───
