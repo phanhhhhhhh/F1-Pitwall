@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { F1, getTeamColor, tyre as tyreSpec } from "../lib/f1-theme";
+import { BASE_URL as API } from "../lib/api-client";
 import type { PitStopEvent, RaceIncident, WeatherChange, TimelineEvent } from "../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 /* ── Event kind config ─────────────────────────────────────────────────── */
 const EVENT_CONFIG: Record<TimelineEvent["kind"], { icon: string; label: string; accent: string; bg: string }> = {

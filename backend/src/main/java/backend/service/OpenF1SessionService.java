@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -30,14 +29,7 @@ public class OpenF1SessionService {
 
     private final RaceRepository raceRepository;
 
-    private final RestTemplate restTemplate = createRestTemplate();
-
-    private static RestTemplate createRestTemplate() {
-        var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(6000);
-        factory.setReadTimeout(20000);
-        return new RestTemplate(factory);
-    }
+    private final RestTemplate restTemplate;
 
     // ─── Sessions for a race weekend ──────────────────────────────────────────
 

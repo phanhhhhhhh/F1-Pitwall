@@ -9,13 +9,13 @@ import Link from "next/link";
 import { BASE_URL as API } from "../lib/api-client";
 import { SkeletonTable } from "../components/LoadingSkeleton";
 import { COUNTRY_FLAGS } from "../lib/f1-theme";
+import type { RaceInfo } from "../types/f1";
 
 interface RaceWinner { driver: string; team: string; }
 
 export default function RacesPage() {
     const { season } = useSeason();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [races, setRaces] = useState<any[]>([]);
+    const [races, setRaces] = useState<RaceInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("GP");
     const [raceWinners, setRaceWinners] = useState<Record<string, RaceWinner>>({});
@@ -33,8 +33,7 @@ export default function RacesPage() {
                 const wRes = await authFetch(`${API}/api/race-results/winners/${season}`);
                 const wData = await wRes.json();
                 const map: Record<string, RaceWinner> = {};
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                Object.entries(wData).forEach(([name, w]: [string, any]) => { map[name] = { driver: w.driverName, team: w.teamName }; });
+                Object.entries(wData as Record<string, { driverName: string; teamName: string }>).forEach(([name, w]) => { map[name] = { driver: w.driverName, team: w.teamName }; });
                 setRaceWinners(map);
             } catch (e) {
                 console.warn("[RacesPage] Failed to fetch race winners:", e);
@@ -96,7 +95,6 @@ export default function RacesPage() {
     return (
         <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
             <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
         .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
         .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
         @keyframes grid-pan{from{background-position:0 0}to{background-position:0 80px}}

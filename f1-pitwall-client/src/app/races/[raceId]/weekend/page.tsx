@@ -3,15 +3,15 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import type { RaceInfo } from "../../../types/f1";
 import { authFetch } from "../../../lib/pitwall-auth";
 import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Navbar from "../../../components/Navbar";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
 import Link from "next/link";
+import { BASE_URL as API } from "../../../lib/api-client";
 import type { SessionInfo, SessionResult } from "../../../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 const SESSION_ACCENT: Record<string, string> = {
   "Practice 1":       "#3b82f6",
@@ -145,7 +145,7 @@ export default function RaceWeekendPage() {
   const raceId = params.raceId as string;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [race, setRace] = useState<any>(null);
+  const [race, setRace] = useState<RaceInfo | null>(null);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<SessionInfo | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);

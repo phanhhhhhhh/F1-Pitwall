@@ -1,6 +1,5 @@
 import { getAccessToken } from "./pitwall-auth";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import { BASE_URL as API } from "./api-client";
 
 async function downloadFile(url: string, filename: string, mimeType: string) {
   const token = getAccessToken();

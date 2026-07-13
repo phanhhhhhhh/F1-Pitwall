@@ -14,30 +14,13 @@ import ExportButton from "../components/ExportButton";
 import Link from "next/link";
 import { SkeletonTable } from "../components/LoadingSkeleton";
 import dynamic from "next/dynamic";
+import { useCountUp } from "../lib/f1-theme";
 import type { DriverStanding, ConstructorStanding } from "../types/f1";
 
 // Dynamic import of the whole chart (recharts must be statically imported
 // inside it so Bar recognizes its Cell children) — avoids SSR issues
 const GapToLeaderChart = dynamic(() => import("../components/GapToLeaderChart"), { ssr: false });
 
-function useCountUp(target: number, duration = 1000, delay = 0) {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const t = setTimeout(() => {
-      let s: number | null = null;
-      const step = (ts: number) => {
-        if (s === null) s = ts;
-        const p = Math.min((ts - s) / duration, 1);
-        setV(Math.round((1 - Math.pow(1 - p, 3)) * target));
-        if (p < 1) raf = requestAnimationFrame(step);
-      };
-      raf = requestAnimationFrame(step);
-    }, delay);
-    return () => { clearTimeout(t); cancelAnimationFrame(raf); };
-  }, [target, duration, delay]);
-  return v;
-}
 const Pts = ({ points, delay = 0 }: { points: number; delay?: number }) => <>{useCountUp(Math.round(points), 900, delay)}</>;
 
 const MEDAL = ["#FFD23F", "#C8CDD4", "#D8853B"];
@@ -76,7 +59,6 @@ export default function StandingsPage() {
   return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
         .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
         .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
         @keyframes grid-pan{from{background-position:0 0}to{background-position:0 80px}}

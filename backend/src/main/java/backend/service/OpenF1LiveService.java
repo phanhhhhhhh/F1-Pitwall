@@ -2,11 +2,11 @@ package backend.service;
 
 import backend.model.LivePosition;
 import backend.repository.LivePositionRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -17,25 +17,14 @@ import java.util.*;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class OpenF1LiveService {
 
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
-    private final RestTemplate restTemplate = createRestTemplate();
+    private final RestTemplate restTemplate;
     private final LivePositionRepository livePositionRepository;
     private final CacheManager cacheManager;
-
-    public OpenF1LiveService(LivePositionRepository livePositionRepository, CacheManager cacheManager) {
-        this.livePositionRepository = livePositionRepository;
-        this.cacheManager = cacheManager;
-    }
-
-    private static RestTemplate createRestTemplate() {
-        var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(10000);
-        return new RestTemplate(factory);
-    }
 
     private static final List<String> MONITORED_SESSIONS = List.of(
             "Race", "Sprint", "Qualifying", "Sprint Qualifying",

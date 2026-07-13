@@ -5,26 +5,15 @@ import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonCard } from "../components/LoadingSkeleton";
-import { NATIONALITY_FLAGS, COUNTRY_FLAGS } from "../lib/f1-theme";
+import { NATIONALITY_FLAGS, COUNTRY_FLAGS, useCountUp } from "../lib/f1-theme";
 import type { TeamInfo, DriverCard } from "../types/f1";
-
-function useCountUp(target: number, delay = 0) {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    if (!target) return;
-    let raf = 0;
-    const t = setTimeout(() => { let s: number | null = null; const step = (ts: number) => { if (!s) s = ts; const p = Math.min((ts - s) / 1000, 1); setV(Math.round((1 - Math.pow(1 - p, 3)) * target)); if (p < 1) raf = requestAnimationFrame(step); }; raf = requestAnimationFrame(step); }, delay);
-    return () => { clearTimeout(t); cancelAnimationFrame(raf); };
-  }, [target, delay]);
-  return v;
-}
 
 function TeamCard({ team, drivers, idx }: { team: TeamInfo; drivers: DriverCard[]; idx: number }) {
   const [hov, setHov] = useState(false);
   const col = team.colorHex || "#666";
   const td = drivers.filter((d) => d.team?.name === team.name);
-  const titles = useCountUp(team.championships, idx * 80);
-  const budget = useCountUp(team.annualBudgetM, idx * 80 + 150);
+  const titles = useCountUp(team.championships, 900, idx * 80);
+  const budget = useCountUp(team.annualBudgetM, 900, idx * 80 + 150);
 
   return (
     <div className="group relative rise" style={{ animationDelay: `${idx * 60}ms` }} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}>
@@ -91,7 +80,6 @@ export default function TeamsPage() {
   return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
         .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
         .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
         @keyframes grid-pan{from{background-position:0 0}to{background-position:0 80px}}

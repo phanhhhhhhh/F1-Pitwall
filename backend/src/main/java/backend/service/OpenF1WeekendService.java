@@ -1,9 +1,9 @@
 package backend.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -14,18 +14,12 @@ import java.util.*;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class OpenF1WeekendService {
 
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
-    private final RestTemplate restTemplate = createRestTemplate();
-
-    private static RestTemplate createRestTemplate() {
-        var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(10000);
-        return new RestTemplate(factory);
-    }
+    private final RestTemplate restTemplate;
 
     // Thứ tự ưu tiên session
     private static final List<String> SESSION_ORDER = List.of(

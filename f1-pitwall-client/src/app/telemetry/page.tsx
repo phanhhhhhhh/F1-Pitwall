@@ -9,9 +9,8 @@ import { authFetch } from "../lib/pitwall-auth";
 import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
 import PitwallBackground from "../components/PitwallBackground";
 import Navbar from "../components/Navbar";
+import { BASE_URL as API } from "../lib/api-client";
 import type { TelemetryData, LiveTyreData, LiveStatus } from "../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 declare global {
   interface Window {

@@ -6,9 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { authFetch, clearTokens, isApiError } from "../lib/pitwall-auth";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
+import { BASE_URL as API } from "../lib/api-client";
 import PitwallBackground from "../components/PitwallBackground";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 // ── Lazy Supabase client — created ONLY inside the upload handler at runtime.
 // This prevents "supabaseUrl is required" at Next.js build/prerender time when

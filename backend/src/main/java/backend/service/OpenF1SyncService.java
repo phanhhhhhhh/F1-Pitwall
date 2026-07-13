@@ -17,7 +17,6 @@ import backend.repository.RaceResultRepository;
 import backend.repository.WeatherConditionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,14 +41,7 @@ public class OpenF1SyncService {
     private static final String JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
-    private final RestTemplate restTemplate = createRestTemplate();
-
-    private static RestTemplate createRestTemplate() {
-        var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(15000);
-        return new RestTemplate(factory);
-    }
+    private final RestTemplate restTemplate;
 
     private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
     private static final int[] RACE_POINTS = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};

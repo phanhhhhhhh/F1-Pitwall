@@ -74,8 +74,16 @@ export interface CircuitRef {
 }
 
 /* ── Race ───────────────────────────────────────────────────────────────── */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type RaceData = Record<string, any>;
+export interface RaceInfo {
+  id: number;
+  name: string;
+  season: number;
+  roundNumber: number;
+  date: string;
+  status: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "ONGOING";
+  circuit: CircuitRef;
+}
+export type RaceData = RaceInfo;
 
 /* ── Driver standings ───────────────────────────────────────────────────── */
 export interface DriverStanding {

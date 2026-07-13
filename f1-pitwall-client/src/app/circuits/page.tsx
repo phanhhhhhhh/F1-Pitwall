@@ -163,7 +163,6 @@ export default function CircuitsPage() {
   return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
         .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
         .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
         @keyframes grid-pan{from{background-position:0 0}to{background-position:0 80px}}

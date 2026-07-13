@@ -10,6 +10,7 @@ import backend.repository.EngineerRepository;
 import backend.repository.TeamRepository;
 import backend.repository.TyreCompoundRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TeamDriverSeeder {
@@ -78,7 +80,7 @@ public class TeamDriverSeeder {
                 Team.builder().name("Cadillac").country("United States").colorHex("#CC0000")
                         .championships(0).annualBudgetM(220f).base("Banbury").foundedYear(2026).build()
         ));
-        System.out.println("[Pitwall] 11 teams seeded (2026 grid)");
+        log.info("[Pitwall] 11 teams seeded (2026 grid)");
         return teams;
     }
 
@@ -154,7 +156,7 @@ public class TeamDriverSeeder {
                 Driver.builder().name("Valtteri Bottas").carNumber(77).nationality("Finnish")
                         .dateOfBirth(LocalDate.of(1989,8,28)).careerPoints(1795).careerWins(10).careerPoles(20).team(cadillac).build()
         ));
-        System.out.println("[Pitwall] 22 drivers seeded (2026 grid)");
+        log.info("[Pitwall] 22 drivers seeded (2026 grid)");
     }
 
     private void seedEngineers(List<Team> teams) {
@@ -168,6 +170,6 @@ public class TeamDriverSeeder {
                 Engineer.builder().name("Toto Wolff").specialization("Team Principal").nationality("Austrian").team(teamMap.get("Mercedes-AMG Petronas")).build(),
                 Engineer.builder().name("Adrian Newey").specialization("Chief Technical Officer").nationality("British").team(teamMap.get("Aston Martin")).build()
         ));
-        System.out.println("[Pitwall] Engineers seeded");
+        log.info("[Pitwall] Engineers seeded");
     }
 }
