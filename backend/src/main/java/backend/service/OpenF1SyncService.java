@@ -275,13 +275,21 @@ public class OpenF1SyncService {
 
     @SuppressWarnings("unchecked")
     @Transactional
-    public void syncPitStops(int sessionKey) {
+    public void syncPitStops(int sessionKey, Race race) {
         try {
             String url = OPENF1_BASE + "/stints?session_key=" + sessionKey;
             List<Map<String, Object>> stints = restTemplate.getForObject(url, List.class);
             if (stints == null || stints.isEmpty()) {
                 log.debug("[Sync] No stints data for session {}", sessionKey);
                 return;
+            }
+
+            List<RaceResult> raceResults = raceResultRepo.findByRaceIdOrderByFinishPosition(race.getId());
+            Map<Integer, RaceResult> resultsByCarNumber = new HashMap<>();
+            for (RaceResult rr : raceResults) {
+                if (rr.getDriver() != null) {
+                    resultsByCarNumber.put(rr.getDriver().getCarNumber(), rr);
+                }
             }
 
             List<PitStop> pitStops = new ArrayList<>();
@@ -292,6 +300,12 @@ public class OpenF1SyncService {
 
                 if (driverNumber == null || lapStart == null) continue;
 
+                RaceResult raceResult = resultsByCarNumber.get(driverNumber);
+                if (raceResult == null) {
+                    log.warn("[Sync] No race result found for driver number {} in session {}", driverNumber, sessionKey);
+                    continue;
+                }
+
                 TyreType tyreOut = mapCompoundToTyreType(compound);
 
                 pitStops.add(PitStop.builder()
@@ -300,6 +314,7 @@ public class OpenF1SyncService {
                         .tyreOut(tyreOut)
                         .crewSize(0) // not available
                         .underSafetyCar(false) // not available
+                        .raceResult(raceResult)
                         .build());
             }
 
@@ -316,13 +331,21 @@ public class OpenF1SyncService {
 
     @SuppressWarnings("unchecked")
     @Transactional
-    public void syncLapTimes(int sessionKey) {
+    public void syncLapTimes(int sessionKey, Race race) {
         try {
             String url = OPENF1_BASE + "/laps?session_key=" + sessionKey;
             List<Map<String, Object>> laps = restTemplate.getForObject(url, List.class);
             if (laps == null || laps.isEmpty()) {
                 log.debug("[Sync] No laps data for session {}", sessionKey);
                 return;
+            }
+
+            List<RaceResult> raceResults = raceResultRepo.findByRaceIdOrderByFinishPosition(race.getId());
+            Map<Integer, RaceResult> resultsByCarNumber = new HashMap<>();
+            for (RaceResult rr : raceResults) {
+                if (rr.getDriver() != null) {
+                    resultsByCarNumber.put(rr.getDriver().getCarNumber(), rr);
+                }
             }
 
             List<LapTelemetry> telemetries = new ArrayList<>();
@@ -336,6 +359,12 @@ public class OpenF1SyncService {
                 float lapTimeSec = ((Number) lapDuration).floatValue();
                 if (lapTimeSec <= 0 || lapTimeSec > 600) continue;
 
+                RaceResult raceResult = resultsByCarNumber.get(driverNumber);
+                if (raceResult == null) {
+                    log.warn("[Sync] No race result found for driver number {} in session {}", driverNumber, sessionKey);
+                    continue;
+                }
+
                 telemetries.add(LapTelemetry.builder()
                         .lapNumber(lapNumber)
                         .lapTimeSec(lapTimeSec)
@@ -346,6 +375,7 @@ public class OpenF1SyncService {
                         .brakePct(0f)     // not available
                         .drsActive(false) // not available
                         .fuelLoad(0f)     // not available
+                        .raceResult(raceResult)
                         .build());
             }
 
@@ -362,7 +392,7 @@ public class OpenF1SyncService {
 
     @SuppressWarnings("unchecked")
     @Transactional
-    public void syncWeather(int sessionKey) {
+    public void syncWeather(int sessionKey, Race race) {
         try {
             String url = OPENF1_BASE + "/weather?session_key=" + sessionKey;
             List<Map<String, Object>> weatherData = restTemplate.getForObject(url, List.class);
@@ -390,6 +420,7 @@ public class OpenF1SyncService {
                         .humidityPct(humidity != null ? ((Number) humidity).floatValue() : 0f)
                         .windSpeedKmh(windSpeed != null ? ((Number) windSpeed).floatValue() : 0f)
                         .condition(weatherType)
+                        .race(race)
                         .build());
             }
 

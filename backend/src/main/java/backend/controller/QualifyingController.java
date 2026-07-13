@@ -4,6 +4,7 @@ import backend.model.QualifyingResult;
 import backend.service.QualifyingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,16 +23,19 @@ public class QualifyingController {
     }
 
     @PostMapping("/sync/race/{raceId}")
+    @PreAuthorize("hasAnyRole('ADMIN','ENGINEER')")
     public ResponseEntity<Map<String, Object>> syncQualifying(@PathVariable Long raceId) {
         return ResponseEntity.ok(qualifyingService.syncQualifying(raceId));
     }
 
     @PostMapping("/sync/all")
+    @PreAuthorize("hasAnyRole('ADMIN','ENGINEER')")
     public ResponseEntity<Map<String, Object>> syncAll() {
         return ResponseEntity.ok(qualifyingService.syncAllQualifying());
     }
 
     @PostMapping("/sync/sprint/race/{raceId}")
+    @PreAuthorize("hasAnyRole('ADMIN','ENGINEER')")
     public ResponseEntity<Map<String, Object>> syncSprintQualifying(@PathVariable Long raceId) {
         return ResponseEntity.ok(qualifyingService.syncSprintQualifying(raceId));
     }

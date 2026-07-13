@@ -45,6 +45,6 @@ export const api = {
     markRead: (id: number) =>
       authFetch(`${BASE_URL}/api/notifications/${id}/read`, { method: "POST" }),
     markAllRead: () =>
-      authFetch(`${BASE_URL}/api/notifications/read-all`, { method: "POST" }),
+      authFetch(`${BASE_URL}/api/notifications/mark-all-read`, { method: "POST" }),
   },
 };

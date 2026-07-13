@@ -22,7 +22,7 @@ export default function RacesPage() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [season]);
 
     const fetchData = async () => {
         try {

@@ -46,7 +46,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [season]);
 
   useEffect(() => {
     if (!nextRace) return;

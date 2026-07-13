@@ -56,6 +56,7 @@ export default function StandingsPage() {
 
   useEffect(() => {
     (async () => {
+      setLoading(true);
       try {
         const [d, c] = await Promise.all([
           authFetch(`${API}/api/race-results/standings/drivers/${season}`),
@@ -68,7 +69,7 @@ export default function StandingsPage() {
         setError(e instanceof Error ? e.message : "Failed to load standings data.");
       } finally { setLoading(false); }
     })();
-  }, []);
+  }, [season]);
 
   const maxPts = drivers[0]?.totalPoints || 1;
 
