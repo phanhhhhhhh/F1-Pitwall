@@ -4,6 +4,7 @@ import backend.model.Notification;
 import backend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +33,7 @@ public class NotificationController {
     }
 
     @PostMapping("/mark-all-read")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> markAllRead() {
         notificationService.markAllRead();
         return ResponseEntity.ok().build();
@@ -44,6 +46,7 @@ public class NotificationController {
     }
 
     @DeleteMapping("/read")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> deleteRead() {
         notificationService.deleteRead();
         return ResponseEntity.ok().build();

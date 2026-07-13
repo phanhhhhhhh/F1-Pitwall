@@ -2,6 +2,7 @@ package backend.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,22 @@ public class JwtService {
 
     @Value("${app.jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
+
+    @PostConstruct
+    public void validateSecret() {
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT_SECRET environment variable is required but not set. " +
+                    "Please set JWT_SECRET to a string of at least 32 characters."
+            );
+        }
+        if (secretKey.getBytes().length < 32) {
+            throw new IllegalStateException(
+                    "JWT secret is too short: need at least 32 characters, currently has " +
+                    secretKey.getBytes().length + ". Set JWT_SECRET to a longer value."
+            );
+        }
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);

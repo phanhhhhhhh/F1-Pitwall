@@ -4,6 +4,7 @@ import backend.service.LiveTimingService;
 import backend.service.OpenF1LiveService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,6 +38,7 @@ public class OpenF1LiveController {
     }
 
     @PostMapping("/fetch")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> forceFetch() {
         return ResponseEntity.ok(openF1LiveService.forceFetch());
     }

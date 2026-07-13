@@ -66,8 +66,6 @@ export default function ProfilePage() {
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdFeedback, setPwdFeedback] = useState({ msg: "", ok: true });
 
-  useEffect(() => { }, []);
-
   useEffect(() => {
     if (user) {
       setProfile({

@@ -315,30 +315,80 @@ public class ExportService {
         return html.toString();
     }
 
-    // ─── PDF Generator (HTML → PDF via simple byte stream) ───────────────
-    // Dùng pure Java — không cần external library
-    // Format: HTML được wrap thành PDF-like response
+    // ─── PDF Generator (HTML → real PDF via OpenPDF) ───────────────────
 
     private byte[] generateSimplePdf(String html, String title) {
-        // Since we don't have iText/OpenPDF, return HTML with PDF-like headers
-        // Frontend sẽ handle việc mở file này trong browser để print/save as PDF
-        try {
-            // Wrap HTML with print-ready CSS
-            String printHtml = html.replace("<style>", "<style>@media print{body{background:#fff!important;color:#000!important;}.header-bar{background:#ef4444!important;-webkit-print-color-adjust:exact;}th{background:#f0f0f0!important;color:#ef4444!important;-webkit-print-color-adjust:exact;}}")
-                    .replace("background:#0a0a0a", "background:#ffffff")
-                    .replace("color:#fff", "color:#000")
-                    .replace("color:#999", "color:#555")
-                    .replace("color:#666", "color:#777")
-                    .replace("border-bottom:1px solid #1a1a1a", "border-bottom:1px solid #eee")
-                    .replace("border-bottom:1px solid #333", "border-bottom:1px solid #ccc")
-                    .replace("background:#1a1a1a", "background:#f5f5f5")
-                    .replace("background:#111", "background:#fafafa")
-                    .replace("background:#1a0000", "background:#fff5f5");
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            com.lowagie.text.Document document = new com.lowagie.text.Document(com.lowagie.text.PageSize.A4.rotate());
+            com.lowagie.text.pdf.PdfWriter.getInstance(document, baos);
+            document.open();
 
-            return printHtml.getBytes("UTF-8");
+            // Title — red bold
+            com.lowagie.text.Font titleFont = com.lowagie.text.FontFactory.getFont(
+                    com.lowagie.text.FontFactory.HELVETICA_BOLD, 18);
+            titleFont.setColor(200, 0, 0);
+            com.lowagie.text.Paragraph titlePara = new com.lowagie.text.Paragraph(title, titleFont);
+            titlePara.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+            titlePara.setSpacingAfter(20);
+            document.add(titlePara);
+
+            // Parse HTML table rows and convert to PDF table
+            String[] rows = html.split("<tr>");
+            boolean isFirstTable = true;
+            for (String row : rows) {
+                if (!row.contains("<td") && !row.contains("<th")) continue;
+                String[] cells = row.contains("<th") ? row.split("<th[^>]*>") : row.split("<td[^>]*>");
+                java.util.List<String> cellTexts = new java.util.ArrayList<>();
+                for (String cell : cells) {
+                    if (cell.contains("</th>") || cell.contains("</td>")) {
+                        cellTexts.add(cell.replaceAll("<[^>]+>", "").replace("&gt;", ">").replace("&lt;", "<").trim());
+                    }
+                }
+                if (cellTexts.isEmpty()) continue;
+
+                int cols = cellTexts.size();
+                com.lowagie.text.pdf.PdfPTable table = new com.lowagie.text.pdf.PdfPTable(cols);
+                table.setWidthPercentage(100);
+                table.setSpacingBefore(6);
+                table.setSpacingAfter(4);
+
+                com.lowagie.text.Font cellFont = com.lowagie.text.FontFactory.getFont(
+                        isFirstTable ? com.lowagie.text.FontFactory.HELVETICA_BOLD
+                                : com.lowagie.text.FontFactory.HELVETICA, 9);
+                if (isFirstTable) {
+                    cellFont.setColor(255, 255, 255);
+                } else {
+                    cellFont.setColor(0, 0, 0);
+                }
+
+                for (String cell : cellTexts) {
+                    com.lowagie.text.pdf.PdfPCell pdfCell = new com.lowagie.text.pdf.PdfPCell(
+                            new com.lowagie.text.Phrase(cell, cellFont));
+                    pdfCell.setPadding(isFirstTable ? 5 : 3);
+                    pdfCell.setBorderWidth(0.5f);
+                    table.addCell(pdfCell);
+                }
+                document.add(table);
+                isFirstTable = false;
+            }
+
+            // Footer
+            com.lowagie.text.Font footerFont = com.lowagie.text.FontFactory.getFont(
+                    com.lowagie.text.FontFactory.HELVETICA, 7);
+            footerFont.setColor(128, 128, 128);
+            com.lowagie.text.Paragraph footer = new com.lowagie.text.Paragraph(
+                    "F1 Pitwall · Generated " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm")),
+                    footerFont);
+            footer.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+            footer.setSpacingBefore(30);
+            document.add(footer);
+
+            document.close();
+            return baos.toByteArray();
         } catch (Exception e) {
-            log.error("PDF generation failed: {}", e.getMessage());
-            return html.getBytes();
+            log.error("PDF generation failed: {}", e.getMessage(), e);
+            return ("<html><body><h1>PDF Error</h1><p>" + e.getMessage() + "</p></body></html>")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
         }
     }
 

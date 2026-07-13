@@ -16,9 +16,12 @@ import java.util.Map;
 public class AuthHandshakeInterceptor implements HandshakeInterceptor {
 
     private final JwtService jwtService;
+    private final backend.security.TokenBlacklistService tokenBlacklistService;
 
-    public AuthHandshakeInterceptor(JwtService jwtService) {
+    public AuthHandshakeInterceptor(JwtService jwtService,
+                                     backend.security.TokenBlacklistService tokenBlacklistService) {
         this.jwtService = jwtService;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Override
@@ -32,6 +35,11 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
 
         if (token != null && !token.isBlank()) {
             try {
+                // Check blacklist first (logged-out tokens)
+                if (tokenBlacklistService.isBlacklisted(token)) {
+                    response.setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return false;
+                }
                 String username = jwtService.extractUsername(token);
                 if (username != null) {
                     Date expiration = jwtService.extractExpiration(token);
