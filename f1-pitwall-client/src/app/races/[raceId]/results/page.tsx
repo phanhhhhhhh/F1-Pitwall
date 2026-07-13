@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { authFetch } from "../../../lib/pitwall-auth";
+import type { RaceInfo } from "../../../types/f1";
 import Navbar from "../../../components/Navbar";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable, SkeletonCard } from "../../../components/LoadingSkeleton";
@@ -10,9 +11,8 @@ import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DriverRef, ResultRow, RaceResultResponse } from "../../../types/f1";
+import { BASE_URL as API } from "../../../lib/api-client";
 import SessionTimeline from "../../../components/SessionTimeline";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 // ── Podium stand heights (px) for P1/P2/P3 visual
 const PODIUM_HEIGHT = { 1: 140, 2: 108, 3: 88 } as const;
@@ -104,7 +104,7 @@ export default function RaceResultsPage() {
   const raceId = params.raceId as string;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [race, setRace] = useState<any>(null);
+  const [race, setRace] = useState<RaceInfo | null>(null);
   const [drivers, setDrivers] = useState<DriverRef[]>([]);
   const [rows, setRows] = useState<ResultRow[]>([]);
   const [existingResults, setExistingResults] = useState<RaceResultResponse[]>([]);

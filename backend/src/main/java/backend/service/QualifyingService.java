@@ -8,7 +8,6 @@ import backend.repository.QualifyingResultRepository;
 import backend.repository.RaceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -25,14 +24,7 @@ public class QualifyingService {
     private final RaceRepository raceRepo;
     private final DriverRepository driverRepo;
 
-    private final RestTemplate restTemplate = createRestTemplate();
-
-    private static RestTemplate createRestTemplate() {
-        var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(10000);
-        return new RestTemplate(factory);
-    }
+    private final RestTemplate restTemplate;
 
     private static final String JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
 

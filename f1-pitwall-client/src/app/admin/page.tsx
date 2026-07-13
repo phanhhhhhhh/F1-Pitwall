@@ -6,9 +6,8 @@ import { authFetch } from "../lib/pitwall-auth";
 import { useCountUp } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
+import { BASE_URL as API } from "../lib/api-client";
 import type { AdminUser, AdminStats, SyncResult } from "../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 const ROLE_COLORS = {
   ADMIN:    "text-red-400 bg-red-500/10  border-red-500/30",

@@ -4,9 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { flagForCountry } from "../lib/f1-theme";
+import { BASE_URL as API } from "../lib/api-client";
 import type { WidgetSession, WeekendData } from "../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 const SESSION_COLORS: Record<string, string> = {
   "Practice 1":        "#3b82f6",

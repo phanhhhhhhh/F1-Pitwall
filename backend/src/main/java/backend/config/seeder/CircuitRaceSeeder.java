@@ -10,6 +10,7 @@ import backend.repository.ChampionshipRepository;
 import backend.repository.CircuitRepository;
 import backend.repository.RaceRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CircuitRaceSeeder {
@@ -111,7 +113,7 @@ public class CircuitRaceSeeder {
                         .type(CircuitType.PERMANENT).totalLaps(58).lengthKm(5.281f).lapRecordSec(88.391f)
                         .lapRecordHolder("Max Verstappen").turnCount(16).build()
         ));
-        System.out.println("[Pitwall] 24 circuits seeded");
+        log.info("[Pitwall] 24 circuits seeded");
         return circuits;
     }
 
@@ -183,7 +185,7 @@ public class CircuitRaceSeeder {
                 Race.builder().name("Singapore Grand Prix Sprint").date(LocalDate.of(2026,10,10))
                         .season(2026).roundNumber(18).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Marina Bay Street Circuit")).build()
         ));
-        System.out.println("[Pitwall] 30 races seeded (24 GP + 6 Sprint)");
+        log.info("[Pitwall] 30 races seeded (24 GP + 6 Sprint)");
     }
 
     private void seedChampionships() {
@@ -193,6 +195,6 @@ public class CircuitRaceSeeder {
                 Championship.builder().season(2026).type(ChampionshipType.CONSTRUCTORS)
                         .leaderName("McLaren").leaderPoints(0f).p2Gap(0f).p3Gap(0f).build()
         ));
-        System.out.println("[Pitwall] Championships seeded (2026)");
+        log.info("[Pitwall] Championships seeded (2026)");
     }
 }

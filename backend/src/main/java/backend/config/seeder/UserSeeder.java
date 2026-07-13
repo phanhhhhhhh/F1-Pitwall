@@ -3,9 +3,11 @@ package backend.config.seeder;
 import backend.model.User;
 import backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class UserSeeder {
@@ -23,7 +25,7 @@ public class UserSeeder {
                     .email("admin@pitwall.f1")
                     .role(User.Role.ADMIN)
                     .build());
-            System.out.println("[Pitwall] Admin seeded");
+            log.info("[Pitwall] Admin seeded");
         }
         if (!userRepo.existsByUsername("engineer")) {
             String engineerPassword = System.getenv("ENGINEER_PASSWORD") != null

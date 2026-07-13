@@ -6,9 +6,8 @@ import { authFetch } from "../lib/pitwall-auth";
 import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
+import { BASE_URL as API } from "../lib/api-client";
 import type { TelemetryData, LiveStatus } from "../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 /* ── WebSocket types (same globals as telemetry page) ───────────────────── */
 interface TelemetryFrame { body: string; }
@@ -626,7 +625,6 @@ export default function LiveTimingPage() {
 
       {/* Keyframe animations */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
         .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
         .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
         @keyframes live-pulse{0%,100%{box-shadow:0 0 0 0 rgba(225,6,0,.6)}70%{box-shadow:0 0 0 6px rgba(225,6,0,0)}}

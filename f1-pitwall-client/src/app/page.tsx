@@ -7,40 +7,19 @@ import { useSeason } from "./context/SeasonContext";
 import Navbar from "./components/Navbar";
 import RaceWeekendWidget from "./components/RaceWeekendWidget";
 import Link from "next/link";
-import { COUNTRY_FLAGS } from "./lib/f1-theme";
-
-function useCountUp(target: number, duration = 1100, delay = 0) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (!target) return;
-    let raf = 0;
-    const t = setTimeout(() => {
-      let start: number | null = null;
-      const step = (ts: number) => {
-        if (start === null) start = ts;
-        const p = Math.min((ts - start) / duration, 1);
-        setValue(Math.round((1 - Math.pow(1 - p, 4)) * target));
-        if (p < 1) raf = requestAnimationFrame(step);
-      };
-      raf = requestAnimationFrame(step);
-    }, delay);
-    return () => { clearTimeout(t); cancelAnimationFrame(raf); };
-  }, [target, duration, delay]);
-  return value;
-}
+import { COUNTRY_FLAGS, useCountUp } from "./lib/f1-theme";
+import type { DriverStanding, RaceInfo } from "./types/f1";
 
 export default function Home() {
   const { season } = useSeason();
   const [stats, setStats] = useState({ drivers: 0, teams: 0, circuits: 0 });
   const [sprintCount, setSprintCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const [allRaces, setAllRaces] = useState<any[]>([]);
-  const [calendar, setCalendar] = useState<any[]>([]);
-  const [standings, setStandings] = useState<any[]>([]);
+  const [allRaces, setAllRaces] = useState<RaceInfo[]>([]);
+  const [calendar, setCalendar] = useState<RaceInfo[]>([]);
+  const [standings, setStandings] = useState<DriverStanding[]>([]);
   const [winners, setWinners] = useState<Record<string, { driver: string; team: string }>>({});
-  const [nextRace, setNextRace] = useState<any>(null);
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const [nextRace, setNextRace] = useState<RaceInfo | null>(null);
   const [cd, setCd] = useState({ d: 0, h: 0, m: 0, s: 0, raceDay: false });
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -103,8 +82,7 @@ export default function Home() {
         setAllRaces(races);
         setCalendar(gp.slice(0, 6));
         const today = new Date().toISOString().split("T")[0];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const up = gp.filter((x: any) => x.status === "SCHEDULED" && x.date >= today).sort((a: any, b: any) => a.date.localeCompare(b.date));
+        const up = gp.filter((x: RaceInfo) => x.status === "SCHEDULED" && x.date >= today).sort((a, b) => a.date.localeCompare(b.date));
         if (up.length) setNextRace(up[0]);
       } else { errors.push(`Races: ${racesRes.reason?.message || racesRes.reason}`); }
     } catch { errors.push("Races: parse error"); }
@@ -122,7 +100,7 @@ export default function Home() {
       const w = await (await authFetch(`${API}/api/race-results/winners/${season}`)).json();
       const m: Record<string, { driver: string; team: string }> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      Object.entries(w).forEach(([n, v]: [string, any]) => { m[n] = { driver: v.driverLastName || v.driverName, team: v.teamName }; });
+      Object.entries(w as Record<string, { driverName: string; driverLastName: string; teamName: string }>).forEach(([n, v]) => { m[n] = { driver: v.driverLastName || v.driverName, team: v.teamName }; });
       setWinners(m);
     } catch { }
     try {
@@ -148,7 +126,6 @@ export default function Home() {
   return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
         .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
         .f-disp{font-family:'Saira',system-ui,sans-serif}
         .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}

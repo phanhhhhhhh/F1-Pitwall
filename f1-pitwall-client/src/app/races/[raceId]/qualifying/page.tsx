@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { authFetch } from "../../../lib/pitwall-auth";
+import type { RaceInfo } from "../../../types/f1";
 import Navbar from "../../../components/Navbar";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
 import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { BASE_URL as API } from "../../../lib/api-client";
 import type { QualifyingResult } from "../../../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 function TimeDelta({ time, best, highlight }: { time: number | null; best: number | null; highlight?: boolean }) {
     if (!time || !best) return <span className="text-zinc-700 f-mono text-xs">—</span>;
@@ -64,7 +64,7 @@ export default function QualifyingPage() {
     const [resyncing, setResyncing] = useState(false);
     const [raceName, setRaceName] = useState("");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [raceInfo, setRaceInfo] = useState<any>(null);
+    const [raceInfo, setRaceInfo] = useState<RaceInfo | null>(null);
     const [hasData, setHasData] = useState(false);
     const [feedback, setFeedback] = useState("");
 

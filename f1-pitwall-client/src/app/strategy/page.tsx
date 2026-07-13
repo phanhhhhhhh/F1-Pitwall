@@ -7,9 +7,8 @@ import { F1, tyre } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
 import { SkeletonCard } from "../components/LoadingSkeleton";
+import { BASE_URL as API } from "../lib/api-client";
 import type { CircuitRef } from "../types/f1";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 // ─── local tyre data (lap-time penalty + degradation model) ──────────────────
 const TYRE_PERF: Record<string, { lapTime: number; degradation: number }> = {

@@ -14,6 +14,7 @@ import backend.repository.DriverRepository;
 import backend.repository.RaceRepository;
 import backend.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class Seeder2025 {
@@ -34,10 +36,10 @@ public class Seeder2025 {
 
     public void seed() {
         if (!raceRepo.findBySeason(2025).isEmpty()) {
-            System.out.println("[Pitwall] 2025 data already exists — skipping 2025 seeder");
+            log.info("[Pitwall] 2025 data already exists — skipping 2025 seeder");
             return;
         }
-        System.out.println("[Pitwall] Seeder2025 starting...");
+        log.info("[Pitwall] Seeder2025 starting...");
 
         List<Team> teams = seedTeams();
         seedDrivers(teams);
@@ -45,7 +47,7 @@ public class Seeder2025 {
         seedRaces(circuits);
         seedChampionships();
 
-        System.out.println("[Pitwall] 2025 season data seeded");
+        log.info("[Pitwall] 2025 season data seeded");
     }
 
     private List<Team> seedTeams() {
@@ -84,7 +86,7 @@ public class Seeder2025 {
             teamRepo.saveAll(teamsToSave);
         }
 
-        System.out.println("[Pitwall] 10 teams seeded (2025 grid)");
+        log.info("[Pitwall] 10 teams seeded (2025 grid)");
 
         // Return all teams (existing + new)
         return newTeams.stream()
@@ -170,7 +172,7 @@ public class Seeder2025 {
         if (!driversToSave.isEmpty()) {
             driverRepo.saveAll(driversToSave);
         }
-        System.out.println("[Pitwall] 20 drivers seeded (2025 grid)");
+        log.info("[Pitwall] 20 drivers seeded (2025 grid)");
     }
 
     private List<Circuit> seedCircuits() {
@@ -261,7 +263,7 @@ public class Seeder2025 {
             circuitRepo.saveAll(toSave);
         }
 
-        System.out.println("[Pitwall] Circuits seeded (2025 calendar)");
+        log.info("[Pitwall] Circuits seeded (2025 calendar)");
 
         // Return all circuits (existing + new)
         return newCircuits.stream()
@@ -349,7 +351,7 @@ public class Seeder2025 {
                         .season(2025).roundNumber(24).status(RaceStatus.SCHEDULED)
                         .circuit(circuitMap.get("Yas Marina Circuit")).build()
         ));
-        System.out.println("[Pitwall] 24 races seeded (2025 season)");
+        log.info("[Pitwall] 24 races seeded (2025 season)");
     }
 
     private void seedChampionships() {
@@ -359,6 +361,6 @@ public class Seeder2025 {
                 Championship.builder().season(2025).type(ChampionshipType.CONSTRUCTORS)
                         .leaderName("TBD").leaderPoints(0f).p2Gap(0f).p3Gap(0f).build()
         ));
-        System.out.println("[Pitwall] Championships seeded (2025)");
+        log.info("[Pitwall] Championships seeded (2025)");
     }
 }

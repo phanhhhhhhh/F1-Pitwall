@@ -6,9 +6,11 @@ import backend.config.seeder.TeamDriverSeeder;
 import backend.config.seeder.UserSeeder;
 import backend.repository.RaceRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -22,10 +24,10 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        System.out.println("[Pitwall] DataSeeder starting...");
+        log.info("[Pitwall] DataSeeder starting...");
         try {
             userSeeder.seed();
-            System.out.println("[Pitwall] Users seeded");
+            log.info("[Pitwall] Users seeded");
 
             // Seed 2025 data first (idempotent — skips if already present)
             seeder2025.seed();
@@ -38,8 +40,7 @@ public class DataSeeder implements CommandLineRunner {
 
             // Race results are synced from Jolpica by OpenF1SyncService — no fictional seeding
         } catch (Exception e) {
-            System.err.println("[Pitwall] DataSeeder failed: " + e.getMessage());
-            e.printStackTrace();
+            log.error("[Pitwall] DataSeeder failed: {}", e.getMessage(), e);
         }
     }
 }
