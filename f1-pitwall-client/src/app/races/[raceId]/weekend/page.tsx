@@ -144,7 +144,6 @@ export default function RaceWeekendPage() {
   const params = useParams();
   const raceId = params.raceId as string;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [race, setRace] = useState<RaceInfo | null>(null);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<SessionInfo | null>(null);
@@ -162,7 +161,7 @@ export default function RaceWeekendPage() {
         authFetch(`${API}/api/races/${raceId}`),
         authFetch(`${API}/api/openf1/race/${raceId}/sessions`),
       ]);
-      const [raceData, sessionsData]: [any, SessionInfo[]] = await Promise.all([raceRes.json(), sessionsRes.json()]);
+      const [raceData, sessionsData]: [RaceInfo, SessionInfo[]] = await Promise.all([raceRes.json(), sessionsRes.json()]);
       setRace(raceData);
       setSessions(sessionsData);
 

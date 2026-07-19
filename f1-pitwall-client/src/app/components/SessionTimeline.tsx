@@ -42,16 +42,10 @@ function formatDuration(ms: number): string {
 export default function SessionTimeline({ raceId }: { raceId: string | number }) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
-
-  useEffect(() => {
-    fetchAll();
-  }, [raceId]);
 
   const fetchAll = async () => {
     setLoading(true);
-    setError(null);
 
     const all: TimelineEvent[] = [];
 
@@ -99,6 +93,11 @@ export default function SessionTimeline({ raceId }: { raceId: string | number })
     setEvents(all);
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceId]);
 
   const filtered = filter === "all"
     ? events
@@ -226,7 +225,6 @@ export default function SessionTimeline({ raceId }: { raceId: string | number })
         <div className="space-y-1.5">
           {filtered.map((event, idx) => {
             const cfg = EVENT_CONFIG[event.kind];
-            const leftPct = ((event.lap - 1) / maxLap) * 100;
 
             return (
               <motion.div

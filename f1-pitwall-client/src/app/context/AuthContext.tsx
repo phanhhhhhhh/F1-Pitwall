@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { AuthResponse, User, clearTokens, getAccessToken, authFetch } from "../lib/pitwall-auth";
+import { BASE_URL as API_URL } from "../lib/api-client";
 
 interface AuthContextType {
   user: User | null;
@@ -13,7 +14,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 const PUBLIC_PATHS = ["/login", "/register", "/oauth2", "/forgot-password"];
 
 async function fetchUserWithRetry(retries = 2): Promise<User | null> {
@@ -30,7 +30,7 @@ async function fetchUserWithRetry(retries = 2): Promise<User | null> {
         return data;
       }
       if (res.status === 401) return null;
-    } catch (e) {
+    } catch {
       if (i < retries) await new Promise(r => setTimeout(r, 3000));
     }
   }

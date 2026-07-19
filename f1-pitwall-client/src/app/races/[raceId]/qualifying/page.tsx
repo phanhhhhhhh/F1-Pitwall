@@ -63,7 +63,6 @@ export default function QualifyingPage() {
     const [syncing, setSyncing] = useState(false);
     const [resyncing, setResyncing] = useState(false);
     const [raceName, setRaceName] = useState("");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [raceInfo, setRaceInfo] = useState<RaceInfo | null>(null);
     const [hasData, setHasData] = useState(false);
     const [feedback, setFeedback] = useState("");
@@ -439,7 +438,6 @@ export default function QualifyingPage() {
                                 {/* Rows */}
                                 {results.map((r, i) => {
                                     const tc = getTeamColor(r.teamName, r.teamColor);
-                                    const seg = getSegment(r);
                                     const isElimQ1 = !r.q2Time && !r.q3Time;
                                     const isElimQ2 = !!r.q2Time && !r.q3Time;
                                     const isPole = r.gridPosition === 1;

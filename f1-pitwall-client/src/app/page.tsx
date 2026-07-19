@@ -5,9 +5,13 @@ import { authFetch } from "./lib/pitwall-auth";
 import { BASE_URL as API } from "./lib/api-client";
 import { useSeason } from "./context/SeasonContext";
 import Navbar from "./components/Navbar";
+import NextRaceCard from "./components/NextRaceCard";
+import TimingTower from "./components/TimingTower";
+import StatTilesGrid from "./components/StatTilesGrid";
+import SeasonProgress from "./components/SeasonProgress";
+import RaceCalendarSection from "./components/RaceCalendarSection";
 import RaceWeekendWidget from "./components/RaceWeekendWidget";
-import Link from "next/link";
-import { COUNTRY_FLAGS, useCountUp } from "./lib/f1-theme";
+import { useCountUp } from "./lib/f1-theme";
 import type { DriverStanding, RaceInfo } from "./types/f1";
 
 export default function Home() {
@@ -75,9 +79,9 @@ export default function Home() {
 
     try {
       if (racesRes.status === "fulfilled") {
-        const races = await racesRes.value.json();
-        const gp = races.filter((x: { name: string }) => !x.name.toLowerCase().includes("sprint"));
-        const sp = races.filter((x: { name: string }) => x.name.toLowerCase().includes("sprint"));
+        const races: RaceInfo[] = await racesRes.value.json();
+        const gp = races.filter((x) => !x.name.toLowerCase().includes("sprint"));
+        const sp = races.filter((x) => x.name.toLowerCase().includes("sprint"));
         setSprintCount(sp.length);
         setAllRaces(races);
         setCalendar(gp.slice(0, 6));
@@ -99,7 +103,6 @@ export default function Home() {
     try {
       const w = await (await authFetch(`${API}/api/race-results/winners/${season}`)).json();
       const m: Record<string, { driver: string; team: string }> = {};
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Object.entries(w as Record<string, { driverName: string; driverLastName: string; teamName: string }>).forEach(([n, v]) => { m[n] = { driver: v.driverLastName || v.driverName, team: v.teamName }; });
       setWinners(m);
     } catch { }
@@ -122,6 +125,13 @@ export default function Home() {
   const tN = useCountUp(stats.teams, 1000, 380);
   const gN = useCountUp(totalGP, 1000, 460);
   const cN = useCountUp(stats.circuits, 1000, 540);
+
+  const statTiles = [
+    { label: "DRIVERS", value: dN, sub: `${season} grid`, href: "/drivers", icon: "🏎" },
+    { label: "TEAMS", value: tN, sub: "constructors", href: "/teams", icon: "🏗" },
+    { label: "GRAND PRIX", value: gN, sub: `${sprintCount} sprints`, href: "/races", icon: "🏁" },
+    { label: "CIRCUITS", value: cN, sub: "worldwide", href: "/circuits", icon: "🗺" },
+  ];
 
   return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
@@ -213,205 +223,35 @@ export default function Home() {
           </div>
 
           {/* Next race */}
-          <div className="rise relative overflow-hidden rounded-2xl border border-[#E10600]/20" style={{ background: "linear-gradient(160deg,rgba(225,6,0,.08),rgba(15,15,18,.85))", animationDelay: "80ms" }}>
-            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg,transparent,#E10600,transparent)" }} />
-            <div className="p-6 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-1">
-                <span className="f-mono text-[11px] tracking-[0.3em] text-[#E10600] font-bold">NEXT RACE</span>
-                {nextRace && <span className="f-mono text-[11px] text-zinc-600">RND {nextRace.roundNumber}</span>}
-              </div>
-              {nextRace ? (
-                <>
-                  <div className="flex items-center gap-3 mt-2 mb-5">
-                    <span className="text-4xl">{COUNTRY_FLAGS[nextRace.circuit?.country] || "🏁"}</span>
-                    <div className="min-w-0">
-                      <h2 className="f-cond font-bold text-2xl leading-tight text-white truncate">{nextRace.name}</h2>
-                      <p className="f-mono text-[11px] text-zinc-500 truncate">{nextRace.circuit?.name}</p>
-                    </div>
-                  </div>
-                  {cd.raceDay ? (
-                    <div className="flex-1 flex items-center justify-center">
-                      <p className="f-cond font-black text-3xl text-[#E10600]" style={{ animation: "glow 1.2s infinite" }}>● RACE DAY</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-2 mt-auto">
-                      {[{ v: cd.d, l: "DAYS" }, { v: cd.h, l: "HRS" }, { v: cd.m, l: "MIN" }, { v: cd.s, l: "SEC" }].map(u => (
-                        <div key={u.l} className="rounded-lg border border-white/8 text-center py-3" style={{ background: "rgba(0,0,0,.3)" }}>
-                          <div className="f-cond font-black text-3xl tabular-nums leading-none" style={{ color: u.l === "SEC" ? "#E10600" : "#fff" }}>{String(u.v).padStart(2, "0")}</div>
-                          <div className="f-mono text-[9px] tracking-widest text-zinc-600 mt-1.5">{u.l}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <p className="f-mono text-[11px] text-zinc-600 mt-4 text-center">{nextRace.date}</p>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-zinc-600 f-mono text-sm">Season complete</div>
-              )}
-            </div>
-          </div>
+          <NextRaceCard nextRace={nextRace} countdown={cd} />
         </section>
 
         {/* BENTO */}
         <div className="grid lg:grid-cols-3 gap-5">
 
           {/* Timing tower */}
-          <section className="lg:col-span-2 rise relative overflow-hidden rounded-2xl border border-white/5" style={{ background: "rgba(18,18,21,.7)", animationDelay: "120ms" }}>
-            <div className="absolute inset-x-0 top-0 h-px overflow-hidden">
-              <div className="h-full w-1/3 shimmer" style={{ background: "linear-gradient(90deg,transparent,rgba(225,6,0,.6),transparent)" }} />
-            </div>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-              <div className="flex items-center gap-2.5">
-                <span className="w-1 h-5 bg-[#E10600] rounded-full" />
-                <h3 className="f-cond font-bold text-lg tracking-wide">CHAMPIONSHIP STANDINGS</h3>
-                <span className="f-mono text-[10px] text-zinc-600 border border-white/10 rounded px-1.5 py-0.5">TOP 6</span>
-              </div>
-              <Link href="/standings" className="f-mono text-[11px] text-[#E10600] hover:text-[#ff5a3c] transition-colors group">
-                FULL TABLE <span className="inline-block group-hover:translate-x-1 transition-transform">→</span>
-              </Link>
-            </div>
-            <div className="relative">
-              {loading ? (
-                <div className="p-4 space-y-2">{[1, 2, 3, 4, 5].map(i => <div key={i} className="h-14 rounded-lg bg-white/[0.03] animate-pulse" />)}</div>
-              ) : standings.length === 0 ? (
-                <div className="py-12 text-center f-mono text-sm text-zinc-600">No standings yet · sync a race first</div>
-              ) : (
-                <>
-                  <div className="absolute left-0 right-0 h-12 pointer-events-none" style={{ background: "linear-gradient(180deg,rgba(225,6,0,.07),transparent)", animation: "scan 7s linear infinite" }} />
-                  {standings.map((s, i) => {
-                    const col = s.teamColor || "#666";
-                    return (
-                      <div key={s.driverId} className="tower-row relative flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 border-b border-white/[0.04] transition-colors">
-                        <span className="pos f-cond font-black italic text-3xl sm:text-4xl w-9 text-center tabular-nums transition-colors" style={{ color: i === 0 ? "#E10600" : "#3f3f46" }}>{s.position}</span>
-                        <span className="w-1 h-9 rounded-full flex-shrink-0" style={{ background: col, boxShadow: `0 0 10px ${col}80` }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="f-cond font-bold text-base sm:text-lg text-white truncate uppercase tracking-wide">{s.driverName}</span>
-                            {s.wins > 0 && <span className="f-mono text-[10px] text-[#FFD200] flex-shrink-0">🏆{s.wins}</span>}
-                          </div>
-                          <span className="f-mono text-[11px]" style={{ color: col }}>{s.teamName}</span>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="f-cond font-black text-2xl tabular-nums leading-none" style={{ color: i === 0 ? "#E10600" : "#fff" }}>{Math.round(s.totalPoints)}</div>
-                          <div className="f-mono text-[10px] text-zinc-600">{i === 0 ? "PTS · LEADER" : `-${Math.round(s.gapToLeader)} PTS`}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          </section>
+          <TimingTower standings={standings} loading={loading} />
 
           {/* Stat tiles 2x2 */}
-          <section className="grid grid-cols-2 gap-3 rise" style={{ animationDelay: "160ms" }}>
-            {[
-              { label: "DRIVERS", value: dN, sub: `${season} grid`, href: "/drivers", icon: "🏎" },
-              { label: "TEAMS", value: tN, sub: "constructors", href: "/teams", icon: "🏗" },
-              { label: "GRAND PRIX", value: gN, sub: `${sprintCount} sprints`, href: "/races", icon: "🏁" },
-              { label: "CIRCUITS", value: cN, sub: "worldwide", href: "/circuits", icon: "🗺" },
-            ].map(s => (
-              <Link key={s.label} href={s.href}
-                className="group relative overflow-hidden rounded-2xl border border-white/5 chamfer p-4 flex flex-col justify-between transition-all hover:border-[#E10600]/30"
-                style={{ background: "rgba(18,18,21,.7)", minHeight: 130 }}>
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "radial-gradient(circle at 50% 0%,rgba(225,6,0,.12),transparent 65%)" }} />
-                <div className="relative flex items-center justify-between">
-                  <span className="f-mono text-[10px] tracking-[0.2em] text-zinc-600 group-hover:text-zinc-400 transition-colors">{s.label}</span>
-                  <span className="text-base opacity-30 group-hover:opacity-70 transition-opacity">{s.icon}</span>
-                </div>
-                <div className="relative">
-                  <div className="f-cond font-black text-5xl leading-none tabular-nums text-white group-hover:text-[#E10600] transition-colors">{s.value}</div>
-                  <div className="f-mono text-[10px] text-zinc-600 mt-1">{s.sub}</div>
-                </div>
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#E10600] scale-x-0 group-hover:scale-x-100 origin-left transition-transform" />
-              </Link>
-            ))}
-          </section>
+          <StatTilesGrid tiles={statTiles} />
 
-          {/* Season track */}
-          <section className="lg:col-span-2 rise relative overflow-hidden rounded-2xl border border-white/5 p-5" style={{ background: "rgba(18,18,21,.7)", animationDelay: "200ms" }}>
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2.5">
-                <span className="w-1 h-5 bg-[#E10600] rounded-full" />
-                <h3 className="f-cond font-bold text-lg tracking-wide">SEASON PROGRESS</h3>
-              </div>
-              <div className="flex items-center gap-3 f-mono text-[11px]">
-                <span className="text-zinc-500"><span className="text-white font-bold text-sm">{gpDone}</span>/{totalGP} GP</span>
-                {sprintDone > 0 && <span className="text-[#FFD200]">⚡{sprintDone}/{sprintCount}</span>}
-              </div>
-            </div>
-            {/* Track */}
-            <div className="relative">
-              <div className="flex items-center justify-between mb-1.5 f-mono text-[9px] text-zinc-700 tracking-widest">
-                <span>LIGHTS OUT</span><span>CHEQUERED FLAG</span>
-              </div>
-              <div className="relative h-4 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,.4)", border: "1px solid rgba(255,255,255,.06)" }}>
-                <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#E10600,#ff5a3c)", boxShadow: "0 0 16px rgba(225,6,0,.5)" }} />
-                <div className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${pct}%` }}>
-                  <div className="absolute inset-0 shimmer" style={{ background: "linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent)" }} />
-                </div>
-                {/* checkered flag end */}
-                <div className="absolute right-0 inset-y-0 w-4" style={{ backgroundImage: "repeating-conic-gradient(#fff 0% 25%,#000 0% 50%)", backgroundSize: "4px 4px", opacity: .25 }} />
-              </div>
-              {/* round ticks */}
-              <div className="relative h-3 mt-1">
-                {Array.from({ length: totalGP }).map((_, i) => (
-                  <div key={i} className="absolute top-0 w-px h-2 rounded-full" style={{ left: `${(i / (totalGP - 1)) * 100}%`, background: i < gpDone ? "#E10600" : "#2a2a2e" }} />
-                ))}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 f-mono text-[11px]">
-              <span className="flex items-center gap-1.5 text-green-400"><span className="w-2 h-2 rounded-full bg-green-500" />{gpDone} completed</span>
-              <span className="flex items-center gap-1.5 text-[#FFD200]"><span className="w-2 h-2 rounded-full bg-[#FFD200]" />⚡ {sprintDone} sprints</span>
-              <span className="flex items-center gap-1.5 text-red-400"><span className="w-2 h-2 rounded-full bg-[#E10600]" />{gpCancel} cancelled</span>
-              <span className="flex items-center gap-1.5 text-zinc-500"><span className="w-2 h-2 rounded-full bg-zinc-600" />{totalGP - gpDone - gpCancel} scheduled</span>
-            </div>
-          </section>
+          {/* Season progress */}
+          <SeasonProgress
+            gpDone={gpDone}
+            totalGP={totalGP}
+            sprintDone={sprintDone}
+            sprintCount={sprintCount}
+            gpCancel={gpCancel}
+            pct={pct}
+          />
 
           {/* Race weekend widget */}
           <section className="rise" style={{ animationDelay: "240ms" }}>
             <RaceWeekendWidget />
           </section>
 
-          {/* Recent calendar — full width */}
-          <section className="lg:col-span-3 rise relative overflow-hidden rounded-2xl border border-white/5" style={{ background: "rgba(18,18,21,.7)", animationDelay: "280ms" }}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-              <div className="flex items-center gap-2.5">
-                <span className="w-1 h-5 bg-[#E10600] rounded-full" />
-                <h3 className="f-cond font-bold text-lg tracking-wide">RACE CALENDAR</h3>
-              </div>
-              <Link href="/races" className="f-mono text-[11px] text-[#E10600] hover:text-[#ff5a3c] transition-colors group">
-                VIEW ALL <span className="inline-block group-hover:translate-x-1 transition-transform">→</span>
-              </Link>
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3">
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-20 m-2 rounded-lg bg-white/[0.03] animate-pulse" />)
-              ) : calendar.map((race, i) => {
-                const w = winners[race.name];
-                const done = race.status === "COMPLETED";
-                const cancel = race.status === "CANCELLED";
-                return (
-                  <Link key={race.id} href={done ? `/races/${race.id}/results` : `/races/${race.id}/qualifying`}
-                    className={`group relative flex items-center gap-3 px-5 py-4 border-b border-r border-white/[0.04] transition-all hover:bg-white/[0.03] ${cancel ? "opacity-40" : ""}`}>
-                    <span className="f-cond font-black text-2xl w-7 text-center tabular-nums" style={{ color: done ? "#22c55e" : cancel ? "#52525b" : "#3f3f46" }}>{race.roundNumber}</span>
-                    <span className="text-2xl">{COUNTRY_FLAGS[race.circuit?.country] || "🏁"}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="f-cond font-bold text-sm text-white truncate group-hover:text-[#E10600] transition-colors uppercase tracking-wide">{race.name.replace(" Grand Prix", " GP")}</p>
-                      {w ? <p className="f-mono text-[10px] text-zinc-500 truncate">🏆 {w.driver}</p>
-                        : cancel ? <p className="f-mono text-[10px] text-red-400/60">cancelled</p>
-                          : <p className="f-mono text-[10px] text-zinc-600">{race.date}</p>}
-                    </div>
-                    <span className="f-mono text-[10px] px-2 py-1 rounded border" style={{
-                      color: done ? "#22c55e" : "#71717a",
-                      borderColor: done ? "rgba(34,197,94,.3)" : "rgba(255,255,255,.08)",
-                      background: done ? "rgba(34,197,94,.08)" : "transparent",
-                    }}>{done ? "✓" : cancel ? "✗" : "—"}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
+          {/* Recent calendar */}
+          <RaceCalendarSection calendar={calendar} winners={winners} loading={loading} />
         </div>
 
         <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">F1 PITWALL · BROADCAST-GRADE TELEMETRY · SEASON {season}</p>
