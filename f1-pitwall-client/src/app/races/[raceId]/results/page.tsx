@@ -103,7 +103,6 @@ export default function RaceResultsPage() {
   const params = useParams();
   const raceId = params.raceId as string;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [race, setRace] = useState<RaceInfo | null>(null);
   const [drivers, setDrivers] = useState<DriverRef[]>([]);
   const [rows, setRows] = useState<ResultRow[]>([]);

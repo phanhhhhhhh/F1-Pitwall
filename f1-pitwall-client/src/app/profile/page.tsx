@@ -21,7 +21,8 @@ function getSupabaseClient() {
       "Avatar upload is unavailable."
     );
   }
-  // Dynamic import so the module can load without env vars at build time.
+  // Dynamic require so the module can load without env vars at build time.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createClient } = require("@supabase/supabase-js");
   return createClient(url, key);
 }

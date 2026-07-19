@@ -408,7 +408,6 @@ export default function LiveTimingPage() {
             <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
               {rows.map((row, i) => {
                 const posUp = row.prevPosition > row.position;
-                const posDown = row.prevPosition < row.position;
                 const posSame = row.prevPosition === row.position;
                 const isP1 = row.position === 1;
                 const tSpec = tyreSpec(row.tyreCompound);

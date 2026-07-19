@@ -61,9 +61,9 @@ function formatLapTime(sec: number): string {
 
 /** Single animated stint bar segment */
 function StintBar({
-  stint, pct, index, totalStints, hovered, totalLaps,
+  stint, pct, index, totalStints, hovered,
 }: {
-  stint: Stint; pct: number; index: number; totalStints: number; hovered: boolean; totalLaps: number;
+  stint: Stint; pct: number; index: number; totalStints: number; hovered: boolean;
 }) {
   const spec = tyre(stint.tyre);
   const showLabel = pct > 0.09;
@@ -579,7 +579,6 @@ export default function StrategyPage() {
                             index={i}
                             totalStints={arr.length}
                             hovered={false}
-                            totalLaps={totalLaps}
                           />
                         ))}
                       </div>
@@ -674,7 +673,6 @@ export default function StrategyPage() {
                                 index={i}
                                 totalStints={synced.stints.length}
                                 hovered={isHov}
-                                totalLaps={totalLaps}
                               />
                             ))}
                           </div>
