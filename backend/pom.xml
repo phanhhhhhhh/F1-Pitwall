@@ -105,6 +105,28 @@
 			<artifactId>openpdf</artifactId>
 			<version>1.3.43</version>
 		</dependency>
+		<!-- H2 for unit/integration testing (no external DB needed) -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Testcontainers for full-stack integration tests -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- API Docs -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

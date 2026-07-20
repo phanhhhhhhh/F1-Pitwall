@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.fail;
  * Verifies correct HTTP status codes for login, register, and protected endpoints.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class AuthIntegrationTest {
 

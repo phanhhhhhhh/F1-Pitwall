@@ -54,6 +54,26 @@ interface TimingRow {
   gear: number;
 }
 
+/** Raw shape returned by GET /api/openf1/session/{key}/live-timing */
+interface LiveTimingEntry {
+  position: number;
+  driverNumber: number;
+  driverName: string;
+  nameAcronym: string;
+  teamName: string;
+  teamColor: string;
+  gapToLeader: number | null;
+  interval: number | null;
+  lastLapTime: number | null;
+  sector1: number | null;
+  sector2: number | null;
+  sector3: number | null;
+  tyreCompound: string;
+  tyreAge: number;
+  pitStopCount: number;
+  lapsCompleted: number;
+}
+
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 
 function driverCode(name: string): string {
@@ -112,13 +132,15 @@ export default function LiveTimingPage() {
   const [drivers, setDrivers] = useState<TelemetryData[]>([]);
   const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
   const [rows, setRows] = useState<TimingRow[]>([]);
+  const [liveTimingData, setLiveTimingData] = useState<LiveTimingEntry[]>([]);
   const stompRef = useRef<StompClient | null>(null);
 
   // Stateful tracking across updates
   const prevPositions = useRef<Record<string, number>>({});
   const sectorBests = useRef<Record<string, { s1: number; s2: number; s3: number }>>({});
-  const overallBests = useRef<{ s1: number; s2: number; s3: number }>({ s1: Infinity, s2: Infinity, s3: Infinity });
   const tyreState = useRef<Record<string, { compound: string; age: number; stops: number }>>({});
+
+  // Track overall bests in a ref (mutable, no re-render needed — derived at render time from rows)
 
   /* ── Sector time simulation ──────────────────────────────────────────── */
   const simulateSectors = useCallback((lapTimeSec: number, driverKey: string) => {
@@ -178,8 +200,97 @@ export default function LiveTimingPage() {
     return () => clearInterval(id);
   }, []);
 
-  /* ── Build timing rows from telemetry data ───────────────────────────── */
+  /* ── Real live timing polling (OpenF1 data when session is live) ─────── */
   useEffect(() => {
+    if (!liveStatus?.isLive || !liveStatus.sessionKey || liveStatus.sessionKey === "none") return;
+
+    const fetchLiveTiming = async () => {
+      try {
+        const res = await authFetch(`${API}/api/openf1/session/${liveStatus.sessionKey}/live-timing`);
+        if (res.ok) {
+          const data: LiveTimingEntry[] = await res.json();
+          setLiveTimingData(data);
+        }
+      } catch { /* silently fail — keep last known data */ }
+    };
+
+    fetchLiveTiming();
+    const id = setInterval(fetchLiveTiming, 8000); // Poll every 8s (respects OpenF1 rate limits)
+    return () => clearInterval(id);
+  }, [liveStatus?.isLive, liveStatus?.sessionKey]);
+
+  /* ── Build timing rows ────────────────────────────────────────────────── */
+  useEffect(() => {
+    // ── Path A: Real OpenF1 live timing data ──────────────────────────────
+    if (liveTimingData.length > 0 && liveStatus?.isLive) {
+      const newRows: TimingRow[] = liveTimingData.map((lt) => {
+        const key = lt.driverName;
+        const code = lt.nameAcronym || driverCode(lt.driverName);
+        const prevPos = prevPositions.current[key] || lt.position;
+
+        // Use real sector times from OpenF1
+        const s1 = lt.sector1 ?? 0;
+        const s2 = lt.sector2 ?? 0;
+        const s3 = lt.sector3 ?? 0;
+
+        // Personal bests (tracked in ref — not accessed during render)
+        const pb = sectorBests.current[key] || { s1: Infinity, s2: Infinity, s3: Infinity };
+        if (s1 > 0 && s1 < pb.s1) pb.s1 = s1;
+        if (s2 > 0 && s2 < pb.s2) pb.s2 = s2;
+        if (s3 > 0 && s3 < pb.s3) pb.s3 = s3;
+        sectorBests.current[key] = pb;
+
+        // Real tyre data
+        const compound = lt.tyreCompound || "";
+        const ts = tyreState.current[key] || { compound, age: 0, stops: 0 };
+        if (compound && ts.compound !== compound) {
+          ts.stops = Math.max(ts.stops, lt.pitStopCount ?? 0);
+          ts.compound = compound;
+        }
+        ts.age = lt.tyreAge ?? ts.age;
+        tyreState.current[key] = ts;
+
+        // Look up DRS/speed/gear from WebSocket telemetry (not in OpenF1 timing)
+        const wsDriver = drivers.find(
+          (d) => d.driverName.toLowerCase().includes(lt.driverName.split(" ").pop()?.toLowerCase() || "")
+        );
+
+        return {
+          position: lt.position,
+          prevPosition: prevPos,
+          driverName: lt.driverName,
+          driverCode: code,
+          teamName: lt.teamName,
+          teamColor: getTeamColor(lt.teamName, lt.teamColor),
+          carNumber: lt.driverNumber,
+          gapToLeader: lt.gapToLeader ?? 0,
+          intervalToAhead: lt.interval ?? 0,
+          lastLap: lt.lastLapTime ?? 0,
+          sector1: s1,
+          sector2: s2,
+          sector3: s3,
+          bestS1: pb.s1 === Infinity ? s1 : pb.s1,
+          bestS2: pb.s2 === Infinity ? s2 : pb.s2,
+          bestS3: pb.s3 === Infinity ? s3 : pb.s3,
+          tyreCompound: compound,
+          tyreAge: ts.age,
+          pitStops: lt.pitStopCount ?? 0,
+          drsActive: wsDriver?.drsActive ?? false,
+          speed: wsDriver?.speed ?? 0,
+          gear: wsDriver?.gear ?? 0,
+        };
+      });
+
+      // Update previous positions for next cycle
+      liveTimingData.forEach((lt) => {
+        prevPositions.current[lt.driverName] = lt.position;
+      });
+
+      setRows(newRows);
+      return;
+    }
+
+    // ── Path B: Fallback — simulated sectors from WebSocket telemetry ─────
     if (!drivers.length) return;
 
     const sorted = [...drivers].sort((a, b) => a.position - b.position);
@@ -189,7 +300,7 @@ export default function LiveTimingPage() {
       const code = driverCode(d.driverName);
       const prevPos = prevPositions.current[key] || d.position;
 
-      // Sector simulation
+      // Sector simulation (fallback)
       const { s1, s2, s3 } = simulateSectors(d.lapTime, key);
 
       // Personal bests
@@ -199,25 +310,15 @@ export default function LiveTimingPage() {
       if (s3 > 0 && s3 < pb.s3) pb.s3 = s3;
       sectorBests.current[key] = pb;
 
-      // Overall bests
-      if (s1 > 0 && s1 < overallBests.current.s1) overallBests.current.s1 = s1;
-      if (s2 > 0 && s2 < overallBests.current.s2) overallBests.current.s2 = s2;
-      if (s3 > 0 && s3 < overallBests.current.s3) overallBests.current.s3 = s3;
-
-      // Tyre tracking
+      // Tyre tracking (simulated)
       const ts = tyreState.current[key] || { compound: d.tyreType, age: 0, stops: 0 };
       if (ts.compound !== d.tyreType) {
         ts.stops += 1;
         ts.compound = d.tyreType;
         ts.age = 0;
       }
-      // Increment tyre age when lap changes (heuristic: gap changes indicate new lap)
       if (d.lap > 0) ts.age = d.lap - (ts.age > 0 ? d.lap - 1 : d.lap);
       tyreState.current[key] = ts;
-
-      // Calculate tyre age properly: track lap changes per driver
-      // Simple approach: age = current lap # - lap when tyre was fitted
-      // Since we don't have stint start lap, we estimate from lap count
 
       // Interval to ahead
       const idx = sorted.indexOf(d);
@@ -256,7 +357,7 @@ export default function LiveTimingPage() {
     });
 
     setRows(newRows);
-  }, [drivers, simulateSectors]);
+  }, [drivers, simulateSectors, liveTimingData, liveStatus?.isLive]);
 
   /* ── Column width constants ──────────────────────────────────────────── */
   const COL = {
@@ -273,7 +374,12 @@ export default function LiveTimingPage() {
     DRS:    "w-[52px]",
   };
 
-  const overallBest = overallBests.current;
+  // Overall best sector times — pure derivation from rows (no ref accessed during render)
+  const overallBest = {
+    s1: rows.reduce((min, r) => (r.sector1 > 0 && r.sector1 < min ? r.sector1 : min), Infinity),
+    s2: rows.reduce((min, r) => (r.sector2 > 0 && r.sector2 < min ? r.sector2 : min), Infinity),
+    s3: rows.reduce((min, r) => (r.sector3 > 0 && r.sector3 < min ? r.sector3 : min), Infinity),
+  };
 
   return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
@@ -618,7 +724,10 @@ export default function LiveTimingPage() {
         )}
 
         <p className="text-center f-mono text-[10px] text-zinc-700 mt-6 tracking-widest">
-          F1 PITWALL · LIVE TIMING · SECTOR TIMES SIMULATED
+          F1 PITWALL · LIVE TIMING
+          {liveTimingData.length > 0
+            ? " · OPENF1 LIVE DATA"
+            : " · SECTOR TIMES SIMULATED"}
         </p>
       </main>
 

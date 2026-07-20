@@ -45,6 +45,31 @@ export function getAccessToken(): string | null {
     return accessToken;
 }
 
+export async function serverLogout(): Promise<void> {
+    const access = getAccessToken();
+    const refresh = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
+
+    if (!access) return;
+
+    try {
+        const body: Record<string, string> = {};
+        if (refresh) body.refreshToken = refresh;
+
+        await fetch(`${API_URL}/api/auth/logout`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${access}`,
+            },
+            body: JSON.stringify(body),
+        });
+    } catch {
+        // Best-effort — clear local state even if server is unreachable
+    } finally {
+        clearTokens();
+    }
+}
+
 export function clearTokens() {
     accessToken = null;
     refreshToken = null;

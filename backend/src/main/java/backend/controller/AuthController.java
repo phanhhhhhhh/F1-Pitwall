@@ -108,6 +108,12 @@ public class AuthController {
         String refreshToken = body.get("refreshToken");
         if (refreshToken == null || refreshToken.isBlank())
             return ResponseEntity.badRequest().body(Map.of("error", "refreshToken is required"));
+        // Reject refresh tokens that have been revoked (logout)
+        if (tokenBlacklistService.isBlacklisted(refreshToken)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Refresh token has been revoked. Please login again."));
+        }
+
         try {
             String username = jwtService.extractUsername(refreshToken);
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
@@ -198,19 +204,39 @@ public class AuthController {
     // ── Logout ─────────────────────────────────────────────────────────────────
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<?> logout(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody(required = false) Map<String, String> body
+    ) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing or invalid Authorization header"));
         }
-        String token = authHeader.substring(7);
+        String accessToken = authHeader.substring(7);
         try {
-            long remainingExpirationMs = jwtService.extractExpiration(token).getTime() - System.currentTimeMillis();
-            if (remainingExpirationMs > 0) {
-                tokenBlacklistService.blacklist(token, remainingExpirationMs);
+            long remainingMs = jwtService.extractExpiration(accessToken).getTime() - System.currentTimeMillis();
+            if (remainingMs > 0) {
+                tokenBlacklistService.blacklist(accessToken, remainingMs);
             }
         } catch (Exception e) {
-            log.warn("[Auth] Logout: could not extract expiration for token: {}", e.getMessage());
+            log.warn("[Auth] Logout: could not extract expiration for access token: {}", e.getMessage());
         }
+
+        // Also blacklist the refresh token if provided, so it cannot be used to mint new access tokens
+        if (body != null && body.containsKey("refreshToken")) {
+            String refreshToken = body.get("refreshToken");
+            if (refreshToken != null && !refreshToken.isBlank()) {
+                try {
+                    long remainingMs = jwtService.extractExpiration(refreshToken).getTime() - System.currentTimeMillis();
+                    if (remainingMs > 0) {
+                        tokenBlacklistService.blacklist(refreshToken, remainingMs);
+                        log.info("[Auth] Refresh token blacklisted on logout");
+                    }
+                } catch (Exception e) {
+                    log.warn("[Auth] Logout: could not blacklist refresh token: {}", e.getMessage());
+                }
+            }
+        }
+
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 

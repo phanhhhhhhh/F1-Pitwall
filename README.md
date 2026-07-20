@@ -205,6 +205,43 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 
 ---
 
+## Known Limitations
+
+### In-Memory State (lost on restart)
+
+All of the following are stored in `ConcurrentHashMap` and are **lost on application restart** (Render free tier restarts frequently due to inactivity):
+
+| Component | What's stored | Impact on restart |
+|---|---|---|
+| `TokenBlacklistService` | SHA-256 hashes of revoked JWT access + refresh tokens | Previously logged-out users can use their old tokens again until natural expiration |
+| `AccountLockoutService` | Failed login attempts per username | Lockout counters reset — a brute-force attacker gets a fresh 5 attempts |
+| `RateLimitFilter` | Bucket4j token buckets per IP | Rate-limit counters reset — a flooder gets a fresh 5 req/min allowance |
+| `TelemetrySimulator` | Simulated speed/RPM/gear per driver | Simulation state resets from lap-start values |
+
+**Mitigation (future):** Redis via Upstash free tier would persist these across restarts.
+
+### Orphan Entities (model + repository, no feature code)
+
+The following entities exist in the database schema but are **not wired to any API endpoint or service**:
+
+| Entity | Repository | Notes |
+|---|---|---|
+| `StrategyPlan` | `StrategyPlanRepository` | Pit strategy simulator planned but not built |
+| `CarSetup` | `CarSetupRepository` | Setup data model ready, no management UI |
+| `DriverContract` | `DriverContractRepository` | Contract tracking, no UI yet |
+| `Sponsorship` | `SponsorshipRepository` | Sponsor management, no UI yet |
+| `Penalty` | `PenaltyRepository` | Penalty tracking, no UI yet |
+| `Engineer` | `EngineerRepository` | Engineer profiles, no UI yet |
+| `Championship` | `ChampionshipRepository` | Has controller but minimal functionality |
+
+These are safe to leave in place (they only add schema weight via `ddl-auto=update`) but are candidates for either building out or removing to keep the codebase lean.
+
+### Database Migration
+
+The project currently uses `spring.jpa.hibernate.ddl-auto=update` even in production. This is convenient for development but risky for schema changes — there's no rollback capability. A migration to **Flyway** is planned for versioned, auditable schema changes.
+
+---
+
 ## License
 
 MIT
