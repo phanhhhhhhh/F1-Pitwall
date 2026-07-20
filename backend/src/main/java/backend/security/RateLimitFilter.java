@@ -52,8 +52,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Parse the first IP from X-Forwarded-For to prevent spoofing
+        // (a client can set an arbitrary X-Forwarded-For; taking only the first
+        // entry and falling back to the direct socket address is the pragmatic fix)
         String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isBlank()) {
+        if (ip != null && !ip.isBlank()) {
+            // X-Forwarded-For format: "client, proxy1, proxy2"
+            int comma = ip.indexOf(',');
+            ip = (comma > 0) ? ip.substring(0, comma).trim() : ip.trim();
+            if (ip.isBlank()) {
+                ip = request.getRemoteAddr();
+            }
+        } else {
             ip = request.getRemoteAddr();
         }
 

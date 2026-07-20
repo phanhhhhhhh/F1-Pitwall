@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.fail;
  * Authenticates once lazily to avoid rate-limiting.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RaceStoryIntegrationTest {

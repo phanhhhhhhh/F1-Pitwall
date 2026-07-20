@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { AuthResponse, User, clearTokens, getAccessToken, authFetch } from "../lib/pitwall-auth";
+import { AuthResponse, User, clearTokens, getAccessToken, authFetch, serverLogout } from "../lib/pitwall-auth";
 import { BASE_URL as API_URL } from "../lib/api-client";
 
 interface AuthContextType {
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ id: 0, username: data.username, email: "", role: data.role, createdAt: new Date().toISOString() });
   };
 
-  const logout = () => { clearTokens(); setUser(null); window.location.href = "/login"; };
+  const logout = () => { serverLogout(); setUser(null); window.location.href = "/login"; };
 
   // Re-fetch /me so Navbar etc. pick up profile changes without a full reload
   const refreshUser = async () => {

@@ -242,6 +242,7 @@ export interface LiveTyreData {
 
 export interface LiveStatus {
   isLive: boolean;
+  sessionKey?: string | number;
   sessionName: string;
   sessionType: string;
   circuitName: string;

@@ -46,18 +46,18 @@ export async function downloadRaceResultsCsv(raceId: number, raceName: string) {
 }
 
 export async function downloadRaceReportPdf(raceId: number, raceName: string) {
-  const filename = raceName.toLowerCase().replace(/ /g, "-") + "-report.html";
+  const filename = raceName.toLowerCase().replace(/ /g, "-") + "-report.pdf";
   await downloadFile(
     `${API}/api/export/pdf/race/${raceId}/report`,
     filename,
-    "text/html"
+    "application/pdf"
   );
 }
 
 export async function downloadStandingsPdf(season: number) {
   await downloadFile(
     `${API}/api/export/pdf/standings/${season}`,
-    `f1-standings-${season}.html`,
-    "text/html"
+    `f1-standings-${season}.pdf`,
+    "application/pdf"
   );
 }
