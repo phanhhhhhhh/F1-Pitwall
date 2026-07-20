@@ -454,8 +454,18 @@ public class OpenF1SyncService {
                 .findFirst();
     }
 
-    static String stripAccents(String s) {
-        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+    public static String stripAccents(String s) {
+        // NFKD decomposes most accented chars (ñ, é, ü, ç, etc.) but NOT
+        // precomposed letter-strokes/ligatures like ø, æ, œ, ł, đ, ß.
+        // Apply known mappings first, then NFKD for remaining diacritics.
+        String result = s
+                .replace("ø", "o").replace("Ø", "O")
+                .replace("æ", "ae").replace("Æ", "AE")
+                .replace("œ", "oe").replace("Œ", "OE")
+                .replace("ß", "ss")
+                .replace("ł", "l").replace("Ł", "L")
+                .replace("đ", "d").replace("Đ", "D");
+        return java.text.Normalizer.normalize(result, java.text.Normalizer.Form.NFKD)
                 .replaceAll("\\p{M}", "")
                 .toLowerCase();
     }
