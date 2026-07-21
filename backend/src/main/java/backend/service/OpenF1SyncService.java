@@ -38,7 +38,6 @@ public class OpenF1SyncService {
     private final LapTelemetryRepository lapTelemetryRepo;
     private final WeatherConditionRepository weatherConditionRepo;
 
-    private static final String JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
     private final RestTemplate restTemplate;
@@ -46,27 +45,47 @@ public class OpenF1SyncService {
     private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
     private static final int[] RACE_POINTS = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};
 
-    private static final Map<Integer, Integer> DB_TO_JOLPICA_ROUND = Map.of(
-            1, 1,
-            2, 2,
-            3, 3,
-            4, -1,
-            5, -1,
-            6, 4,
-            7, 5,
-            8, 6,
-            9, 7
+    /** Maps OpenF1 circuit_short_name → DB Circuit.name for session-key lookups. */
+    private static final Map<String, String> OPENF1_CIRCUIT_TO_DB = Map.ofEntries(
+            Map.entry("Melbourne", "Albert Park Circuit"),
+            Map.entry("Shanghai", "Shanghai International Circuit"),
+            Map.entry("Suzuka", "Suzuka International Racing Course"),
+            Map.entry("Sakhir", "Bahrain International Circuit"),
+            Map.entry("Jeddah", "Jeddah Corniche Circuit"),
+            Map.entry("Miami", "Miami International Autodrome"),
+            Map.entry("Montreal", "Circuit Gilles-Villeneuve"),
+            Map.entry("Monte Carlo", "Circuit de Monaco"),
+            Map.entry("Catalunya", "Circuit de Barcelona-Catalunya"),
+            Map.entry("Spielberg", "Red Bull Ring"),
+            Map.entry("Silverstone", "Silverstone Circuit"),
+            Map.entry("Spa-Francorchamps", "Circuit de Spa-Francorchamps"),
+            Map.entry("Hungaroring", "Hungaroring"),
+            Map.entry("Zandvoort", "Circuit Zandvoort"),
+            Map.entry("Monza", "Autodromo Nazionale Monza"),
+            Map.entry("Madring", "Madring Circuit"),
+            Map.entry("Baku", "Baku City Circuit"),
+            Map.entry("Singapore", "Marina Bay Street Circuit"),
+            Map.entry("Austin", "Circuit of the Americas"),
+            Map.entry("Mexico City", "Autodromo Hermanos Rodriguez"),
+            Map.entry("Interlagos", "Interlagos Circuit"),
+            Map.entry("Las Vegas", "Las Vegas Strip Circuit"),
+            Map.entry("Lusail", "Lusail International Circuit"),
+            Map.entry("Yas Marina Circuit", "Yas Marina Circuit")
     );
 
-    @Scheduled(fixedRate = 3600000)
+    // ─── Auto-sync (every 30 min) ──────────────────────────────────────────────
+
+    @Scheduled(fixedRate = 1_800_000)
     public void autoSyncCompletedRaces() {
-        log.info("🔄 [Sync] Auto-sync checking for completed races...");
+        log.info("🔄 [AutoSync] Checking for completed races...");
         try {
             syncRecentSessions();
         } catch (Exception e) {
-            log.error("[Sync] Auto-sync failed: {}", e.getMessage());
+            log.error("[AutoSync] Race results sync failed: {}", e.getMessage());
         }
     }
+
+    // ─── Batch sync ────────────────────────────────────────────────────────────
 
     public Map<String, Object> syncRecentSessions() {
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -74,7 +93,7 @@ public class OpenF1SyncService {
         List<String> skipped = new ArrayList<>();
         List<String> errors = new ArrayList<>();
 
-        List<Race> races = raceRepo.findBySeasonOrderByRoundNumber(2026);
+        List<Race> races = raceRepo.findAllByOrderBySeasonDescRoundNumberAsc();
 
         for (Race race : races) {
             if (race.getStatus() == RaceStatus.CANCELLED) {
@@ -94,11 +113,11 @@ public class OpenF1SyncService {
 
             String label = race.getName();
             try {
-                sleep(1200);
+                sleep(800);
                 boolean isSprint = race.getName().toLowerCase().contains("sprint");
                 boolean result = syncRaceByRound(race, isSprint);
                 if (result) synced.add(label);
-                else skipped.add(label + " (no data from Jolpica)");
+                else skipped.add(label + " (no data available)");
             } catch (Exception e) {
                 errors.add(label + ": " + e.getMessage());
                 log.warn("[Sync] Failed to sync {}: {}", label, e.getMessage());
@@ -112,32 +131,181 @@ public class OpenF1SyncService {
         return summary;
     }
 
+    // ─── Race Results: OpenF1 first, Jolpica fallback ──────────────────────────
+
     @Transactional
     public boolean syncRaceByRound(Race race, boolean isSprint) {
+        // 1) Try OpenF1 (fast, near-real-time)
+        try {
+            boolean ok = syncRaceResultsFromOpenF1(race, isSprint);
+            if (ok) {
+                race.setStatus(RaceStatus.COMPLETED);
+                raceRepo.save(race);
+                return true;
+            }
+        } catch (Exception e) {
+            log.debug("[Sync] OpenF1 race sync failed for {}: {}", race.getName(), e.getMessage());
+        }
+
+        // 2) Fallback to Jolpica (slower, curated)
+        return syncRaceByRoundViaJolpica(race, isSprint);
+    }
+
+    /**
+     * Syncs race results from OpenF1 position + laps data.
+     * Matches drivers by car number (driver_number in OpenF1 = carNumber in DB).
+     */
+    @SuppressWarnings("unchecked")
+    @Transactional
+    public boolean syncRaceResultsFromOpenF1(Race race, boolean isSprint) {
+        String sessionType = isSprint ? "Race" : "Race"; // OpenF1 uses "Race" for both, Sprint has session_name="Sprint"
+        Optional<Integer> keyOpt = findSessionKey(race, sessionType, isSprint);
+        if (keyOpt.isEmpty()) {
+            log.debug("[OpenF1] No session key for {} (sprint={})", race.getName(), isSprint);
+            return false;
+        }
+        int sessionKey = keyOpt.get();
+
+        // ── Position data → finish order ───────────────────────────────────
+        String posUrl = OPENF1_BASE + "/position?session_key=" + sessionKey;
+        List<Map<String, Object>> positions = restTemplate.getForObject(posUrl, List.class);
+        if (positions == null || positions.isEmpty()) {
+            log.debug("[OpenF1] No position data for {} (session={})", race.getName(), sessionKey);
+            return false;
+        }
+
+        // Take the last position entry per driver
+        Map<Integer, Integer> finishPositions = new LinkedHashMap<>();
+        Map<Integer, String> lastTimestamps = new HashMap<>();
+        for (Map<String, Object> p : positions) {
+            Integer dn = toInt(p.get("driver_number"));
+            Integer pos = toInt(p.get("position"));
+            String date = String.valueOf(p.getOrDefault("date", ""));
+            if (dn == null || pos == null) continue;
+            if (lastTimestamps.get(dn) == null || date.compareTo(lastTimestamps.get(dn)) > 0) {
+                lastTimestamps.put(dn, date);
+                finishPositions.put(dn, pos);
+            }
+        }
+
+        if (finishPositions.isEmpty()) return false;
+
+        // ── Lap data → fastest lap per driver ──────────────────────────────
+        String lapsUrl = OPENF1_BASE + "/laps?session_key=" + sessionKey;
+        List<Map<String, Object>> laps = restTemplate.getForObject(lapsUrl, List.class);
+        Map<Integer, Float> bestLaps = new HashMap<>();
+        if (laps != null) {
+            for (Map<String, Object> lap : laps) {
+                Integer dn = toInt(lap.get("driver_number"));
+                Object dur = lap.get("lap_duration");
+                if (dn == null || dur == null) continue;
+                float sec = ((Number) dur).floatValue();
+                if (sec <= 0 || sec > 600) continue;
+                Float prev = bestLaps.get(dn);
+                if (prev == null || sec < prev) bestLaps.put(dn, sec);
+            }
+        }
+
+        // Determine fastest lap driver (lowest lap time among all classified drivers)
+        int fastestLapDriver = -1;
+        if (!isSprint && !bestLaps.isEmpty()) {
+            fastestLapDriver = bestLaps.entrySet().stream()
+                    .filter(e -> {
+                        Integer pos = finishPositions.get(e.getKey());
+                        return pos != null && pos >= 1 && pos <= 10;
+                    })
+                    .min(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
+                    .orElse(-1);
+        }
+
+        // ── Build results ─────────────────────────────────────────────────
+        List<Driver> allDrivers = driverRepo.findAll();
+        Map<Integer, Driver> driversByCar = new HashMap<>();
+        for (Driver d : allDrivers) {
+            driversByCar.put(d.getCarNumber(), d);
+        }
+
+        int[] pointsSystem = isSprint ? SPRINT_POINTS : RACE_POINTS;
+        List<RaceResult> results = new ArrayList<>();
+
+        // Sort by finish position (0 = DNF, goes last)
+        List<Map.Entry<Integer, Integer>> sorted = new ArrayList<>(finishPositions.entrySet());
+        sorted.sort(Comparator.comparingInt(e -> e.getValue() <= 0 ? 999 : e.getValue()));
+
+        int classifiedPos = 0;
+        for (Map.Entry<Integer, Integer> entry : sorted) {
+            int carNumber = entry.getKey();
+            int rawPos = entry.getValue();
+            boolean dnf = rawPos <= 0;
+
+            Driver driver = driversByCar.get(carNumber);
+            if (driver == null) {
+                log.debug("[OpenF1] No DB driver for car #{} in {}", carNumber, race.getName());
+                continue;
+            }
+
+            if (!dnf) classifiedPos++;
+            int finishPos = dnf ? 0 : classifiedPos;
+            float points = 0;
+            if (!dnf && finishPos >= 1 && finishPos <= pointsSystem.length) {
+                points = pointsSystem[finishPos - 1];
+            }
+
+            boolean hasFL = (carNumber == fastestLapDriver);
+            float fastestLapTime = bestLaps.getOrDefault(carNumber, 0f);
+
+            results.add(RaceResult.builder()
+                    .race(race)
+                    .driver(driver)
+                    .finishPosition(finishPos)
+                    .startPosition(0) // not available from position data alone
+                    .points(points)
+                    .hasFastestLap(hasFL)
+                    .fastestLapTime(fastestLapTime > 0 ? fastestLapTime : 0)
+                    .fastestLapNumber(0)
+                    .dnfReason(dnf ? "DNF" : null)
+                    .build());
+        }
+
+        if (results.isEmpty()) return false;
+
+        raceResultRepo.deleteByRaceId(race.getId());
+        raceResultRepo.saveAll(results);
+
+        results.stream()
+                .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)
+                .findFirst()
+                .ifPresent(winner -> notificationService.notifyRaceResult(
+                        race.getName() + (isSprint ? " (Sprint)" : ""),
+                        winner.getDriver().getName(),
+                        winner.getDriver().getTeam() != null ? winner.getDriver().getTeam().getName() : ""
+                ));
+
+        log.info("✅ [OpenF1] Synced {} — {} drivers via OpenF1", race.getName(), results.size());
+        return true;
+    }
+
+    // ─── Jolpica fallback ─────────────────────────────────────────────────────
+
+    @Transactional
+    public boolean syncRaceByRoundViaJolpica(Race race, boolean isSprint) {
         int dbRound = race.getRoundNumber();
         if (dbRound <= 0) return false;
 
-
-        int round;
-        if (DB_TO_JOLPICA_ROUND.containsKey(dbRound)) {
-            round = DB_TO_JOLPICA_ROUND.get(dbRound);
-            if (round == -1) {
-                log.debug("[Sync] Skipping cancelled race: {}", race.getName());
-                return false;
-            }
-        } else {
-
-            round = dbRound - 2;
+        int jolpicaRound = JolpicaRoundMapper.toJolpicaRound(dbRound);
+        if (jolpicaRound == JolpicaRoundMapper.CANCELLED) {
+            log.debug("[Sync] Skipping cancelled race: {}", race.getName());
+            return false;
         }
+
+        int season = race.getSeason() > 0 ? race.getSeason() : 2026;
+        String url = JolpicaRoundMapper.buildResultsUrl(dbRound, season, isSprint);
+        log.info("[Sync] Fetching {} from Jolpica: {}", race.getName(), url);
 
         List<Driver> allDrivers = driverRepo.findAll();
 
         try {
-
-            String endpoint = isSprint ? "/sprint" : "/results";
-            String url = JOLPICA_BASE + "/2026/" + round + endpoint + ".json";
-            log.info("[Sync] Fetching {} from: {}", race.getName(), url);
-
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response == null) return false;
 
@@ -174,7 +342,6 @@ public class OpenF1SyncService {
                     continue;
                 }
 
-
                 float points = 0;
                 try {
                     points = Float.parseFloat(String.valueOf(r.getOrDefault("points", "0")));
@@ -183,7 +350,6 @@ public class OpenF1SyncService {
                         points = pointsSystem[position - 1];
                     }
                 }
-
 
                 boolean hasFastestLap = false;
                 if (!isSprint) {
@@ -215,6 +381,7 @@ public class OpenF1SyncService {
 
             if (results.isEmpty()) return false;
 
+            raceResultRepo.deleteByRaceId(race.getId());
             raceResultRepo.saveAll(results);
             race.setStatus(RaceStatus.COMPLETED);
             raceRepo.save(race);
@@ -232,15 +399,16 @@ public class OpenF1SyncService {
             return true;
 
         } catch (Exception e) {
-            log.warn("[Sync] Jolpica failed for {} (DB round={}, Jolpica round={}): {}", race.getName(), dbRound, round, e.getMessage());
+            log.warn("[Sync] Jolpica failed for {} (DB round={}, Jolpica round={}): {}", race.getName(), dbRound, jolpicaRound, e.getMessage());
             return false;
         }
     }
 
+    // ─── Session-key lookup ────────────────────────────────────────────────────
 
     @Transactional
     public boolean syncSession(int sessionKey, String countryName, boolean isSprint) {
-        List<Race> races = raceRepo.findBySeasonOrderByRoundNumber(2026);
+        List<Race> races = raceRepo.findAllByOrderBySeasonDescRoundNumberAsc();
         Optional<Race> raceOpt = races.stream()
                 .filter(r -> {
                     String name = r.getName().toLowerCase();
@@ -263,7 +431,55 @@ public class OpenF1SyncService {
         return syncRaceByRound(raceOpt.get(), isSprint);
     }
 
-    // ─── Sync Pit Stops from OpenF1 ──────────────────────────────────────────────
+    /**
+     * Finds the OpenF1 session key for a race by matching circuit and session type.
+     */
+    @SuppressWarnings("unchecked")
+    public Optional<Integer> findSessionKey(Race race, String sessionType, boolean sprint) {
+        if (race.getCircuit() == null) return Optional.empty();
+
+        String dbCircuitName = race.getCircuit().getName();
+        int season = race.getSeason() > 0 ? race.getSeason() : 2026;
+
+        // Find which OpenF1 short name maps to this DB circuit
+        String openf1Circuit = null;
+        for (Map.Entry<String, String> e : OPENF1_CIRCUIT_TO_DB.entrySet()) {
+            if (e.getValue().equals(dbCircuitName)) {
+                openf1Circuit = e.getKey();
+                break;
+            }
+        }
+        if (openf1Circuit == null) {
+            log.debug("[OpenF1] No circuit mapping for: {}", dbCircuitName);
+            return Optional.empty();
+        }
+
+        try {
+            String url = OPENF1_BASE + "/sessions?year=" + season
+                    + "&session_type=" + sessionType
+                    + "&circuit_short_name=" + openf1Circuit;
+            List<Map<String, Object>> sessions = restTemplate.getForObject(url, List.class);
+            if (sessions == null || sessions.isEmpty()) return Optional.empty();
+
+            for (Map<String, Object> s : sessions) {
+                String sessionName = String.valueOf(s.getOrDefault("session_name", ""));
+                boolean isSprintSession = sessionName.equalsIgnoreCase("Sprint")
+                        || sessionName.equalsIgnoreCase("Sprint Qualifying");
+                if (sprint == isSprintSession) {
+                    return Optional.of(toInt(s.get("session_key")));
+                }
+            }
+            // If no exact sprint/GP match, return the first one
+            if (!sessions.isEmpty()) {
+                return Optional.of(toInt(sessions.get(0).get("session_key")));
+            }
+        } catch (Exception e) {
+            log.debug("[OpenF1] Session lookup error for {}: {}", race.getName(), e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    // ─── Pit Stops from OpenF1 ─────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     @Transactional
@@ -302,10 +518,10 @@ public class OpenF1SyncService {
 
                 pitStops.add(PitStop.builder()
                         .lapNumber(lapStart)
-                        .durationSec(0f) // not available from stints endpoint
+                        .durationSec(0f)
                         .tyreOut(tyreOut)
-                        .crewSize(0) // not available
-                        .underSafetyCar(false) // not available
+                        .crewSize(0)
+                        .underSafetyCar(false)
                         .raceResult(raceResult)
                         .build());
             }
@@ -319,7 +535,7 @@ public class OpenF1SyncService {
         }
     }
 
-    // ─── Sync Lap Times from OpenF1 ──────────────────────────────────────────────
+    // ─── Lap Times from OpenF1 ─────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     @Transactional
@@ -360,13 +576,13 @@ public class OpenF1SyncService {
                 telemetries.add(LapTelemetry.builder()
                         .lapNumber(lapNumber)
                         .lapTimeSec(lapTimeSec)
-                        .speedKmh(0f)    // not available from laps endpoint
-                        .rpm(0)           // not available
-                        .gear(0)          // not available
-                        .throttlePct(0f)  // not available
-                        .brakePct(0f)     // not available
-                        .drsActive(false) // not available
-                        .fuelLoad(0f)     // not available
+                        .speedKmh(0f)
+                        .rpm(0)
+                        .gear(0)
+                        .throttlePct(0f)
+                        .brakePct(0f)
+                        .drsActive(false)
+                        .fuelLoad(0f)
                         .raceResult(raceResult)
                         .build());
             }
@@ -380,7 +596,7 @@ public class OpenF1SyncService {
         }
     }
 
-    // ─── Sync Weather from OpenF1 ────────────────────────────────────────────────
+    // ─── Weather from OpenF1 ───────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     @Transactional
@@ -425,6 +641,8 @@ public class OpenF1SyncService {
         }
     }
 
+    // ─── Helpers ───────────────────────────────────────────────────────────────
+
     private TyreType mapCompoundToTyreType(String compound) {
         if (compound == null) return null;
         return switch (compound.toUpperCase()) {
@@ -438,7 +656,6 @@ public class OpenF1SyncService {
     }
 
     private Optional<Driver> findDriver(String fullName, List<Driver> allDrivers) {
-        // Normalize diacritics so Jolpica names (Hülkenberg, Pérez) match DB names without accents
         String fName = stripAccents(fullName);
         String[] fParts = fName.split(" ");
         String fLast = fParts.length > 0 ? fParts[fParts.length - 1] : "";
@@ -455,9 +672,6 @@ public class OpenF1SyncService {
     }
 
     public static String stripAccents(String s) {
-        // NFKD decomposes most accented chars (ñ, é, ü, ç, etc.) but NOT
-        // precomposed letter-strokes/ligatures like ø, æ, œ, ł, đ, ß.
-        // Apply known mappings first, then NFKD for remaining diacritics.
         String result = s
                 .replace("ø", "o").replace("Ø", "O")
                 .replace("æ", "ae").replace("Æ", "AE")

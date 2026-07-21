@@ -15,6 +15,8 @@ public interface RaceRepository extends JpaRepository<Race, Long> {
     List<Race> findByStatus(RaceStatus status);
     List<Race> findBySeasonOrderByRoundNumber(int season);
 
+    List<Race> findAllByOrderBySeasonDescRoundNumberAsc();
+
     @Query("SELECT r FROM Race r LEFT JOIN FETCH r.circuit WHERE r.season = :season ORDER BY r.roundNumber")
     List<Race> findBySeasonWithCircuit(@Param("season") int season);
 }

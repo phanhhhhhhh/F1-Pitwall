@@ -11,7 +11,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        value: https://f1-pitwall.vercel.app
+        value: https://f1-pitwall-tau.vercel.app
       - key: DATABASE_URL
         fromDatabase:
           name: f1-pitwall-db
