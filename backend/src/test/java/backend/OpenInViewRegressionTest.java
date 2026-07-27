@@ -53,46 +53,62 @@ class OpenInViewRegressionTest {
 
     private void assert200(String path) {
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
-        ResponseEntity<?> response = rest.exchange(
-                url(path), HttpMethod.GET, request, Object.class);
+        ResponseEntity<String> response = rest.exchange(
+                url(path), HttpMethod.GET, request, String.class);
         assertThat(response.getStatusCode())
                 .as("GET %s → expected 200 OK (OSIV=false)", path)
                 .isEqualTo(HttpStatus.OK);
+    }
+
+    /** Like assert200 but also proves lazy chain was walked by checking
+     *  the response body contains the given substring. */
+    private void assert200AndContains(String path, String expectedSubstring) {
+        HttpEntity<Void> request = new HttpEntity<>(authHeaders());
+        ResponseEntity<String> response = rest.exchange(
+                url(path), HttpMethod.GET, request, String.class);
+        assertThat(response.getStatusCode())
+                .as("GET %s → expected 200 OK (OSIV=false)", path)
+                .isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody())
+                .as("GET %s → response must contain '%s' to prove lazy-loading was exercised",
+                        path, expectedSubstring)
+                .isNotNull()
+                .contains(expectedSubstring);
     }
 
     // ── Race results / standings (driver + team lazy chain) ──────────────
 
     @Test @Order(1)
     @DisplayName("GET /api/race-results/standings/drivers/2026")
-    void driverStandings() { assert200("/api/race-results/standings/drivers/2026"); }
+    void driverStandings() { assert200AndContains("/api/race-results/standings/drivers/2026", "Lando Norris"); }
 
     @Test @Order(2)
     @DisplayName("GET /api/race-results/standings/constructors/2026")
-    void constructorStandings() { assert200("/api/race-results/standings/constructors/2026"); }
+    void constructorStandings() { assert200AndContains("/api/race-results/standings/constructors/2026", "McLaren"); }
 
     @Test @Order(3)
     @DisplayName("GET /api/race-results/winners/2026")
-    void seasonWinners() { assert200("/api/race-results/winners/2026"); }
+    void seasonWinners() { assert200AndContains("/api/race-results/winners/2026", "Lando Norris"); }
 
     @Test @Order(4)
     @DisplayName("GET /api/race-results/race/1")
-    void resultsByRace() { assert200("/api/race-results/race/1"); }
+    void resultsByRace() { assert200AndContains("/api/race-results/race/1", "Lando Norris"); }
 
     // ── Sprint standings (driver + team lazy chain) ──────────────────────
 
     @Test @Order(5)
     @DisplayName("GET /api/standings/sprint/drivers/2026")
-    void sprintDriverStandings() { assert200("/api/standings/sprint/drivers/2026"); }
+    void sprintDriverStandings() { assert200AndContains("/api/standings/sprint/drivers/2026", "Lando Norris"); }
 
     @Test @Order(6)
     @DisplayName("GET /api/standings/sprint/constructors/2026")
-    void sprintConstructorStandings() { assert200("/api/standings/sprint/constructors/2026"); }
+    void sprintConstructorStandings() { assert200AndContains("/api/standings/sprint/constructors/2026", "McLaren"); }
 
     // ── Qualifying (driver + team lazy chain) ────────────────────────────
 
     @Test @Order(7)
     @DisplayName("GET /api/qualifying/race/1")
-    void qualifyingResults() { assert200("/api/qualifying/race/1"); }
+    void qualifyingResults() { assert200AndContains("/api/qualifying/race/1", "Lando Norris"); }
 
     // ── Races (circuit lazy) ─────────────────────────────────────────────
 
@@ -130,7 +146,7 @@ class OpenInViewRegressionTest {
 
     @Test @Order(15)
     @DisplayName("GET /api/races/1/pit-stops")
-    void pitStops() { assert200("/api/races/1/pit-stops"); }
+    void pitStops() { assert200AndContains("/api/races/1/pit-stops", "Lando Norris"); }
 
     // ── Circuits (races collection is @JsonIgnore — safe, but test anyway)
 
