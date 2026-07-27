@@ -52,10 +52,15 @@ public class AuthController {
 
         if (accountLockoutService.isLocked(username)) {
             long unlockSeconds = accountLockoutService.getUnlockSeconds(username);
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
-                    "error", "Account locked",
-                    "message", "Too many failed attempts. Try again in " + unlockSeconds + " seconds.",
-                    "unlockInSeconds", unlockSeconds
+            // Return the SAME 401 shape as BadCredentialsException to prevent
+            // username enumeration through lockout-vs-invalid response difference.
+            // Legitimate locked-out users will see a generic message; the only
+            // distinguishing information is logged server-side (see log line below).
+            log.warn("[Auth] Account locked for user: {}", username);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "error", "Invalid username or password",
+                    "message", "Too many attempts. Please try again.",
+                    "retryAfterSeconds", unlockSeconds
             ));
         }
 
