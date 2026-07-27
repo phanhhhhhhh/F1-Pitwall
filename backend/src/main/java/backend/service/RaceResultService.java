@@ -77,6 +77,7 @@ public class RaceResultService {
         return saved.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<RaceResultResponse> getResultsByRace(Long raceId) {
         return raceResultRepo.findByRaceIdOrderByFinishPosition(raceId)
                 .stream().map(this::toResponse).collect(Collectors.toList());
@@ -88,6 +89,7 @@ public class RaceResultService {
      * GET /api/race-results/winners/{season}
      * Response: { "Australian Grand Prix": { driverName, teamName, ... }, ... }
      */
+    @Transactional(readOnly = true)
     public Map<String, RaceWinnerResponse> getSeasonWinners(int season) {
         // Fetch only P1 non-DNF results directly from DB instead of loading all race results
         List<RaceResult> winnerResults = raceResultRepo.findSeasonWinners(season, RaceStatus.COMPLETED);
@@ -114,6 +116,7 @@ public class RaceResultService {
         return winners;
     }
 
+    @Transactional(readOnly = true)
     public List<DriverStandingResponse> getDriverStandings(int season) {
         List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
         Map<Long, DriverStats> statsMap = new LinkedHashMap<>();
@@ -164,6 +167,7 @@ public class RaceResultService {
         return standings;
     }
 
+    @Transactional(readOnly = true)
     public List<ConstructorStandingResponse> getConstructorStandings(int season) {
         List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
         Map<Long, ConstructorStats> statsMap = new LinkedHashMap<>();
