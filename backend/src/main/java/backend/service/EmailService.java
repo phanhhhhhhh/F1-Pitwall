@@ -3,6 +3,7 @@ package backend.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -19,7 +20,16 @@ public class EmailService {
     @Value("${resend.from:onboarding@resend.dev}")
     private String fromAddress;
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
+
+    public EmailService() {
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        this.restClient = RestClient.builder()
+                .requestFactory(factory)
+                .build();
+    }
 
     public void sendOtpEmail(String to, String code, String purpose) {
         if (apiKey == null || apiKey.isBlank()) {
