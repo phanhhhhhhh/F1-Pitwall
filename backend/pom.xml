@@ -99,6 +99,11 @@
 			<artifactId>bucket4j-core</artifactId>
 			<version>8.10.1</version>
 		</dependency>
+		<!-- High-performance bounded cache for rate-limit buckets -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
 		<!-- OpenPDF for real PDF generation -->
 		<dependency>
 			<groupId>com.github.librepdf</groupId>
