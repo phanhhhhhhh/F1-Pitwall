@@ -21,6 +21,7 @@ public class RaceResultService {
     private final NotificationService notificationService;
 
     private static final float[] POINTS = { 25, 18, 15, 12, 10, 8, 6, 4, 2, 1 };
+    private static final int[] SPRINT_POINTS = { 8, 7, 6, 5, 4, 3, 2, 1 };
 
     @Transactional
     public List<RaceResultResponse> submitResults(Long raceId, List<RaceResultRequest> requests) {
@@ -41,7 +42,8 @@ public class RaceResultService {
             Driver driver = driverRepo.findById(req.getDriverId())
                     .orElseThrow(() -> new RuntimeException("Driver not found: " + req.getDriverId()));
 
-            float points = calculatePoints(req.getFinishPosition(), req.isHasFastestLap(), req.getDnfReason());
+            boolean isSprint = race.getName() != null && race.getName().toLowerCase().contains("sprint");
+            float points = calculatePoints(req.getFinishPosition(), req.isHasFastestLap(), req.getDnfReason(), isSprint);
 
             results.add(RaceResult.builder()
                     .race(race)
@@ -223,15 +225,18 @@ public class RaceResultService {
         return standings;
     }
 
-    private boolean isSprintRace(RaceResult r) {
+    public static boolean isSprintRace(RaceResult r) {
         String name = r.getRace().getName();
         return name != null && name.toLowerCase().contains("sprint");
     }
 
     // 2026 rules: no fastest-lap bonus point (abolished from 2025)
-    private float calculatePoints(int position, boolean hasFastestLap, String dnfReason) {
+    private float calculatePoints(int position, boolean hasFastestLap, String dnfReason, boolean isSprint) {
         if (dnfReason != null && !dnfReason.isEmpty()) return 0;
-        return (position >= 1 && position <= 10) ? POINTS[position - 1] : 0;
+        if (isSprint) {
+            return (position >= 1 && position <= SPRINT_POINTS.length) ? SPRINT_POINTS[position - 1] : 0;
+        }
+        return (position >= 1 && position <= POINTS.length) ? POINTS[position - 1] : 0;
     }
 
     private RaceResultResponse toResponse(RaceResult r) {

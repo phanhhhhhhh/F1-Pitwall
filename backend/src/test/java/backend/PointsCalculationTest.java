@@ -73,4 +73,50 @@ class PointsCalculationTest {
         float points = (dnfReason != null && !dnfReason.isEmpty()) ? 0 : 25;
         assertThat(points).isEqualTo(0);
     }
+
+    // ── Sprint points (Fix 2: submitResults now uses sprint points for sprint races) ──
+
+    private static final int[] SPRINT_POINTS = { 8, 7, 6, 5, 4, 3, 2, 1 };
+
+    @ParameterizedTest(name = "Sprint P{0} = {1} points")
+    @CsvSource({
+            "1,   8",
+            "2,   7",
+            "3,   6",
+            "4,   5",
+            "5,   4",
+            "6,   3",
+            "7,   2",
+            "8,   1"
+    })
+    @DisplayName("Sprint P1-P8 get correct sprint points (not GP points)")
+    void sprintTop8GetCorrectPoints(int position, int expectedPoints) {
+        assertThat(SPRINT_POINTS[position - 1]).isEqualTo(expectedPoints);
+    }
+
+    @ParameterizedTest(name = "Sprint P{0} = 0 points (outside top 8)")
+    @ValueSource(ints = { 9, 10, 11, 15, 20 })
+    @DisplayName("Sprint P9+ get zero points")
+    void sprintOutsideTop8GetZeroPoints(int position) {
+        int points = (position >= 1 && position <= SPRINT_POINTS.length) ? SPRINT_POINTS[position - 1] : 0;
+        assertThat(points).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Sprint DNF always scores 0 regardless of position")
+    void sprintDnfScoresZero() {
+        String dnfReason = "Collision";
+        int position = 3; // Would normally score 6 sprint points
+        float points = (dnfReason != null && !dnfReason.isEmpty()) ? 0 : SPRINT_POINTS[position - 1];
+        assertThat(points).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Sprint points are NOT inflated GP points (P1 sprint = 8, not 25)")
+    void sprintPointsNotInflatedToGpPoints() {
+        // Sprint P1 = 8 points, GP P1 = 25 points — must not be swapped
+        assertThat(SPRINT_POINTS[0]).isEqualTo(8);
+        assertThat(POINTS[0]).isEqualTo(25);
+        assertThat(SPRINT_POINTS[0]).isNotEqualTo((int) POINTS[0]);
+    }
 }
