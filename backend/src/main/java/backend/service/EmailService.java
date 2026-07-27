@@ -2,6 +2,7 @@ package backend.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -52,7 +53,11 @@ public class EmailService {
                 .toBodilessEntity();
             log.info("[Email] OTP sent to {} for {}", to, purpose);
         } catch (Exception e) {
-            log.error("[Email] Failed to send OTP to {}: {}", to, e.getMessage());
+            // Never log the exception message — it may embed the Authorization
+            // header containing the Resend API key in plaintext.
+            log.error("[Email] Failed to send OTP to {}: {} — see debug log for details",
+                    to, e.getClass().getSimpleName());
+            log.debug("[Email] Resend API failure detail", e);
             throw new RuntimeException("Failed to send email. Please try again.");
         }
     }
