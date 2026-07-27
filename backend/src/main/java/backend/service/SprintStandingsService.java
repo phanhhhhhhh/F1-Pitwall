@@ -27,7 +27,7 @@ public class SprintStandingsService {
 
         // Filter only sprint results
         List<RaceResult> sprintResults = allResults.stream()
-                .filter(r -> isSprintRace(r))
+                .filter(r -> RaceResultService.isSprintRace(r))
                 .collect(Collectors.toList());
 
         Map<Long, SprintDriverStats> statsMap = new LinkedHashMap<>();
@@ -80,7 +80,7 @@ public class SprintStandingsService {
 
         // Filter only sprint results
         List<RaceResult> sprintResults = allResults.stream()
-                .filter(r -> isSprintRace(r))
+                .filter(r -> RaceResultService.isSprintRace(r))
                 .collect(Collectors.toList());
 
         Map<Long, SprintConstructorStats> statsMap = new LinkedHashMap<>();
@@ -133,11 +133,6 @@ public class SprintStandingsService {
             prevPoints = s.totalPoints;
         }
         return standings;
-    }
-
-    private boolean isSprintRace(RaceResult r) {
-        String name = r.getRace().getName();
-        return name != null && name.toLowerCase().contains("sprint");
     }
 
     private static class SprintDriverStats {
