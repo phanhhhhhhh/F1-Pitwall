@@ -10,6 +10,10 @@ services:
         value: prod
       - key: JWT_SECRET
         generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
       - key: FRONTEND_URL
         value: https://f1-pitwall-tau.vercel.app
       - key: DATABASE_URL
