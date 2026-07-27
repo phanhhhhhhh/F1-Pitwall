@@ -56,6 +56,12 @@ public class TeamDriverSeeder {
     }
 
     private List<Team> seedTeams() {
+        // Idempotency guard: if 2026 teams already exist (e.g. from another seeder profile), skip
+        if (teamRepo.findByName("McLaren").isPresent()) {
+            log.info("[Pitwall] Teams already exist — skipping team seeding");
+            return teamRepo.findAll();
+        }
+
         List<Team> teams = teamRepo.saveAll(List.of(
                 Team.builder().name("McLaren").country("United Kingdom").colorHex("#FF8000")
                         .championships(9).annualBudgetM(350f).base("Woking").foundedYear(1966).build(),
@@ -88,6 +94,13 @@ public class TeamDriverSeeder {
         Map<String, Team> teamMap = teams.stream()
                 .collect(Collectors.toMap(Team::getName, t -> t));
 
+        // Idempotency: skip drivers whose name or carNumber already exist (e.g. from Seeder2025)
+        var allExisting = driverRepo.findAll();
+        var existingNames = allExisting.stream()
+                .map(Driver::getName).collect(Collectors.toSet());
+        var existingCarNumbers = allExisting.stream()
+                .map(Driver::getCarNumber).collect(Collectors.toSet());
+
         Team mclaren  = teamMap.get("McLaren");
         Team ferrari  = teamMap.get("Ferrari");
         Team redbull  = teamMap.get("Red Bull Racing");
@@ -100,7 +113,7 @@ public class TeamDriverSeeder {
         Team audi     = teamMap.get("Audi");
         Team cadillac = teamMap.get("Cadillac");
 
-        driverRepo.saveAll(List.of(
+        var drivers = List.of(
                 Driver.builder().name("Lando Norris").carNumber(1).nationality("British")
                         .dateOfBirth(LocalDate.of(1999,11,13)).careerPoints(771).careerWins(8).careerPoles(7).team(mclaren).build(),
                 Driver.builder().name("Oscar Piastri").carNumber(81).nationality("Australian")
@@ -155,8 +168,16 @@ public class TeamDriverSeeder {
                         .dateOfBirth(LocalDate.of(1990,1,26)).careerPoints(1330).careerWins(6).careerPoles(3).team(cadillac).build(),
                 Driver.builder().name("Valtteri Bottas").carNumber(77).nationality("Finnish")
                         .dateOfBirth(LocalDate.of(1989,8,28)).careerPoints(1795).careerWins(10).careerPoles(20).team(cadillac).build()
-        ));
-        log.info("[Pitwall] 22 drivers seeded (2026 grid)");
+        );
+
+        var toSave = drivers.stream()
+                .filter(d -> !existingNames.contains(d.getName())
+                        && !existingCarNumbers.contains(d.getCarNumber()))
+                .collect(Collectors.toList());
+        if (!toSave.isEmpty()) {
+            driverRepo.saveAll(toSave);
+        }
+        log.info("[Pitwall] {} drivers seeded (2026 grid)", toSave.size());
     }
 
     private void seedEngineers(List<Team> teams) {

@@ -55,6 +55,11 @@ public class Seeder2025 {
                 .map(Team::getName)
                 .collect(Collectors.toSet());
 
+        if (teamRepo.findByName("McLaren").isPresent()) {
+            log.info("[Pitwall] 2025 teams already exist — skipping 2025 team seeding");
+            return teamRepo.findAll();
+        }
+
         List<Team> newTeams = List.of(
                 Team.builder().name("McLaren").country("United Kingdom").colorHex("#FF8000")
                         .championships(8).annualBudgetM(135f).base("Woking").foundedYear(1966).build(),
