@@ -55,6 +55,7 @@ public class QualifyingService {
 
     // ─── Read ─────────────────────────────────────────────────────────────────
 
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> getQualifyingResults(Long raceId) {
         List<QualifyingResult> results = qualifyingRepo.findByRaceIdOrderByGridPosition(raceId);
         return results.stream().map(r -> {
