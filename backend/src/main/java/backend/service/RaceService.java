@@ -16,12 +16,12 @@ public class RaceService {
     private final RaceRepository raceRepository;
     private final CircuitRepository circuitRepository;
 
-    public List<Race> getAll() { return raceRepository.findAll(); }
+    public List<Race> getAll() { return raceRepository.findAllWithCircuit(); }
     public List<Race> getBySeason(int season) { return raceRepository.findBySeasonWithCircuit(season); }
     public List<Race> getByStatus(RaceStatus status) { return raceRepository.findByStatus(status); }
 
     public Race getById(Long id) {
-        return raceRepository.findById(id)
+        return raceRepository.findByIdWithCircuit(id)
                 .orElseThrow(() -> new RuntimeException("Race not found: " + id));
     }
 
