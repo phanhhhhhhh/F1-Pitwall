@@ -119,13 +119,11 @@ public class DataMigrationController {
             RaceResult wrong = raceResultRepo.findById(removeFromId)
                     .orElseThrow(() -> new RuntimeException("Not found: " + removeFromId));
             wrong.setHasFastestLap(false);
-            wrong.setPoints(wrong.getPoints() - 1);
             raceResultRepo.save(wrong);
 
             RaceResult correct = raceResultRepo.findById(addToId)
                     .orElseThrow(() -> new RuntimeException("Not found: " + addToId));
             correct.setHasFastestLap(true);
-            correct.setPoints(correct.getPoints() + 1);
             raceResultRepo.save(correct);
 
             return ResponseEntity.ok(Map.of("success", true,
