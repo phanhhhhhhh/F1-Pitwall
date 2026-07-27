@@ -8,6 +8,7 @@ import backend.service.QualifyingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -30,6 +31,7 @@ public class SyncController {
         return ResponseEntity.ok(result);
     }
 
+    @Transactional
     @PostMapping("/race/{raceId}/results")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
     public ResponseEntity<Map<String, Object>> resyncRaceResults(
