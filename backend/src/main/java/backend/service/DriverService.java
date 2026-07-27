@@ -20,12 +20,12 @@ public class DriverService {
 
     public List<Driver> getAll() { return driverRepository.findAllWithTeam(); }
 
-    public Page<Driver> getPaged(Pageable pageable) { return driverRepository.findAll(pageable); }
-    public List<Driver> getByTeam(Long teamId) { return driverRepository.findByTeamId(teamId); }
-    public List<Driver> getLeaderboard() { return driverRepository.findAllOrderByCareerPoints(); }
+    public Page<Driver> getPaged(Pageable pageable) { return driverRepository.findAllWithTeam(pageable); }
+    public List<Driver> getByTeam(Long teamId) { return driverRepository.findByTeamIdWithTeam(teamId); }
+    public List<Driver> getLeaderboard() { return driverRepository.findAllOrderByCareerPointsWithTeam(); }
 
     public Driver getById(Long id) {
-        return driverRepository.findById(id)
+        return driverRepository.findByIdWithTeam(id)
                 .orElseThrow(() -> new RuntimeException("Driver not found: " + id));
     }
 
