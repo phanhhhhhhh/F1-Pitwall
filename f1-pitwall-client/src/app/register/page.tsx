@@ -41,7 +41,12 @@ const STRENGTH_LABELS = ["", "Weak", "Fair", "Good", "Strong"];
 
 function strengthScore(p: string): number {
     if (!p) return 0;
-    return p.length < 6 ? 1 : p.length < 10 ? 2 : /[A-Z]/.test(p) && /[0-9]/.test(p) ? 4 : 3;
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9]/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
 }
 
 function StrengthBar({ password }: { password: string }) {
@@ -124,7 +129,7 @@ export default function RegisterPage() {
         if (!username.trim() || username.trim().length < 3) { setError("Callsign must be at least 3 characters"); return; }
         if (!email.trim() || !email.includes("@") || !email.includes(".")) { setError("Please enter a valid email address"); return; }
         if (password !== confirm) { setError("Passwords do not match"); return; }
-        if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+        if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
         setIsLoading(true);
         try {
             await register(username, password, email);

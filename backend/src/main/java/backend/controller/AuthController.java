@@ -195,7 +195,7 @@ public class AuthController {
         if (currentPassword == null || newPassword == null)
             return ResponseEntity.badRequest().body(Map.of("error", "currentPassword and newPassword are required"));
         if (newPassword.length() < 6)
-            return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 6 characters"));
+            return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 8 characters"));
         User user = userRepository.findByUsername(username).orElseThrow();
         boolean isOAuthUser = user.getPassword() == null || user.getPassword().isEmpty();
         if (!isOAuthUser && !passwordEncoder.matches(currentPassword, user.getPassword()))
@@ -271,7 +271,7 @@ public class AuthController {
         if (email == null || code == null || newPassword == null)
             return ResponseEntity.badRequest().body(Map.of("error", "email, otp, and newPassword are required"));
         if (newPassword.length() < 6)
-            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters"));
         if (!otpService.verifyOtp(email.trim(), code.trim(), OtpToken.OtpType.FORGOT_PASSWORD))
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
         User user = userRepository.findByEmail(email.trim()).orElse(null);
