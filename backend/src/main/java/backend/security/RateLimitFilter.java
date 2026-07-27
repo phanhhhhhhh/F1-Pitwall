@@ -26,7 +26,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/api/auth/login",
             "/api/auth/register",
             "/api/auth/forgot-password",
+            "/api/auth/otp/send",
             "/api/auth/otp/verify",
+            "/api/auth/oauth2/resend-otp",
             "/api/auth/oauth2/verify-otp"
     );
 
