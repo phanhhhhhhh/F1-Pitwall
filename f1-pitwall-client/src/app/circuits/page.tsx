@@ -5,6 +5,7 @@ import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonTable } from "../components/LoadingSkeleton";
+import { ErrorBanner } from "../components/auth";
 import { flagForCountry } from "../lib/f1-theme";
 import type { CircuitInfo } from "../types/f1";
 
@@ -146,12 +147,15 @@ function CircuitCard({ circuit, idx }: { circuit: CircuitInfo; idx: number }) {
 export default function CircuitsPage() {
   const [circuits, setCircuits] = useState<CircuitInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    authFetch(`${API}/api/circuits`).then(r => r.json()).then(setCircuits).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  const fetchCircuits = () => {
+    setError(null); setLoading(true);
+    authFetch(`${API}/api/circuits`).then(r => r.json()).then(setCircuits).catch(() => setError("Failed to load circuits")).finally(() => setLoading(false));
+  };
+  useEffect(() => { fetchCircuits(); }, []);
 
   const types = ["ALL", "PERMANENT", "STREET", "OVAL"];
   const filtered = circuits.filter(c => {
@@ -216,9 +220,10 @@ export default function CircuitsPage() {
           })}
         </div>
 
-        {loading ? (
+        {error && <div className="max-w-2xl mx-auto"><ErrorBanner msg={error} /><button onClick={fetchCircuits} className="block mx-auto mt-2 f-mono text-xs text-red-400 hover:text-red-300 transition-colors">↻ Retry</button></div>}
+        {!error && loading ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><SkeletonTable rows={8} cols={5} /></div>
-        ) : filtered.length === 0 ? (
+        ) : !error && filtered.length === 0 ? (
           <div className="text-center py-20"><p className="f-cond text-zinc-500 text-xl mb-1">No circuits found</p><p className="f-mono text-zinc-700 text-xs">Try adjusting your search</p></div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{filtered.map((c, i) => <CircuitCard key={c.id} circuit={c} idx={i} />)}</div>

@@ -5,6 +5,7 @@ import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonCard } from "../components/LoadingSkeleton";
+import { ErrorBanner } from "../components/auth";
 import { NATIONALITY_FLAGS, COUNTRY_FLAGS, useCountUp } from "../lib/f1-theme";
 import type { TeamInfo, DriverCard } from "../types/f1";
 
@@ -68,11 +69,14 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [drivers, setDrivers] = useState<DriverCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchTeams = () => {
+    setError(null); setLoading(true);
     Promise.all([authFetch(`${API}/api/teams`).then(r => r.json()), authFetch(`${API}/api/drivers`).then(r => r.json())])
-      .then(([t, d]) => { setTeams(t); setDrivers(d); }).catch(console.error).finally(() => setLoading(false));
-  }, []);
+      .then(([t, d]) => { setTeams(t); setDrivers(d); }).catch(() => setError("Failed to load teams")).finally(() => setLoading(false));
+  };
+  useEffect(() => { fetchTeams(); }, []);
 
   const totalBudget = teams.reduce((s, t) => s + (t.annualBudgetM || 0), 0);
   const totalTitles = teams.reduce((s, t) => s + (t.championships || 0), 0);
@@ -111,7 +115,8 @@ export default function TeamsPage() {
               <span className="block text-transparent bg-clip-text" style={{ backgroundImage: "linear-gradient(90deg,#E10600,#ff5a3c)" }}>THE GRID</span>
             </h1>
           </div>
-          {!loading && (
+          {error && <div className="max-w-2xl mx-auto mb-6"><ErrorBanner msg={error} /><button onClick={fetchTeams} className="block mx-auto mt-2 f-mono text-xs text-red-400 hover:text-red-300 transition-colors">↻ Retry</button></div>}
+          {!error && !loading && (
             <div className="flex gap-3 rise" style={{ animationDelay: "150ms" }}>
               {[{ l: "TOTAL TITLES", v: totalTitles.toLocaleString() }, { l: "COMBINED BUDGET", v: `$${totalBudget.toLocaleString()}M` }].map(s => (
                 <div key={s.l} className="rounded-xl border border-white/8 px-5 py-3 text-right chamfer" style={{ background: "rgba(18,18,21,.7)" }}>
