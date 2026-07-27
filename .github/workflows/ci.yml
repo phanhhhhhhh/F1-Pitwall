@@ -30,6 +30,11 @@ jobs:
         env:
           JWT_SECRET: ci-test-secret-key-with-at-least-32-chars
 
+      - name: OSIV=false regression guard
+        run: ./mvnw --batch-mode test -Dtest=OpenInViewRegressionTest -Dspring.profiles.active=test,ci
+        env:
+          JWT_SECRET: ci-test-secret-key-with-at-least-32-chars
+
       - name: Lint (Checkstyle / spotless if configured)
         run: ./mvnw --batch-mode compile -DskipTests
         continue-on-error: true
