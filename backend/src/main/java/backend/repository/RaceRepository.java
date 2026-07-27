@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface RaceRepository extends JpaRepository<Race, Long> {
@@ -19,4 +20,10 @@ public interface RaceRepository extends JpaRepository<Race, Long> {
 
     @Query("SELECT r FROM Race r LEFT JOIN FETCH r.circuit WHERE r.season = :season ORDER BY r.roundNumber")
     List<Race> findBySeasonWithCircuit(@Param("season") int season);
+
+    @Query("SELECT r FROM Race r LEFT JOIN FETCH r.circuit ORDER BY r.season DESC, r.roundNumber")
+    List<Race> findAllWithCircuit();
+
+    @Query("SELECT r FROM Race r LEFT JOIN FETCH r.circuit WHERE r.id = :id")
+    Optional<Race> findByIdWithCircuit(@Param("id") Long id);
 }
