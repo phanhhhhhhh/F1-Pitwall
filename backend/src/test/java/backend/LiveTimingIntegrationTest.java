@@ -1,6 +1,5 @@
 package backend;
 
-import backend.service.LiveTimingService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,25 +7,27 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.LinkedHashMap;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Integration test for the Live Timing endpoint — hermetic (no OpenF1 network dependency).
- * Uses @TestConfiguration with a @Primary mock LiveTimingService so the controller
- * returns stubbed data instead of hitting the real OpenF1 API.
+ * Integration test for Live Timing — hermetic (mocks OpenF1 at the RestTemplate layer).
+ * The REAL LiveTimingService merge logic runs; only HTTP calls are intercepted
+ * by a Mockito mock RestTemplate returning static JSON fixtures.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -35,10 +36,10 @@ import static org.mockito.Mockito.when;
 class LiveTimingIntegrationTest {
 
     @TestConfiguration
-    static class MockConfig {
+    static class RestTemplateOverride {
         @Bean @Primary
-        LiveTimingService liveTimingService() {
-            return mock(LiveTimingService.class);
+        RestTemplate testRestTemplate() {
+            return mock(RestTemplate.class);
         }
     }
 
@@ -46,9 +47,9 @@ class LiveTimingIntegrationTest {
     private int port;
 
     @Autowired
-    private LiveTimingService liveTimingService;
+    private RestTemplate restTemplate;
 
-    private final RestTemplate rest = new RestTemplate();
+    private final RestTemplate testClient = new RestTemplate();
     private String jwtToken;
 
     private String url(String path) {
@@ -58,7 +59,7 @@ class LiveTimingIntegrationTest {
     private HttpHeaders authHeaders() {
         if (jwtToken == null) {
             @SuppressWarnings("rawtypes")
-            ResponseEntity<Map> resp = rest.postForEntity(
+            ResponseEntity<Map> resp = testClient.postForEntity(
                     url("/api/auth/login"),
                     Map.of("username", "admin", "password", "pitwall2024"),
                     Map.class);
@@ -69,60 +70,49 @@ class LiveTimingIntegrationTest {
         return headers;
     }
 
-    /** Returns a realistic stubbed live-timing response with 2 drivers. */
-    private static List<Map<String, Object>> stubTiming() {
-        Map<String, Object> d1 = new LinkedHashMap<>();
-        d1.put("position", 1);
-        d1.put("driverNumber", 1);
-        d1.put("driverName", "Lando Norris");
-        d1.put("firstName", "Lando");
-        d1.put("lastName", "Norris");
-        d1.put("nameAcronym", "NOR");
-        d1.put("teamName", "McLaren");
-        d1.put("teamColor", "#FF8000");
-        d1.put("headshotUrl", "https://example.com/norris.png");
-        d1.put("gapToLeader", null);
-        d1.put("interval", null);
-        d1.put("lastLapTime", 87.123);
-        d1.put("sector1", 27.1);
-        d1.put("sector2", 33.4);
-        d1.put("sector3", 26.6);
-        d1.put("tyreCompound", "SOFT");
-        d1.put("tyreAge", 3);
-        d1.put("pitStopCount", 0);
-        d1.put("lapsCompleted", 12);
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> fixture(String name) {
+        try {
+            String json = new ClassPathResource("openf1-fixtures/" + name + ".json")
+                    .getContentAsString(StandardCharsets.UTF_8);
+            // Use Jackson via RestTemplate's own converters, or just parse inline
+            return List.of((Map<String, Object>[]) new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(json, Map[].class));
+        } catch (Exception e) {
+            throw new RuntimeException("Fixture not found: " + name, e);
+        }
+    }
 
-        Map<String, Object> d2 = new LinkedHashMap<>();
-        d2.put("position", 2);
-        d2.put("driverNumber", 44);
-        d2.put("driverName", "Lewis Hamilton");
-        d2.put("firstName", "Lewis");
-        d2.put("lastName", "Hamilton");
-        d2.put("nameAcronym", "HAM");
-        d2.put("teamName", "Ferrari");
-        d2.put("teamColor", "#E8002D");
-        d2.put("headshotUrl", "https://example.com/hamilton.png");
-        d2.put("gapToLeader", 1.234);
-        d2.put("interval", 0.567);
-        d2.put("lastLapTime", 87.890);
-        d2.put("sector1", 27.5);
-        d2.put("sector2", 33.8);
-        d2.put("sector3", 26.5);
-        d2.put("tyreCompound", "MEDIUM");
-        d2.put("tyreAge", 8);
-        d2.put("pitStopCount", 1);
-        d2.put("lapsCompleted", 12);
+    @BeforeAll
+    @SuppressWarnings("unchecked")
+    void stubRestTemplate() {
+        int sk = 9590;
+        String base = "https://api.openf1.org/v1";
+        List<Map<String, Object>> empty = new ArrayList<>();
 
-        return List.of(d1, d2);
+        // Catch-all first: any OpenF1 URL defaults to empty list
+        // (later-specific stubs override this for the LiveTiming URLs)
+        when(restTemplate.getForObject(startsWith(base), any()))
+                .thenReturn((List) empty);
+
+        // Specific overrides for LiveTimingService's 5 endpoints
+        when(restTemplate.getForObject(eq(base + "/position?session_key=" + sk), eq(List.class)))
+                .thenReturn((List) fixture("positions"));
+        when(restTemplate.getForObject(eq(base + "/intervals?session_key=" + sk), eq(List.class)))
+                .thenReturn((List) fixture("intervals"));
+        when(restTemplate.getForObject(eq(base + "/laps?session_key=" + sk + "&is_pit_out_lap=false"), eq(List.class)))
+                .thenReturn((List) fixture("laps"));
+        when(restTemplate.getForObject(eq(base + "/stints?session_key=" + sk), eq(List.class)))
+                .thenReturn((List) fixture("stints"));
+        when(restTemplate.getForObject(eq(base + "/drivers?session_key=" + sk), eq(List.class)))
+                .thenReturn((List) fixture("drivers"));
     }
 
     @Test
     @Order(1)
     void liveTimingEndpointReturns200() {
-        when(liveTimingService.getLiveTiming(anyInt())).thenReturn(stubTiming());
-
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
-        ResponseEntity<List> response = rest.exchange(
+        ResponseEntity<List> response = testClient.exchange(
                 url("/api/openf1/session/9590/live-timing"),
                 HttpMethod.GET, request, List.class);
 
@@ -133,10 +123,8 @@ class LiveTimingIntegrationTest {
     @Test
     @Order(2)
     void liveTimingResponseIsArray() {
-        when(liveTimingService.getLiveTiming(anyInt())).thenReturn(stubTiming());
-
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
-        ResponseEntity<List> response = rest.exchange(
+        ResponseEntity<List> response = testClient.exchange(
                 url("/api/openf1/session/9590/live-timing"),
                 HttpMethod.GET, request, List.class);
 
@@ -145,15 +133,13 @@ class LiveTimingIntegrationTest {
 
     @Test
     @Order(3)
+    @SuppressWarnings("unchecked")
     void liveTimingEntriesHaveRequiredFieldsWhenDataPresent() {
-        when(liveTimingService.getLiveTiming(anyInt())).thenReturn(stubTiming());
-
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
-        ResponseEntity<List> response = rest.exchange(
+        ResponseEntity<List> response = testClient.exchange(
                 url("/api/openf1/session/9590/live-timing"),
                 HttpMethod.GET, request, List.class);
 
-        @SuppressWarnings("unchecked")
         List<Map<String, Object>> body = response.getBody();
         assertThat(body).isNotNull().isNotEmpty();
 
@@ -171,16 +157,28 @@ class LiveTimingIntegrationTest {
                 "pitStopCount", "lapsCompleted"
         );
 
+        // Verify merge logic: values come from our fixtures
         assertThat(entry.get("driverName")).isEqualTo("Lando Norris");
         assertThat(entry.get("teamName")).isEqualTo("McLaren");
         assertThat(entry.get("position")).isEqualTo(1);
+        assertThat(entry.get("tyreCompound")).isEqualTo("SOFT");
+        assertThat(entry.get("pitStopCount")).isEqualTo(0);
+        assertThat(entry.get("lapsCompleted")).isEqualTo(12);
+        assertThat(entry.get("gapToLeader")).isNull();
+
+        Map<String, Object> entry2 = body.get(1);
+        assertThat(entry2.get("driverName")).isEqualTo("Lewis Hamilton");
+        assertThat(entry2.get("position")).isEqualTo(2);
+        assertThat(entry2.get("gapToLeader")).isEqualTo(1.234);
+        assertThat(entry2.get("interval")).isEqualTo(0.567);
+        assertThat(entry2.get("pitStopCount")).isEqualTo(1);
     }
 
     @Test
     @Order(4)
     void liveTimingEndpointRequiresAuth() {
         try {
-            rest.getForEntity(
+            testClient.getForEntity(
                     url("/api/openf1/session/9590/live-timing"), String.class);
             fail("Expected 401");
         } catch (HttpClientErrorException e) {
