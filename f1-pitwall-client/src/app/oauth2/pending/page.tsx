@@ -1,38 +1,16 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { verifyOauth2Otp, sendOauth2Otp } from "../../lib/pitwall-auth";
 import { motion, AnimatePresence } from "framer-motion";
 import PitwallBackground from "../../components/PitwallBackground";
+import { RedLine, Spinner, ErrorBanner } from "../../components/auth";
 import { F1 } from "../../lib/f1-theme";
 
 const OTP_EXPIRY_SECONDS = 300;
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
-
-function RedLine() {
-    return (
-        <div className="h-px w-full" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
-    );
-}
-
-function Spinner() {
-    return <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />;
-}
-
-function ErrorBanner({ msg }: { msg: string }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-            className="mb-5 p-3 rounded-lg f-mono text-xs text-red-400 text-center flex items-center gap-2 justify-center chamfer-sm"
-            style={{ background: "rgba(225,6,0,0.08)", border: `1px solid rgba(225,6,0,0.28)` }}
-        >
-            <span className="text-base">⚠</span> {msg}
-        </motion.div>
-    );
-}
-
 /* ── Timer ring ──────────────────────────────────────────────────────────── */
 function TimerRing({ timeLeft }: { timeLeft: number }) {
     const minutes = String(Math.floor(timeLeft / 60)).padStart(2, "0");
