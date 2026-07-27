@@ -35,9 +35,8 @@ jobs:
         env:
           JWT_SECRET: ci-test-secret-key-with-at-least-32-chars
 
-      - name: Lint (Checkstyle / spotless if configured)
+      - name: Compile sanity check
         run: ./mvnw --batch-mode compile -DskipTests
-        continue-on-error: true
 
   # ── Frontend: Next.js ───────────────────────────────────────────────────
   frontend:
