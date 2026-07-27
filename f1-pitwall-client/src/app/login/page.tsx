@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -7,22 +7,13 @@ import { BASE_URL as API } from "../lib/api-client";
 import { Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import PitwallBackground from "../components/PitwallBackground";
+import { RedLine, Spinner, ErrorBanner } from "../components/auth";
 import { F1 } from "../lib/f1-theme";
 
 type LoginMode = "password" | "otp";
 type OtpStep = "email" | "code";
 
 /* ── shared micro-components ─────────────────────────────────────────────── */
-
-function RedLine() {
-    return (
-        <div
-            className="h-px w-full"
-            style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }}
-        />
-    );
-}
-
 function InputField({
     id, label, type, value, onChange, placeholder, autoComplete, required, inputMode, maxLength, autoFocus,
     extra, focusedId, setFocused,
@@ -94,22 +85,6 @@ function PrimaryButton({ children, disabled, isLoading }: {
             )}
             <span className="relative flex items-center justify-center gap-2">{children}</span>
         </button>
-    );
-}
-
-function Spinner() {
-    return <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />;
-}
-
-function ErrorBanner({ msg }: { msg: string }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-            className="mb-5 p-3 rounded-lg f-mono text-xs text-red-400 text-center flex items-center gap-2 justify-center chamfer-sm"
-            style={{ background: "rgba(225,6,0,0.08)", border: `1px solid rgba(225,6,0,0.28)` }}
-        >
-            <span className="text-base">⚠</span> {msg}
-        </motion.div>
     );
 }
 
