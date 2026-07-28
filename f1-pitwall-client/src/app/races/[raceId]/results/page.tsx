@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 import { authFetch } from "../../../lib/pitwall-auth";
 import type { RaceInfo } from "../../../types/f1";
 import Navbar from "../../../components/Navbar";
+import RaceSubNav from "../../../components/RaceSubNav";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable, SkeletonCard } from "../../../components/LoadingSkeleton";
-import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
+import { F1, getTeamColor } from "../../../lib/f1-theme";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DriverRef, ResultRow, RaceResultResponse } from "../../../types/f1";
@@ -187,8 +188,6 @@ export default function RaceResultsPage() {
   const p3 = sorted.find(r => !r.dnfReason && r.finishPosition === 3);
   const hasPodium = p1 && p2 && p3;
 
-  const countryFlag = flagForCountry(race?.circuit?.country);
-
   // ── Loading state
   if (loading) return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: F1.bg }}>
@@ -214,44 +213,19 @@ export default function RaceResultsPage() {
       <Navbar />
       <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
 
-        {/* ── Page header */}
-        <motion.div
-          className="mb-8 sm:mb-10"
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <Link
-            href="/races"
-            className="f-mono text-[11px] tracking-widest text-zinc-600 hover:text-[#ff6a52] transition-colors mb-4 inline-flex items-center gap-1.5"
-          >
-            ← BACK TO CALENDAR
-          </Link>
+        {/* ── Sub-navigation + race context */}
+        <RaceSubNav
+          raceId={raceId}
+          raceName={race?.name}
+          roundNumber={race?.roundNumber}
+          country={race?.circuit?.country}
+          date={race?.date}
+          activeTab="results"
+        />
 
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="inline-block w-8 h-[3px] rounded-full" style={{ background: F1.red }} />
-            <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500 uppercase">
-              {race?.circuit?.country && `${countryFlag} `}
-              {race?.date ? race.date.slice(0, 4) : "2026"}
-              {race?.roundNumber ? ` · ROUND ${race.roundNumber}` : ""}
-              {race?.circuit?.country ? ` · ${race.circuit.country.toUpperCase()}` : ""}
-            </span>
-          </div>
-
-          <h1 className="f-cond font-black tracking-tight leading-[0.85]" style={{ fontSize: "clamp(40px,7vw,76px)" }}>
-            <span className="block text-white">{race?.name?.toUpperCase().replace(/ GRAND PRIX$/, "") || "RACE"}</span>
-            <span
-              className="block text-transparent bg-clip-text"
-              style={{ backgroundImage: `linear-gradient(90deg, ${F1.red}, ${F1.orange})` }}
-            >
-              RACE RESULTS
-            </span>
-          </h1>
-
-          {race?.circuit?.name && (
-            <p className="f-mono text-xs text-zinc-500 mt-2">{race.circuit.name}</p>
-          )}
-        </motion.div>
+        {race?.circuit?.name && (
+          <p className="f-mono text-xs text-zinc-500 -mt-4 mb-6">{race.circuit.name}</p>
+        )}
 
         {/* ── Submitted success banner */}
         <AnimatePresence>

@@ -5,13 +5,13 @@ import { useParams } from "next/navigation";
 import { authFetch } from "../../../lib/pitwall-auth";
 import type { RaceInfo } from "../../../types/f1";
 import Navbar from "../../../components/Navbar";
+import RaceSubNav from "../../../components/RaceSubNav";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
-import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
-import Link from "next/link";
+import { F1, getTeamColor } from "../../../lib/f1-theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { BASE_URL as API } from "../../../lib/api-client";
-import type { QualifyingResult } from "../../../types/f1";
+import type { QualifyingResult, PenaltyItem } from "../../../types/f1";
 
 function TimeDelta({ time, best, highlight }: { time: number | null; best: number | null; highlight?: boolean }) {
     if (!time || !best) return <span className="text-zinc-700 f-mono text-xs">—</span>;
@@ -59,16 +59,14 @@ export default function QualifyingPage() {
     const raceId = params?.raceId as string;
 
     const [results, setResults] = useState<QualifyingResult[]>([]);
+    const [penalties, setPenalties] = useState<PenaltyItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [syncing, setSyncing] = useState(false);
-    const [resyncing, setResyncing] = useState(false);
     const [raceName, setRaceName] = useState("");
     const [raceInfo, setRaceInfo] = useState<RaceInfo | null>(null);
     const [hasData, setHasData] = useState(false);
-    const [feedback, setFeedback] = useState("");
 
     useEffect(() => {
-        fetchData(); fetchRaceInfo();
+        fetchData(); fetchRaceInfo(); fetchPenalties();
     }, [raceId]);
 
     const fetchData = async () => {
@@ -80,6 +78,14 @@ export default function QualifyingPage() {
         finally { setLoading(false); }
     };
 
+    const fetchPenalties = async () => {
+        try {
+            const res = await authFetch(`${API}/api/penalties/race/${raceId}`);
+            const data = await res.json();
+            setPenalties(data);
+        } catch { /* endpoint may not exist yet */ }
+    };
+
     const fetchRaceInfo = async () => {
         try {
             const res = await authFetch(`${API}/api/races/${raceId}`);
@@ -89,31 +95,19 @@ export default function QualifyingPage() {
         } catch { }
     };
 
-    const handleSync = async () => {
-        setSyncing(true);
-        try { await authFetch(`${API}/api/qualifying/sync/race/${raceId}`, { method: "POST" }); await fetchData(); }
-        catch (e) { console.error(e); }
-        finally { setSyncing(false); }
-    };
-
-    const handleResync = async () => {
-        if (!confirm("This will delete current qualifying data and re-fetch.\nContinue?")) return;
-        setResyncing(true); setFeedback("");
-        try {
-            const res = await authFetch(`${API}/api/sync/race/${raceId}/qualifying`, { method: "POST" });
-            const data = await res.json();
-            if (data.success) { setFeedback("✓ Re-sync successful!"); await fetchData(); }
-            else setFeedback("✗ " + (data.message || data.error || "Re-sync failed"));
-        } catch { setFeedback("✗ Connection error"); }
-        finally { setResyncing(false); setTimeout(() => setFeedback(""), 4000); }
-    };
+    // Map driver name → penalty info for quick lookup
+    const penaltyByDriver = new Map<string, PenaltyItem[]>();
+    penalties.forEach(p => {
+        const key = p.driverName;
+        if (!penaltyByDriver.has(key)) penaltyByDriver.set(key, []);
+        penaltyByDriver.get(key)!.push(p);
+    });
 
     const bestQ1 = safeBest(results.map(r => r.q1TimeRaw));
     const bestQ2 = safeBest(results.map(r => r.q2TimeRaw));
     const bestQ3 = safeBest(results.map(r => r.q3TimeRaw));
 
     const poleDriver = results.find(r => r.gridPosition === 1);
-    const countryFlag = flagForCountry(raceInfo?.circuit?.country);
 
     // ── Loading
     if (loading) return (
@@ -138,81 +132,19 @@ export default function QualifyingPage() {
             <Navbar />
             <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
 
-                {/* ── Page header */}
-                <motion.div
-                    className="mb-8 sm:mb-10"
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                >
-                    <Link
-                        href="/races"
-                        className="f-mono text-[11px] tracking-widest text-zinc-600 hover:text-[#ff6a52] transition-colors mb-4 inline-flex items-center gap-1.5"
-                    >
-                        ← BACK TO CALENDAR
-                    </Link>
+                {/* ── Sub-navigation + race context */}
+                <RaceSubNav
+                    raceId={raceId}
+                    raceName={raceName || raceInfo?.name}
+                    roundNumber={raceInfo?.roundNumber}
+                    country={raceInfo?.circuit?.country}
+                    date={raceInfo?.date}
+                    activeTab="qualifying"
+                />
 
-                    <div className="flex items-center gap-2.5 mb-2">
-                        <span className="inline-block w-8 h-[3px] rounded-full" style={{ background: F1.gold }} />
-                        <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500 uppercase">
-                            {raceInfo?.circuit?.country && `${countryFlag} `}
-                            {raceInfo?.date ? raceInfo.date.slice(0, 4) : "2026"}
-                            {raceInfo?.roundNumber ? ` · ROUND ${raceInfo.roundNumber}` : ""}
-                            {raceInfo?.circuit?.country ? ` · ${raceInfo.circuit.country.toUpperCase()}` : ""}
-                        </span>
-                    </div>
-
-                    <h1 className="f-cond font-black tracking-tight leading-[0.85]" style={{ fontSize: "clamp(40px,7vw,76px)" }}>
-                        <span className="block text-white">{raceName?.toUpperCase().replace(/ GRAND PRIX$/, "") || "QUALIFYING"}</span>
-                        <span
-                            className="block text-transparent bg-clip-text"
-                            style={{ backgroundImage: `linear-gradient(90deg, ${F1.gold}, #f59e0b)` }}
-                        >
-                            QUALIFYING
-                        </span>
-                    </h1>
-
-                    {raceInfo?.circuit?.name && (
-                        <p className="f-mono text-xs text-zinc-500 mt-2">{raceInfo.circuit.name}</p>
-                    )}
-                </motion.div>
-
-                {/* ── Feedback toast */}
-                <AnimatePresence>
-                    {feedback && (
-                        <motion.div
-                            className={`mb-4 text-xs f-mono px-4 py-2.5 rounded-xl border inline-flex items-center gap-2 ${feedback.startsWith("✓") ? "text-[#00E676] border-[#00E676]/25 bg-[#00E676]/08" : "text-red-400 border-red-500/25 bg-red-500/08"}`}
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                        >
-                            {feedback}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* ── Action bar */}
-                <motion.div
-                    className="flex flex-wrap items-center gap-3 justify-end mb-6"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                >
-                    {hasData && (
-                        <button onClick={handleResync} disabled={resyncing}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all f-mono ${resyncing ? "border-zinc-700 text-zinc-500" : "border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/08"}`}>
-                            {resyncing ? (<><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />RE-SYNCING...</>) : "⚠ RE-SYNC"}
-                        </button>
-                    )}
-                    <button onClick={handleSync} disabled={syncing}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all f-mono ${syncing ? "border-zinc-700 text-zinc-500" : "border-[#E10600]/40 text-[#ff6a52] hover:bg-[#E10600]/08"}`}>
-                        {syncing ? (<><div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />SYNCING...</>) : "↻ SYNC FROM OPENF1"}
-                    </button>
-                    <Link href={`/races/${raceId}/results`}
-                        className="f-mono text-xs border border-zinc-700 text-zinc-500 hover:text-white hover:border-zinc-500 px-4 py-2 rounded-xl transition-all">
-                        RACE RESULTS →
-                    </Link>
-                </motion.div>
+                {raceInfo?.circuit?.name && (
+                    <p className="f-mono text-xs text-zinc-500 -mt-4 mb-6">{raceInfo.circuit.name}</p>
+                )}
 
                 {/* ── No data state */}
                 {!hasData ? (
@@ -227,14 +159,9 @@ export default function QualifyingPage() {
                             <span className="text-2xl">🏎</span>
                         </div>
                         <p className="f-cond font-black text-xl text-white mb-1">Qualifying Data Unavailable</p>
-                        <p className="f-mono text-xs text-zinc-500 max-w-xs mb-8">
-                            Session not yet complete · Sync from OpenF1 once qualifying has finished
+                        <p className="f-mono text-xs text-zinc-500 max-w-xs">
+                            Session not yet complete · Data syncs automatically once qualifying has finished
                         </p>
-                        <button onClick={handleSync} disabled={syncing}
-                            className="px-8 py-3 rounded-xl f-cond font-black text-sm text-white transition-all"
-                            style={{ background: `linear-gradient(135deg, ${F1.red}, #dc2626)`, boxShadow: `0 0 24px rgba(225,6,0,.3)` }}>
-                            {syncing ? "SYNCING..." : "SYNC QUALIFYING DATA"}
-                        </button>
                     </motion.div>
                 ) : (
                     <div className="space-y-8">
@@ -356,17 +283,32 @@ export default function QualifyingPage() {
                                                     const segC = Q_COLORS[seg];
                                                     const tc = getTeamColor(driver.teamName, driver.teamColor);
                                                     const isPole = driver.gridPosition === 1;
+                                                    const driverPenalties = penaltyByDriver.get(driver.driverName) || [];
+                                                    const hasGridPenalty = driver.qualifyingPosition > 0 && driver.gridPosition !== driver.qualifyingPosition;
+                                                    const totalGridDrop = driverPenalties.reduce((sum, p) => sum + p.gridDrop, 0);
 
                                                     return (
                                                         <div
                                                             key={driver.id}
-                                                            className="flex-1 flex items-center gap-3 rounded-xl px-3 sm:px-4 py-2.5 transition-all group border"
+                                                            className="flex-1 flex items-center gap-3 rounded-xl px-3 sm:px-4 py-2.5 transition-all group border relative"
                                                             style={{
                                                                 background: isPole ? `rgba(255,210,0,.06)` : "rgba(255,255,255,.02)",
                                                                 borderColor: isPole ? `${F1.gold}30` : "rgba(255,255,255,.06)",
                                                                 borderLeft: `3px solid ${tc}`,
                                                             }}
                                                         >
+                                                            {/* Penalty indicator */}
+                                                            {driverPenalties.length > 0 && (
+                                                                <div className="absolute -top-1.5 -right-1.5 flex gap-0.5">
+                                                                    {driverPenalties.map((p, pi) => (
+                                                                        <span key={pi} title={`${p.type}: ${p.reason || "Grid penalty"} (${p.gridDrop} places)`}
+                                                                            className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black f-mono border"
+                                                                            style={{ background: "#f97316", color: "#fff", borderColor: "#f97316" }}>
+                                                                            ↓
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                             {/* Grid position */}
                                                             <span
                                                                 className="f-cond font-black text-2xl w-7 flex-shrink-0 tabular-nums leading-none"
@@ -392,6 +334,11 @@ export default function QualifyingPage() {
                                                             <div className="text-right flex-shrink-0">
                                                                 <p className="f-mono text-xs text-zinc-400">{driver.bestTime || "—"}</p>
                                                                 <div className="flex items-center justify-end gap-1 mt-0.5">
+                                                                    {hasGridPenalty && (
+                                                                        <span className="f-mono text-[9px] text-orange-400/80" title={`Qualified P${driver.qualifyingPosition} → Grid P${driver.gridPosition}`}>
+                                                                            Q{driver.qualifyingPosition}
+                                                                        </span>
+                                                                    )}
                                                                     <span className="f-mono text-[9px] font-bold" style={{ color: segC.text }}>{seg.toUpperCase()}</span>
                                                                     <div className="w-1.5 h-1.5 rounded-full" style={{ background: segC.dot, boxShadow: `0 0 4px ${segC.dot}` }} />
                                                                 </div>
@@ -563,8 +510,37 @@ export default function QualifyingPage() {
                             ))}
                         </motion.div>
 
+                        {/* ── Active penalties list (admin) ── */}
+                        {penalties.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.4 }}
+                            >
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="inline-block w-5 h-[2px]" style={{ background: "#f97316" }} />
+                                    <span className="f-mono text-[10px] tracking-[0.35em] text-orange-400">ACTIVE PENALTIES</span>
+                                    <span className="f-mono text-[10px] text-zinc-600 ml-auto">{penalties.length} applied</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {penalties.map(p => (
+                                        <div key={p.id}
+                                            className="flex items-center gap-2 rounded-xl px-3 py-2 border text-xs f-mono group"
+                                            style={{ background: "rgba(249,115,22,.06)", borderColor: "rgba(249,115,22,.25)" }}>
+                                            <span className="text-orange-400 font-bold">{p.driverName}</span>
+                                            <span className="text-orange-300/70">
+                                                {p.type === "GRID_DROP" ? `↓${p.gridDrop}` : p.type}
+                                            </span>
+                                            {p.reason && <span className="text-zinc-500 max-w-[200px] truncate hidden sm:inline">— {p.reason}</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+
                     </div>
                 )}
+
             </main>
         </div>
     );

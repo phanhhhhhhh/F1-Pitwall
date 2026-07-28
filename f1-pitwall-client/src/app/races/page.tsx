@@ -17,7 +17,7 @@ export default function RacesPage() {
     const { season } = useSeason();
     const [races, setRaces] = useState<RaceInfo[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState("GP");
+    const [filter, setFilter] = useState("ALL");
     const [raceWinners, setRaceWinners] = useState<Record<string, RaceWinner>>({});
 
     useEffect(() => {
@@ -51,18 +51,16 @@ export default function RacesPage() {
     const totalGP = mainRaces.length || 22;
 
     const displayList =
-        filter === "GP" ? mainRaces.map(r => ({ ...r, _type: "gp" }))
-            : filter === "SPRINT" ? sprintRaces.map(r => ({ ...r, _type: "sprint" }))
-                : filter === "ALL" ? races.map(r => ({ ...r, _type: r.name.toLowerCase().includes("sprint") ? "sprint" : "gp" }))
-                    : mainRaces.filter(r => r.status === filter).map(r => ({ ...r, _type: "gp" }));
+        filter === "COMPLETED" ? races.filter(r => r.status === "COMPLETED").map(r => ({ ...r, _type: r.name.toLowerCase().includes("sprint") ? "sprint" : "gp" }))
+            : filter === "UPCOMING" ? races.filter(r => r.status === "SCHEDULED").map(r => ({ ...r, _type: r.name.toLowerCase().includes("sprint") ? "sprint" : "gp" }))
+                : filter === "SPRINT" ? sprintRaces.map(r => ({ ...r, _type: "sprint" }))
+                    : races.map(r => ({ ...r, _type: r.name.toLowerCase().includes("sprint") ? "sprint" : "gp" }));
 
     const TABS = [
-        { key: "GP", label: "🏁 Grand Prix", count: mainRaces.length },
-        { key: "SPRINT", label: "⚡ Sprint", count: sprintRaces.length },
+        { key: "ALL", label: "All Races", count: races.length },
         { key: "COMPLETED", label: "Completed", count: completed },
-        { key: "SCHEDULED", label: "Scheduled", count: scheduled },
-        { key: "CANCELLED", label: "Cancelled", count: cancelled },
-        { key: "ALL", label: "All sessions", count: races.length },
+        { key: "UPCOMING", label: "Upcoming", count: scheduled },
+        { key: "SPRINT", label: "Sprint", count: sprintRaces.length },
     ];
 
     const today = new Date().toISOString().split("T")[0];
@@ -84,12 +82,10 @@ export default function RacesPage() {
     }, [nextGP]);
 
     const TAB_ACTIVE: Record<string, string> = {
-        GP: "border-[#E10600] bg-[#E10600]/15 text-[#ff6a52]",
-        SPRINT: "border-[#F97316] bg-[#F97316]/15 text-orange-300",
-        COMPLETED: "border-[#00E676] bg-[#00E676]/15 text-emerald-300",
-        SCHEDULED: "border-[#3B82F6] bg-[#3B82F6]/15 text-blue-300",
-        CANCELLED: "border-zinc-500 bg-zinc-700/30 text-zinc-300",
         ALL: "border-white/40 bg-white/10 text-white",
+        COMPLETED: "border-[#00E676] bg-[#00E676]/15 text-emerald-300",
+        UPCOMING: "border-[#3B82F6] bg-[#3B82F6]/15 text-blue-300",
+        SPRINT: "border-[#F97316] bg-[#F97316]/15 text-orange-300",
     };
 
     return (
@@ -171,20 +167,18 @@ export default function RacesPage() {
                                 const dotColor = isCancelled ? "#52525b" : isCompleted ? "#00E676" : isSprint ? "#F97316" : isNext ? "#E10600" : "#3f3f46";
 
                                 return (
-                                    <div key={race.id} className={`relative rise ${isSprint ? "pl-16" : "pl-12"}`} style={{ animationDelay: `${idx * 25}ms` }}>
+                                    <div key={race.id} className={`relative rise pl-10 sm:pl-12`} style={{ animationDelay: `${idx * 25}ms` }}>
                                         <div className="absolute rounded-full border-2 z-10" style={{
-                                            width: isSprint ? "10px" : "14px", height: isSprint ? "10px" : "14px",
-                                            left: isSprint ? "16px" : "13px", top: "50%", transform: "translateY(-50%)",
+                                            width: "12px", height: "12px",
+                                            left: "12px", top: "50%", transform: "translateY(-50%)",
                                             borderColor: "#0a0a0c", backgroundColor: dotColor,
                                             animation: isNext ? "livedot 1.6s infinite" : "none",
                                         }} />
-                                        <div className="flex items-center gap-3 sm:gap-4 rounded-2xl border px-4 sm:px-5 py-3.5 transition-all group"
+                                        <div className="flex items-center gap-3 sm:gap-4 rounded-2xl border px-3 sm:px-5 py-3.5 transition-all group"
                                             style={{
                                                 background: isCancelled ? "rgba(255,255,255,.015)" : isNext ? "rgba(225,6,0,.08)" : isCompleted ? "rgba(18,18,21,.7)" : isSprint ? "rgba(249,115,22,.06)" : "rgba(255,255,255,.02)",
                                                 borderColor: isCancelled ? "rgba(255,255,255,.04)" : isNext ? "rgba(225,6,0,.35)" : "rgba(255,255,255,.07)",
                                                 opacity: isCancelled ? 0.45 : 1,
-                                                borderLeft: isCompleted && !isSprint ? "3px solid rgba(0,230,118,.5)" : isNext ? "3px solid #E10600" : isSprint ? "3px solid rgba(249,115,22,.5)" : undefined,
-                                                borderRadius: (isCompleted || isNext || isSprint) ? "0 16px 16px 0" : undefined,
                                             }}>
                                             <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center f-cond font-black text-sm"
                                                 style={{
@@ -200,25 +194,19 @@ export default function RacesPage() {
                                                     {isSprint && <span className="f-mono text-[9px] bg-[#F97316]/15 text-[#F97316] border border-[#F97316]/25 px-1.5 py-0.5 rounded">SPRINT</span>}
                                                     {isNext && countdown && <span className="f-mono text-[10px] text-[#E10600]/80">{countdown}</span>}
                                                 </div>
-                                                <p className="f-mono text-[11px] text-zinc-600 mt-0.5 truncate">{race.circuit?.name} · {race.date}</p>
+                                                <p className="f-mono text-[10px] sm:text-[11px] text-zinc-600 mt-0.5 truncate">{race.circuit?.name} · {race.date}</p>
                                                 {winner && <p className="f-mono text-[11px] text-zinc-500 mt-1">🏆 <span className="text-[#FFD23F] font-bold">{winner.driver}</span> <span className="text-zinc-700 mx-1">·</span> {winner.team}</p>}
                                             </div>
                                             <div className="flex items-center gap-2 flex-shrink-0">
                                                 <Link href={`/races/${race.id}/weekend`}
-                                                    className="f-mono text-[11px] text-zinc-500 hover:text-blue-400 border border-white/10 hover:border-blue-400/40 px-3 py-1.5 rounded-lg transition-all">
+                                                    className="f-mono text-[11px] text-zinc-400 hover:text-white border border-white/10 hover:border-white/30 px-3 py-1.5 rounded-lg transition-all">
                                                     Weekend →
                                                 </Link>
-                                                {(isCompleted || race.status === "SCHEDULED") && (
-                                                    <Link href={`/races/${race.id}/qualifying`}
-                                                        className={`f-mono text-[11px] border px-3 py-1.5 rounded-lg transition-all ${isSprint ? "text-zinc-500 hover:text-[#F97316] border-white/10 hover:border-[#F97316]/40" : "text-zinc-500 hover:text-[#FFD23F] border-white/10 hover:border-[#FFD23F]/40"}`}>
-                                                        {isSprint ? "⚡ S-Quali →" : "Quali →"}
-                                                    </Link>
-                                                )}
                                                 {isCompleted && (
                                                     <Link href={`/races/${race.id}/results`}
                                                         className="f-mono text-[11px] text-zinc-500 hover:text-[#ff6a52] border border-white/10 hover:border-[#E10600]/40 px-3 py-1.5 rounded-lg transition-all">Results →</Link>
                                                 )}
-                                                <span className="f-mono text-[10px] px-2.5 py-1 rounded-lg border font-bold"
+                                                <span className="f-mono text-[10px] px-2.5 py-1 rounded-lg border font-bold hidden sm:inline-block"
                                                     style={{
                                                         color: isCompleted ? "#00E676" : isCancelled ? "#71717a" : isNext ? "#ff6a52" : isSprint ? "#F97316" : "#71717a",
                                                         background: isCompleted ? "rgba(0,230,118,.1)" : isNext ? "rgba(225,6,0,.1)" : isSprint ? "rgba(249,115,22,.1)" : "rgba(255,255,255,.03)",
@@ -234,7 +222,7 @@ export default function RacesPage() {
                         </div>
                     </div>
                 )}
-                {!loading && <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">{completed} COMPLETED · {scheduled} REMAINING · {cancelled} CANCELLED</p>}
+                {!loading && <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">{completed} COMPLETED · {scheduled} UPCOMING · {sprintRaces.length} SPRINTS</p>}
             </main>
         </div>
     );
