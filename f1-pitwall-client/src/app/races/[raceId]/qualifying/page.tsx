@@ -9,7 +9,7 @@ import RaceSubNav from "../../../components/RaceSubNav";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
 import { F1, getTeamColor } from "../../../lib/f1-theme";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { BASE_URL as API } from "../../../lib/api-client";
 import type { QualifyingResult, PenaltyItem } from "../../../types/f1";
 
@@ -67,6 +67,7 @@ export default function QualifyingPage() {
 
     useEffect(() => {
         fetchData(); fetchRaceInfo(); fetchPenalties();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [raceId]);
 
     const fetchData = async () => {
@@ -285,7 +286,6 @@ export default function QualifyingPage() {
                                                     const isPole = driver.gridPosition === 1;
                                                     const driverPenalties = penaltyByDriver.get(driver.driverName) || [];
                                                     const hasGridPenalty = driver.qualifyingPosition > 0 && driver.gridPosition !== driver.qualifyingPosition;
-                                                    const totalGridDrop = driverPenalties.reduce((sum, p) => sum + p.gridDrop, 0);
 
                                                     return (
                                                         <div

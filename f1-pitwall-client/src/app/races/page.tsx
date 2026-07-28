@@ -22,6 +22,7 @@ export default function RacesPage() {
 
     useEffect(() => {
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [season]);
 
     const fetchData = async () => {
