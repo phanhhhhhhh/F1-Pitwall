@@ -26,6 +26,7 @@ public class QualifyingService {
     private final RaceRepository raceRepo;
     private final DriverRepository driverRepo;
     private final OpenF1SyncService openF1SyncService;
+    private final PenaltyService penaltyService;
 
     private final RestTemplate restTemplate;
 
@@ -37,6 +38,7 @@ public class QualifyingService {
     public void autoSyncQualifying() {
         log.info("🔄 [AutoSync Quali] Checking for completed qualifying sessions...");
         int synced = 0;
+        int penaltiesDetected = 0;
         List<Race> races = raceRepo.findAllByOrderBySeasonDescRoundNumberAsc();
         for (Race race : races) {
             if (race.getName().toLowerCase().contains("sprint")) continue;
@@ -45,12 +47,30 @@ public class QualifyingService {
             try {
                 sleep();
                 Map<String, Object> result = syncQualifying(race.getId());
-                if (Boolean.TRUE.equals(result.get("success"))) synced++;
+                if (Boolean.TRUE.equals(result.get("success"))) {
+                    synced++;
+                    // Auto-detect penalties from OpenF1 starting grid
+                    try {
+                        sleep();
+                        Map<String, Object> penaltyResult = penaltyService.syncPenaltiesFromOpenF1(race.getId());
+                        if (Boolean.TRUE.equals(penaltyResult.get("success"))) {
+                            int detected = (int) penaltyResult.getOrDefault("penaltiesDetected", 0);
+                            penaltiesDetected += detected;
+                            if (detected > 0) {
+                                log.info("⚖️ [AutoSync Quali] {}: {} penalties auto-detected", race.getName(), detected);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.debug("[AutoSync Quali] Penalty sync failed for {}: {}", race.getName(), e.getMessage());
+                    }
+                }
             } catch (Exception e) {
                 log.debug("[AutoSync Quali] Failed for {}: {}", race.getName(), e.getMessage());
             }
         }
-        if (synced > 0) log.info("✅ [AutoSync Quali] Synced {} qualifying sessions", synced);
+        if (synced > 0 || penaltiesDetected > 0) {
+            log.info("✅ [AutoSync Quali] Synced {} sessions, detected {} penalties", synced, penaltiesDetected);
+        }
     }
 
     // ─── Read ─────────────────────────────────────────────────────────────────
@@ -61,6 +81,7 @@ public class QualifyingService {
         return results.stream().map(r -> {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("id", r.getId());
+            map.put("driverId", r.getDriver() != null ? r.getDriver().getId() : 0);
             map.put("gridPosition", r.getGridPosition());
             map.put("driverName", r.getDriver() != null ? r.getDriver().getName() : "");
             map.put("teamName", r.getDriver() != null && r.getDriver().getTeam() != null
@@ -77,6 +98,7 @@ public class QualifyingService {
             map.put("q1TimeRaw", r.getQ1Time());
             map.put("q2TimeRaw", r.getQ2Time());
             map.put("q3TimeRaw", r.getQ3Time());
+            map.put("qualifyingPosition", r.getQualifyingPosition() > 0 ? r.getQualifyingPosition() : r.getGridPosition());
             return map;
         }).collect(Collectors.toList());
     }
@@ -229,6 +251,7 @@ public class QualifyingService {
                     .race(race)
                     .driver(driver)
                     .gridPosition(gridPos)
+                    .qualifyingPosition(gridPos) // initially same as grid, penalties adjust grid later
                     .q1Time(null).q2Time(null).q3Time(null) // OpenF1 doesn't split Q segments
                     .bestTime(bestTime)
                     .eliminatedQ1(false).eliminatedQ2(false)
@@ -316,6 +339,7 @@ public class QualifyingService {
                         .race(race)
                         .driver(driverOpt.get())
                         .gridPosition(position)
+                        .qualifyingPosition(position) // initially same as grid, penalties adjust later
                         .q1Time(q1).q2Time(q2).q3Time(q3).bestTime(best)
                         .eliminatedQ1(elQ1).eliminatedQ2(elQ2)
                         .build());
