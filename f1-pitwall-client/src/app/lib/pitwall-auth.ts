@@ -32,22 +32,22 @@ export function setTokens(access: string, refresh: string) {
     accessToken = access;
     refreshToken = refresh;
     if (isBrowser()) {
-        localStorage.setItem("pitwall_access", access);
-        localStorage.setItem("pitwall_refresh", refresh);
+        sessionStorage.setItem("pitwall_access", access);
+        sessionStorage.setItem("pitwall_refresh", refresh);
         document.cookie = "pitwall_session=1; path=/; SameSite=Strict";
     }
 }
 
 export function getAccessToken(): string | null {
     if (!accessToken && isBrowser()) {
-        accessToken = localStorage.getItem("pitwall_access");
+        accessToken = sessionStorage.getItem("pitwall_access");
     }
     return accessToken;
 }
 
 export async function serverLogout(): Promise<void> {
     const access = getAccessToken();
-    const refresh = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
+    const refresh = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
 
     if (!access) return;
 
@@ -74,8 +74,8 @@ export function clearTokens() {
     accessToken = null;
     refreshToken = null;
     if (isBrowser()) {
-        localStorage.removeItem("pitwall_access");
-        localStorage.removeItem("pitwall_refresh");
+        sessionStorage.removeItem("pitwall_access");
+        sessionStorage.removeItem("pitwall_refresh");
         localStorage.removeItem("pitwall_username");
         localStorage.removeItem("pitwall_role");
         localStorage.removeItem("pitwall_avatar");
@@ -165,7 +165,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
     }
     clearTimeout(timeoutId);
 
-    const currentRefresh = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
+    const currentRefresh = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
     if (res.status === 401 && currentRefresh) {
         const refreshed = await tryRefreshToken();
         if (refreshed) {
@@ -198,7 +198,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
 
 async function doRefresh(): Promise<boolean> {
     try {
-        const stored = refreshToken || (isBrowser() ? localStorage.getItem("pitwall_refresh") : null);
+        const stored = refreshToken || (isBrowser() ? sessionStorage.getItem("pitwall_refresh") : null);
         if (!stored) return false;
         const res = await fetch(`${API_URL}/api/auth/refresh`, {
             method: "POST",
@@ -208,7 +208,7 @@ async function doRefresh(): Promise<boolean> {
         if (res.ok) {
             const data = await res.json();
             accessToken = data.accessToken;
-            if (isBrowser()) localStorage.setItem("pitwall_access", data.accessToken);
+            if (isBrowser()) sessionStorage.setItem("pitwall_access", data.accessToken);
             return true;
         }
     } catch (e) { console.warn("Token refresh failed:", e); }
