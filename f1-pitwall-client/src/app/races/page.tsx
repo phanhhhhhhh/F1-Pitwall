@@ -203,6 +203,10 @@ export default function RacesPage() {
                                                     className="f-mono text-[11px] text-zinc-400 hover:text-white border border-white/10 hover:border-white/30 px-3 py-1.5 rounded-lg transition-all">
                                                     Weekend →
                                                 </Link>
+                                                <Link href={`/races/${race.id}/qualifying`}
+                                                    className={`f-mono text-[11px] border px-3 py-1.5 rounded-lg transition-all hidden sm:inline-block ${isSprint ? "text-zinc-500 hover:text-[#F97316] border-white/10 hover:border-[#F97316]/40" : "text-zinc-500 hover:text-[#FFD23F] border-white/10 hover:border-[#FFD23F]/40"}`}>
+                                                    {isSprint ? "S-Quali →" : "Quali →"}
+                                                </Link>
                                                 {isCompleted && (
                                                     <Link href={`/races/${race.id}/results`}
                                                         className="f-mono text-[11px] text-zinc-500 hover:text-[#ff6a52] border border-white/10 hover:border-[#E10600]/40 px-3 py-1.5 rounded-lg transition-all">Results →</Link>
