@@ -83,7 +83,7 @@ export default function QualifyingPage() {
         try {
             const res = await authFetch(`${API}/api/penalties/race/${raceId}`);
             const data = await res.json();
-            setPenalties(data);
+            setPenalties(Array.isArray(data) ? data : []);
         } catch { /* endpoint may not exist yet */ }
     };
 
