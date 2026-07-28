@@ -153,6 +153,7 @@ export default function RaceWeekendPage() {
 
   useEffect(() => {
     fetchPageData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raceId]);
 
   const fetchPageData = async () => {
@@ -199,7 +200,7 @@ export default function RaceWeekendPage() {
     } finally {
       setLoadingResults(false);
     }
-  }, [raceId]);
+  }, []);
 
   useEffect(() => {
     if (activeSession) loadResults(activeSession);

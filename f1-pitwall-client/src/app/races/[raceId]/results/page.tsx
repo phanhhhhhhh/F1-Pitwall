@@ -117,6 +117,7 @@ export default function RaceResultsPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raceId]);
 
   const fetchData = async () => {
