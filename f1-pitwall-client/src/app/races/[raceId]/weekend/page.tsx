@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { RaceInfo } from "../../../types/f1";
 import { authFetch } from "../../../lib/pitwall-auth";
-import { F1, getTeamColor, flagForCountry } from "../../../lib/f1-theme";
+import { F1, getTeamColor } from "../../../lib/f1-theme";
 import Navbar from "../../../components/Navbar";
+import RaceSubNav from "../../../components/RaceSubNav";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
 import Link from "next/link";
@@ -140,7 +141,6 @@ function PracticeTable({ results, loading, accent }: { results: SessionResult[];
 }
 
 export default function RaceWeekendPage() {
-  const router = useRouter();
   const params = useParams();
   const raceId = params.raceId as string;
 
@@ -175,8 +175,11 @@ export default function RaceWeekendPage() {
   const sessionCacheRef = useRef<Record<number, SessionResult[]>>({});
 
   const loadResults = useCallback(async (session: SessionInfo) => {
-    if (session.name === "Race") { router.push(`/races/${raceId}/results`); return; }
-    if (session.name === "Qualifying") { router.push(`/races/${raceId}/qualifying`); return; }
+    // Qualifying and Race show inline summary cards with links — don't redirect
+    if (session.name === "Race" || session.name === "Qualifying") {
+      setResults([]);
+      return;
+    }
 
     const cached = sessionCacheRef.current[session.sessionKey];
     if (cached) {
@@ -196,14 +199,13 @@ export default function RaceWeekendPage() {
     } finally {
       setLoadingResults(false);
     }
-  }, [raceId, router]);
+  }, [raceId]);
 
   useEffect(() => {
     if (activeSession) loadResults(activeSession);
   }, [activeSession, loadResults]);
 
   const accent = activeSession ? SESSION_ACCENT[activeSession.name] ?? F1.red : F1.red;
-  const countryFlag = flagForCountry(race?.circuit?.country);
 
   if (loadingPage) return (
     <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: F1.bg }}>
@@ -225,28 +227,17 @@ export default function RaceWeekendPage() {
       <Navbar />
       <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
 
-        {/* Page header */}
-        <motion.div className="mb-8" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-          <Link href="/races" className="f-mono text-[11px] tracking-widest text-zinc-600 hover:text-[#ff6a52] transition-colors mb-4 inline-flex items-center gap-1.5">
-            ← BACK TO CALENDAR
-          </Link>
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="inline-block w-8 h-[3px] rounded-full" style={{ background: F1.red }} />
-            <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500 uppercase">
-              {race?.circuit?.country && `${countryFlag} `}
-              {race?.date?.slice(0, 4) ?? "2026"}
-              {race?.roundNumber ? ` · ROUND ${race.roundNumber}` : ""}
-              {race?.circuit?.country ? ` · ${race.circuit.country.toUpperCase()}` : ""}
-            </span>
-          </div>
-          <h1 className="f-cond font-black tracking-tight leading-[0.85]" style={{ fontSize: "clamp(40px,7vw,76px)" }}>
-            <span className="block text-white">{race?.name?.toUpperCase().replace(/ GRAND PRIX$/, "") || "RACE"}</span>
-            <span className="block text-transparent bg-clip-text" style={{ backgroundImage: `linear-gradient(90deg, ${F1.red}, ${F1.orange})` }}>
-              RACE WEEKEND
-            </span>
-          </h1>
-          {race?.circuit?.name && <p className="f-mono text-xs text-zinc-500 mt-2">{race.circuit.name}</p>}
-        </motion.div>
+        {/* Sub-navigation + race context */}
+        <RaceSubNav
+          raceId={raceId}
+          raceName={race?.name}
+          roundNumber={race?.roundNumber}
+          country={race?.circuit?.country}
+          date={race?.date}
+          activeTab="weekend"
+        />
+
+        {race?.circuit?.name && <p className="f-mono text-xs text-zinc-500 -mt-4 mb-6">{race.circuit.name}</p>}
 
         {/* No sessions fallback */}
         {sessions.length === 0 && (
@@ -293,33 +284,15 @@ export default function RaceWeekendPage() {
                   transition={{ duration: 0.18 }}
                 >
                   {/* Session info bar */}
-                  <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
-                    <div className="flex items-center gap-3">
-                      <span className="inline-block w-5 h-[2px]" style={{ background: accent }} />
-                      <span className="f-mono text-[10px] tracking-[0.35em] text-zinc-500 uppercase">
-                        {activeSession.name}
+                  <div className="flex items-center gap-3 mb-5 flex-wrap">
+                    <span className="inline-block w-5 h-[2px]" style={{ background: accent }} />
+                    <span className="f-mono text-[10px] tracking-[0.35em] text-zinc-500 uppercase">
+                      {activeSession.name}
+                    </span>
+                    {activeSession.dateStart && (
+                      <span className="f-mono text-[10px] text-zinc-700">
+                        {formatDate(activeSession.dateStart)}
                       </span>
-                      {activeSession.dateStart && (
-                        <span className="f-mono text-[10px] text-zinc-700">
-                          {formatDate(activeSession.dateStart)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Link to full dedicated pages for Quali / Race */}
-                    {activeSession.name === "Qualifying" && (
-                      <Link href={`/races/${raceId}/qualifying`}
-                        className="f-mono text-[10px] border rounded-lg px-3 py-1.5 transition-colors"
-                        style={{ borderColor: `${F1.gold}40`, color: F1.gold }}>
-                        VIEW FULL QUALIFYING →
-                      </Link>
-                    )}
-                    {activeSession.name === "Race" && (
-                      <Link href={`/races/${raceId}/results`}
-                        className="f-mono text-[10px] border rounded-lg px-3 py-1.5 transition-colors"
-                        style={{ borderColor: `${F1.red}40`, color: F1.red }}>
-                        VIEW RACE RESULTS →
-                      </Link>
                     )}
                   </div>
 
