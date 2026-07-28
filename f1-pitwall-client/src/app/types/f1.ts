@@ -147,7 +147,9 @@ export interface RaceResultResponse {
 /* ── Qualifying ─────────────────────────────────────────────────────────── */
 export interface QualifyingResult {
   id: number;
+  driverId: number;
   gridPosition: number;
+  qualifyingPosition: number;
   driverName: string;
   teamName: string;
   teamColor: string;
@@ -161,6 +163,20 @@ export interface QualifyingResult {
   q1TimeRaw: number | null;
   q2TimeRaw: number | null;
   q3TimeRaw: number | null;
+}
+
+/* ── Penalty ──────────────────────────────────────────────────────────── */
+export interface PenaltyItem {
+  id: number;
+  type: string;
+  timeSeconds: number;
+  gridDrop: number;
+  reason: string;
+  lap: number;
+  driverId: number;
+  driverName: string;
+  carNumber: number;
+  teamName: string;
 }
 
 /* ── Race weekend sessions + results ────────────────────────────────────── */
