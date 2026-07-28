@@ -12,6 +12,7 @@ public class QualifyingResult {
     private Long id;
 
     private int gridPosition;
+    private int qualifyingPosition; // original quali classification (before penalties)
     private int q1Position;
     private int q2Position;
     private int q3Position;
