@@ -7,7 +7,7 @@ import { F1, tyre } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
 import { SkeletonCard } from "../components/LoadingSkeleton";
-import { ErrorBanner } from "../components/auth";
+
 import { BASE_URL as API } from "../lib/api-client";
 import type { CircuitRef } from "../types/f1";
 
@@ -193,16 +193,15 @@ export default function StrategyPage() {
   const [hoveredStrat, setHoveredStrat] = useState<string | null>(null);
 
   // ── auth + data fetch (preserved exactly) ──────────────────────────────────
-  const [error, setError] = useState<string | null>(null);
   const fetchCircuits = () => {
-    setError(null); setLoading(true);
+    setLoading(true);
     authFetch(`${API}/api/circuits`)
       .then(r => r.json())
       .then((data: CircuitRef[]) => {
         setCircuits(data);
         setSelectedCircuit(data.find((c: CircuitRef) => c.name.includes("Albert")) || data[0]);
       })
-      .catch(() => setError("Failed to load circuits"))
+      .catch(() => {})
       .finally(() => setLoading(false));
   };
   useEffect(() => { fetchCircuits(); }, []);

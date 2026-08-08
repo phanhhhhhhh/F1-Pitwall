@@ -30,4 +30,4 @@ secrets.txt
 .claude/
 
 # OMC runtime state (không cần track)
-.omc/state/
+.omc/
