@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useSyncExternalStore, useCallback, ReactNode } from "react";
 
 const STORAGE_KEY = "pitwall_season";
 const DEFAULT_SEASON = 2026;
@@ -12,26 +12,32 @@ interface SeasonContextType {
 
 const SeasonContext = createContext<SeasonContextType | undefined>(undefined);
 
-export function SeasonProvider({ children }: { children: ReactNode }) {
-  const [season, setSeasonState] = useState(DEFAULT_SEASON);
+// localStorage-backed external store. useSyncExternalStore hydrates the stored
+// value AFTER the server/client handoff (getServerSnapshot keeps the first
+// client render identical to the server HTML), avoiding both a hydration
+// mismatch and a synchronous setState in an effect.
+const listeners = new Set<() => void>();
+function emitChange() { listeners.forEach(l => l()); }
+function subscribe(onStoreChange: () => void) {
+  listeners.add(onStoreChange);
+  return () => { listeners.delete(onStoreChange); };
+}
+function getSnapshot(): number {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const parsed = parseInt(stored, 10);
+    if (!isNaN(parsed) && parsed >= 1950 && parsed <= 2030) return parsed;
+  }
+  return DEFAULT_SEASON;
+}
+function getServerSnapshot(): number { return DEFAULT_SEASON; }
 
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed) && parsed >= 1950 && parsed <= 2030) {
-        setSeasonState(parsed);
-      }
-    }
-  }, []);
+export function SeasonProvider({ children }: { children: ReactNode }) {
+  const season = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setSeason = useCallback((year: number) => {
-    setSeasonState(year);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, String(year));
-    }
+    localStorage.setItem(STORAGE_KEY, String(year));
+    emitChange();
   }, []);
 
   return (

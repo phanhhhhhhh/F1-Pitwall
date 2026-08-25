@@ -192,9 +192,10 @@ export default function StrategyPage() {
   const [loading, setLoading] = useState(true);
   const [hoveredStrat, setHoveredStrat] = useState<string | null>(null);
 
-  // ── auth + data fetch (preserved exactly) ──────────────────────────────────
-  const fetchCircuits = () => {
-    setLoading(true);
+  // ── auth + data fetch ───────────────────────────────────────────────────────
+  // loading starts true, so the mount effect fetches directly without the
+  // synchronous state resets a retry handler would need.
+  useEffect(() => {
     authFetch(`${API}/api/circuits`)
       .then(r => r.json())
       .then((data: CircuitRef[]) => {
@@ -203,8 +204,7 @@ export default function StrategyPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  };
-  useEffect(() => { fetchCircuits(); }, []);
+  }, []);
 
   // ── derived values ─────────────────────────────────────────────────────────
   const totalLaps = selectedCircuit?.totalLaps || 57;

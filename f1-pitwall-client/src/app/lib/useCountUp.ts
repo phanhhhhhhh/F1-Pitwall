@@ -8,13 +8,21 @@ import { useEffect, useState } from "react";
  */
 export function useCountUp(target: number, duration = 900, delay = 0): number {
   const [value, setValue] = useState(0);
+  const [prevTarget, setPrevTarget] = useState(target);
+
+  // Render-phase adjustment (the React-endorsed alternative to a synchronous
+  // setState in an effect): reset to 0 when the target drops, or snap straight
+  // to the target when the user prefers reduced motion.
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  if (prevTarget !== target) {
+    setPrevTarget(target);
+    if (!target || prefersReducedMotion) setValue(target);
+  }
+
   useEffect(() => {
-    if (!target) { setValue(0); return; }
-    if (typeof window !== "undefined" &&
-        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setValue(target);
-      return;
-    }
+    if (!target || prefersReducedMotion) return;
     let raf = 0;
     const t = setTimeout(() => {
       let start: number | null = null;
@@ -27,6 +35,6 @@ export function useCountUp(target: number, duration = 900, delay = 0): number {
       raf = requestAnimationFrame(step);
     }, delay);
     return () => { clearTimeout(t); cancelAnimationFrame(raf); };
-  }, [target, duration, delay]);
+  }, [target, duration, delay, prefersReducedMotion]);
   return value;
 }
