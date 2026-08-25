@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "./lib/pitwall-auth";
 import { BASE_URL as API } from "./lib/api-client";
 import { useSeason } from "./context/SeasonContext";
@@ -28,10 +28,6 @@ export default function Home() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
-  }, [season]);
-
-  useEffect(() => {
     if (!nextRace) return;
     const target = new Date(nextRace.date + "T00:00:00Z").getTime();
     const tick = () => {
@@ -50,7 +46,7 @@ export default function Home() {
     return () => clearInterval(id);
   }, [nextRace]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setFetchError(null);
     const errors: string[] = [];
     try {
@@ -112,7 +108,13 @@ export default function Home() {
     } catch { }
     } catch (e) { console.error("[Overview] unexpected error:", e); }
     finally { setLoading(false); }
-  };
+  }, [season]);
+
+  // Declared after fetchData: the callback captures it lazily, but the
+  // dependency array is evaluated during render, so it must come later.
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const gpRaces = allRaces.filter(r => !r.name.toLowerCase().includes("sprint"));
   const totalGP = gpRaces.length || 22;

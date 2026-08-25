@@ -49,6 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Auth bootstrap must hydrate from sessionStorage/localStorage in a mount
+  // effect: reading them during render would desync the server HTML from the
+  // first client render (hydration mismatch). The synchronous setState calls
+  // below are the intended pattern, hence the rule exception.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const token = getAccessToken();
     if (!token) { setIsLoading(false); return; }
@@ -76,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setIsLoading(false));
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const loginSuccess = (data: AuthResponse) => {
     setUser({ id: 0, username: data.username, email: "", role: data.role, createdAt: new Date().toISOString() });

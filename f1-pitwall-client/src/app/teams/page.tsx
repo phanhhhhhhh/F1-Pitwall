@@ -76,7 +76,13 @@ export default function TeamsPage() {
     Promise.all([authFetch(`${API}/api/teams`).then(r => r.json()), authFetch(`${API}/api/drivers`).then(r => r.json())])
       .then(([t, d]) => { setTeams(t); setDrivers(d); }).catch(() => setError("Failed to load teams")).finally(() => setLoading(false));
   };
-  useEffect(() => { fetchTeams(); }, []);
+  // Initial load: error/loading already start at their post-fetch values, so the
+  // mount effect fetches directly instead of calling fetchTeams, whose
+  // synchronous state resets are only needed by the Retry handler.
+  useEffect(() => {
+    Promise.all([authFetch(`${API}/api/teams`).then(r => r.json()), authFetch(`${API}/api/drivers`).then(r => r.json())])
+      .then(([t, d]) => { setTeams(t); setDrivers(d); }).catch(() => setError("Failed to load teams")).finally(() => setLoading(false));
+  }, []);
 
   const totalBudget = teams.reduce((s, t) => s + (t.annualBudgetM || 0), 0);
   const totalTitles = teams.reduce((s, t) => s + (t.championships || 0), 0);

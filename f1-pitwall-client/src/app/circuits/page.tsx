@@ -155,7 +155,12 @@ export default function CircuitsPage() {
     setError(null); setLoading(true);
     authFetch(`${API}/api/circuits`).then(r => r.json()).then(setCircuits).catch(() => setError("Failed to load circuits")).finally(() => setLoading(false));
   };
-  useEffect(() => { fetchCircuits(); }, []);
+  // Initial load: error/loading already start at their post-fetch values, so the
+  // mount effect fetches directly instead of calling fetchCircuits, whose
+  // synchronous state resets are only needed by the Retry handler.
+  useEffect(() => {
+    authFetch(`${API}/api/circuits`).then(r => r.json()).then(setCircuits).catch(() => setError("Failed to load circuits")).finally(() => setLoading(false));
+  }, []);
 
   const types = ["ALL", "PERMANENT", "STREET", "OVAL"];
   const filtered = circuits.filter(c => {
