@@ -13,7 +13,7 @@ function isStaticAsset(pathname: string): boolean {
   return STATIC_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Let static assets + public paths through without auth
