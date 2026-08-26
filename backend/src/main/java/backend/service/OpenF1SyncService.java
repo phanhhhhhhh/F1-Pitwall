@@ -131,11 +131,20 @@ public class OpenF1SyncService {
         return summary;
     }
 
-    // ─── Race Results: OpenF1 first, Jolpica fallback ──────────────────────────
+    // ─── Race Results: OpenF1 first (live), Jolpica preferred (historical) ─────
 
     @Transactional
     public boolean syncRaceByRound(Race race, boolean isSprint) {
-        // 1) Try OpenF1 (fast, near-real-time)
+        boolean historical = race.getDate() != null && race.getDate().isBefore(LocalDate.now());
+
+        // Past races: sync from Jolpica only. Its official classification
+        // includes penalties, DSQs and DNF classification that OpenF1's
+        // on-track position feed cannot reflect.
+        if (historical) {
+            return syncRaceByRoundViaJolpica(race, isSprint);
+        }
+
+        // Live races: try OpenF1 first (fast, near-real-time)…
         try {
             boolean ok = syncRaceResultsFromOpenF1(race, isSprint);
             if (ok) {
@@ -147,7 +156,7 @@ public class OpenF1SyncService {
             log.debug("[Sync] OpenF1 race sync failed for {}: {}", race.getName(), e.getMessage());
         }
 
-        // 2) Fallback to Jolpica (slower, curated)
+        // …then fall back to Jolpica (slower, curated)
         return syncRaceByRoundViaJolpica(race, isSprint);
     }
 
