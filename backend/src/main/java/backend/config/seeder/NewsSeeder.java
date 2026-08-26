@@ -59,8 +59,10 @@ public class NewsSeeder implements CommandLineRunner {
             return;
         }
 
+        // Sprint rows share their GP's round number — attach to the GP itself
         Race dutchGp = raceRepo.findBySeason(2026).stream()
-                .filter(r -> r.getRoundNumber() == 14)
+                .filter(r -> r.getRoundNumber() == 14
+                        && (r.getName() == null || !r.getName().toLowerCase().contains("sprint")))
                 .findFirst()
                 .orElse(null);
         if (dutchGp == null) {

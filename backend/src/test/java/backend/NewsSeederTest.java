@@ -45,8 +45,11 @@ class NewsSeederTest {
     void seedsCuratedDriverNews() {
         Race dutchGp = Race.builder().id(30L).name("Dutch Grand Prix")
                 .season(2026).roundNumber(14).status(RaceStatus.COMPLETED).build();
+        // Sprint rows share the GP's round number — the GP must win the match
+        Race dutchSprint = Race.builder().id(31L).name("Dutch Grand Prix Sprint")
+                .season(2026).roundNumber(14).status(RaceStatus.COMPLETED).build();
         when(raceRepo.findAllByOrderBySeasonDescRoundNumberAsc()).thenReturn(List.of());
-        when(raceRepo.findBySeason(2026)).thenReturn(List.of(dutchGp));
+        when(raceRepo.findBySeason(2026)).thenReturn(List.of(dutchSprint, dutchGp));
         when(newsRepo.existsByTitle(anyString())).thenReturn(false);
 
         new NewsSeeder(newsService, newsRepo, raceRepo).run();
