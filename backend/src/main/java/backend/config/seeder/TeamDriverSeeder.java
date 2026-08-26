@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -41,6 +42,10 @@ public class TeamDriverSeeder {
     }
 
     private void seedTyres() {
+        if (tyreRepo.count() > 0) {
+            log.info("[Pitwall] Tyres already exist — skipping tyre seeding");
+            return;
+        }
         tyreRepo.saveAll(List.of(
                 TyreCompound.builder().name("Pirelli C1 Hard").type(TyreType.HARD)
                         .optimalTempMin(100f).optimalTempMax(130f).degradationRate(0.3f).maxLaps(40).build(),
@@ -56,13 +61,11 @@ public class TeamDriverSeeder {
     }
 
     private List<Team> seedTeams() {
-        // Idempotency guard: if 2026 teams already exist (e.g. from another seeder profile), skip
-        if (teamRepo.findByName("McLaren").isPresent()) {
-            log.info("[Pitwall] Teams already exist — skipping team seeding");
-            return teamRepo.findAll();
-        }
-
-        List<Team> teams = teamRepo.saveAll(List.of(
+        // Create missing teams one-by-one — the 2025 seeder runs first and may
+        // already have created part of the grid under different names (RB,
+        // Mercedes, Sauber). Skipping everything when "McLaren" exists left
+        // the new 2026 teams (Racing Bulls, Cadillac, Audi, …) unseeded.
+        List<Team> grid = List.of(
                 Team.builder().name("McLaren").country("United Kingdom").colorHex("#FF8000")
                         .championships(9).annualBudgetM(350f).base("Woking").foundedYear(1966).build(),
                 Team.builder().name("Ferrari").country("Italy").colorHex("#E8002D")
@@ -85,9 +88,25 @@ public class TeamDriverSeeder {
                         .championships(0).annualBudgetM(250f).base("Hinwil").foundedYear(2026).build(),
                 Team.builder().name("Cadillac").country("United States").colorHex("#CC0000")
                         .championships(0).annualBudgetM(220f).base("Banbury").foundedYear(2026).build()
-        ));
-        log.info("[Pitwall] 11 teams seeded (2026 grid)");
-        return teams;
+        );
+        Set<String> existingNames = teamRepo.findAll().stream()
+                .map(Team::getName)
+                .collect(Collectors.toSet());
+        List<Team> toSave = grid.stream()
+                .filter(t -> !existingNames.contains(t.getName()))
+                .collect(Collectors.toList());
+        if (!toSave.isEmpty()) {
+            teamRepo.saveAll(toSave);
+            log.info("[Pitwall] {} new teams seeded (2026 grid)", toSave.size());
+        } else {
+            log.info("[Pitwall] All 2026 grid teams already exist");
+        }
+
+        // Return the full grid (existing or freshly saved rows) so downstream
+        // seeders can resolve every team by name.
+        return grid.stream()
+                .map(t -> teamRepo.findByName(t.getName()).orElse(t))
+                .collect(Collectors.toList());
     }
 
     private void seedDrivers(List<Team> teams) {
@@ -178,9 +197,27 @@ public class TeamDriverSeeder {
             driverRepo.saveAll(toSave);
         }
         log.info("[Pitwall] {} drivers seeded (2026 grid)", toSave.size());
+
+        // Backfill: assign teams to drivers that were created without one
+        // (e.g. rookies seeded before their 2026 teams existed on the first
+        // deploy — Lindblad, Perez, Bottas).
+        for (Driver gridDriver : drivers) {
+            if (gridDriver.getTeam() == null) continue;
+            driverRepo.findByCarNumber(gridDriver.getCarNumber()).ifPresent(existing -> {
+                if (existing.getTeam() == null) {
+                    existing.setTeam(gridDriver.getTeam());
+                    driverRepo.save(existing);
+                    log.info("[Pitwall] Backfilled team for {}: {}", existing.getName(), gridDriver.getTeam().getName());
+                }
+            });
+        }
     }
 
     private void seedEngineers(List<Team> teams) {
+        if (engineerRepo.count() > 0) {
+            log.info("[Pitwall] Engineers already exist — skipping engineer seeding");
+            return;
+        }
         Map<String, Team> teamMap = teams.stream()
                 .collect(Collectors.toMap(Team::getName, t -> t));
 

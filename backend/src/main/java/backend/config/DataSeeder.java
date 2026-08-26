@@ -34,9 +34,13 @@ public class DataSeeder implements CommandLineRunner {
             // Seed 2025 data first (idempotent — skips if already present)
             seeder2025.seed();
 
-            // Seed 2026 data only if no 2026 races exist
+            // Teams/drivers/tyres/engineers are idempotent — run on every
+            // startup so missing 2026 teams get created and null-team
+            // drivers get backfilled on existing deployments.
+            teamDriverSeeder.seed();
+
+            // Seed 2026 races only if none exist
             if (raceRepo.findBySeason(2026).isEmpty()) {
-                teamDriverSeeder.seed();
                 circuitRaceSeeder.seed();
             }
 
