@@ -293,13 +293,13 @@ public class OpenF1SyncService {
         int dbRound = race.getRoundNumber();
         if (dbRound <= 0) return false;
 
-        int jolpicaRound = JolpicaRoundMapper.toJolpicaRound(dbRound);
+        int season = race.getSeason() > 0 ? race.getSeason() : 2026;
+        int jolpicaRound = JolpicaRoundMapper.toJolpicaRound(dbRound, season);
         if (jolpicaRound == JolpicaRoundMapper.CANCELLED) {
             log.debug("[Sync] Skipping cancelled race: {}", race.getName());
             return false;
         }
 
-        int season = race.getSeason() > 0 ? race.getSeason() : 2026;
         String url = JolpicaRoundMapper.buildResultsUrl(dbRound, season, isSprint);
         log.info("[Sync] Fetching {} from Jolpica: {}", race.getName(), url);
 
