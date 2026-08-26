@@ -64,8 +64,10 @@ public class Seeder2025 {
             return;
         }
 
+        // Prod DBs can hold duplicate circuit rows with the same name (seeded
+        // once per season) — keep the first one, any copy works for a sprint.
         Map<String, Circuit> byName = circuitRepo.findAll().stream()
-                .collect(Collectors.toMap(Circuit::getName, c -> c));
+                .collect(Collectors.toMap(Circuit::getName, c -> c, (a, b) -> a));
 
         // 6 sprint weekends of 2025: China, Miami, Belgium, USA, São Paulo, Qatar.
         // Sprint round = its GP's round; date = the day before the GP.
