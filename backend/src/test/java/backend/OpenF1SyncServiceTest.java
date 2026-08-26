@@ -7,6 +7,7 @@ import backend.repository.LapTelemetryRepository;
 import backend.repository.PitStopRepository;
 import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
+import backend.repository.TeamRepository;
 import backend.repository.WeatherConditionRepository;
 import backend.service.NotificationService;
 import backend.service.OpenF1SyncService;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @DisplayName("OpenF1SyncService — diacritics & name-matching")
 class OpenF1SyncServiceTest {
@@ -135,6 +137,7 @@ class OpenF1SyncServiceTest {
                     raceRepo,
                     mock(RaceResultRepository.class),
                     mock(DriverRepository.class),
+                    mock(TeamRepository.class),
                     mock(NotificationService.class),
                     mock(RaceNewsService.class),
                     mock(PitStopRepository.class),
@@ -201,6 +204,67 @@ class OpenF1SyncServiceTest {
 
             assertThat(svc.syncRaceByRound(race, false)).isTrue();
             verify(svc, never()).syncRaceByRoundViaJolpica(any(Race.class), anyBoolean());
+        }
+    }
+
+    @Nested
+    @DisplayName("resolveTeam — Jolpica constructor name → DB team")
+    class ResolveTeamMapping {
+
+        private final TeamRepository teamRepo = mock(TeamRepository.class);
+
+        private OpenF1SyncService newService() {
+            return new OpenF1SyncService(
+                    mock(RaceRepository.class),
+                    mock(RaceResultRepository.class),
+                    mock(DriverRepository.class),
+                    teamRepo,
+                    mock(NotificationService.class),
+                    mock(RaceNewsService.class),
+                    mock(PitStopRepository.class),
+                    mock(LapTelemetryRepository.class),
+                    mock(WeatherConditionRepository.class),
+                    mock(RestTemplate.class));
+        }
+
+        @SuppressWarnings("unchecked")
+        private backend.model.Team resolve(OpenF1SyncService svc, String constructorName, int season)
+                throws Exception {
+            java.lang.reflect.Method m = OpenF1SyncService.class.getDeclaredMethod("resolveTeam", String.class, int.class);
+            m.setAccessible(true);
+            return (backend.model.Team) m.invoke(svc, constructorName, season);
+        }
+
+        @Test
+        @DisplayName("Jolpica 'Red Bull' maps to DB 'Red Bull Racing'")
+        void redBullMapsToFullName() throws Exception {
+            backend.model.Team rbr = backend.model.Team.builder().name("Red Bull Racing").build();
+            when(teamRepo.findByName("Red Bull Racing")).thenReturn(java.util.Optional.of(rbr));
+
+            assertThat(resolve(newService(), "Red Bull", 2025)).isEqualTo(rbr);
+            assertThat(resolve(newService(), "Red Bull", 2026)).isEqualTo(rbr);
+        }
+
+        @Test
+        @DisplayName("Mercedes maps season-aware (2026 uses Mercedes-AMG Petronas)")
+        void mercedesMappingIsSeasonAware() throws Exception {
+            backend.model.Team old = backend.model.Team.builder().name("Mercedes").build();
+            backend.model.Team newName = backend.model.Team.builder().name("Mercedes-AMG Petronas").build();
+            when(teamRepo.findByName("Mercedes")).thenReturn(java.util.Optional.of(old));
+            when(teamRepo.findByName("Mercedes-AMG Petronas")).thenReturn(java.util.Optional.of(newName));
+
+            assertThat(resolve(newService(), "Mercedes", 2025)).isEqualTo(old);
+            assertThat(resolve(newService(), "Mercedes", 2026)).isEqualTo(newName);
+        }
+
+        @Test
+        @DisplayName("Racing Bulls and unknown names pass through")
+        void directAndUnknownNames() throws Exception {
+            backend.model.Team rb = backend.model.Team.builder().name("Racing Bulls").build();
+            when(teamRepo.findByName("Racing Bulls")).thenReturn(java.util.Optional.of(rb));
+
+            assertThat(resolve(newService(), "Racing Bulls", 2026)).isEqualTo(rb);
+            assertThat(resolve(newService(), "Nonexistent Team", 2026)).isNull();
         }
     }
 }

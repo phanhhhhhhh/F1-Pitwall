@@ -176,8 +176,10 @@ public class RaceResultService {
 
         for (RaceResult r : allResults) {
             Driver driver = r.getDriver();
-            if (driver.getTeam() == null) continue;
-            Team team = driver.getTeam();
+            // Per-result team snapshot wins (drivers can move mid-season);
+            // legacy rows without a snapshot fall back to the driver's team.
+            Team team = r.getTeam() != null ? r.getTeam() : driver.getTeam();
+            if (team == null) continue;
             ConstructorStats stats = statsMap.computeIfAbsent(team.getId(), k -> new ConstructorStats(team));
             stats.totalPoints += r.getPoints();
             boolean isSprint = isSprintRace(r);
@@ -241,6 +243,7 @@ public class RaceResultService {
 
     private RaceResultResponse toResponse(RaceResult r) {
         Driver d = r.getDriver();
+        Team raceTeam = r.getTeam() != null ? r.getTeam() : d.getTeam();
         return RaceResultResponse.builder()
                 .id(r.getId())
                 .finishPosition(r.getFinishPosition())
@@ -253,8 +256,8 @@ public class RaceResultService {
                 .driverName(d.getName())
                 .carNumber(d.getCarNumber())
                 .nationality(d.getNationality())
-                .teamName(d.getTeam() != null ? d.getTeam().getName() : "")
-                .teamColor(d.getTeam() != null ? d.getTeam().getColorHex() : "#666")
+                .teamName(raceTeam != null ? raceTeam.getName() : "")
+                .teamColor(raceTeam != null ? raceTeam.getColorHex() : "#666")
                 .raceId(r.getRace().getId())
                 .raceName(r.getRace().getName())
                 .roundNumber(r.getRace().getRoundNumber())

@@ -28,6 +28,16 @@ public class RaceResult {
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private Driver driver;
 
+    /**
+     * Snapshot of the team the driver raced for in this race. Drivers can move
+     * mid-season, so constructor standings must use this per-result team (with
+     * driver.team as fallback for legacy rows), never the driver's current team.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    @ToString.Exclude @EqualsAndHashCode.Exclude
+    private Team team;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "race_id")
     @ToString.Exclude @EqualsAndHashCode.Exclude
