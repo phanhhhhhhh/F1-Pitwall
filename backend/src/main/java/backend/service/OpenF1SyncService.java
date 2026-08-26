@@ -5,6 +5,7 @@ import backend.model.LapTelemetry;
 import backend.model.PitStop;
 import backend.model.Race;
 import backend.model.RaceResult;
+import backend.model.Team;
 import backend.model.WeatherCondition;
 import backend.model.enums.RaceStatus;
 import backend.model.enums.TyreType;
@@ -14,6 +15,7 @@ import backend.repository.LapTelemetryRepository;
 import backend.repository.PitStopRepository;
 import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
+import backend.repository.TeamRepository;
 import backend.repository.WeatherConditionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class OpenF1SyncService {
     private final RaceRepository raceRepo;
     private final RaceResultRepository raceResultRepo;
     private final DriverRepository driverRepo;
+    private final TeamRepository teamRepo;
     private final NotificationService notificationService;
     private final RaceNewsService raceNewsService;
     private final PitStopRepository pitStopRepo;
@@ -268,6 +271,7 @@ public class OpenF1SyncService {
             results.add(RaceResult.builder()
                     .race(race)
                     .driver(driver)
+                    .team(driver.getTeam()) // snapshot at sync time
                     .finishPosition(finishPos)
                     .startPosition(0) // not available from position data alone
                     .points(points)
@@ -379,9 +383,14 @@ public class OpenF1SyncService {
                 Integer grid = toInt(r.get("grid"));
                 int startPos = (grid != null && grid > 0) ? grid : finishPos;
 
+                // Jolpica reports the constructor the driver raced for in this
+                // round — snapshot it so mid-season moves don't distort history.
+                Team raceTeam = resolveTeam(constructorName(r), season);
+
                 results.add(RaceResult.builder()
                         .race(race)
                         .driver(driverOpt.get())
+                        .team(raceTeam != null ? raceTeam : driverOpt.get().getTeam())
                         .finishPosition(finishPos)
                         .startPosition(startPos)
                         .points(points)
@@ -654,6 +663,34 @@ public class OpenF1SyncService {
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Extracts the constructor name from a Jolpica result entry. */
+    @SuppressWarnings("unchecked")
+    private static String constructorName(Map<String, Object> result) {
+        try {
+            List<Map<String, Object>> constructors = (List<Map<String, Object>>) result.get("Constructors");
+            if (constructors != null && !constructors.isEmpty()) {
+                Object name = constructors.get(0).get("name");
+                return name != null ? String.valueOf(name) : null;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    /**
+     * Maps a Jolpica constructor name to a DB team, season-aware (2026 renamed
+     * Mercedes to Mercedes-AMG Petronas; Jolpica always calls Red Bull just
+     * "Red Bull").
+     */
+    private Team resolveTeam(String constructorName, int season) {
+        if (constructorName == null || constructorName.isEmpty()) return null;
+        String dbName = switch (constructorName) {
+            case "Red Bull" -> "Red Bull Racing";
+            case "Mercedes" -> season >= 2026 ? "Mercedes-AMG Petronas" : "Mercedes";
+            default -> constructorName;
+        };
+        return teamRepo.findByName(dbName).orElse(null);
+    }
 
     private TyreType mapCompoundToTyreType(String compound) {
         if (compound == null) return null;

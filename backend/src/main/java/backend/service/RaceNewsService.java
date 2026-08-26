@@ -5,6 +5,7 @@ import backend.dto.RaceNewsResponse;
 import backend.model.Race;
 import backend.model.RaceNews;
 import backend.model.RaceResult;
+import backend.model.Team;
 import backend.repository.RaceNewsRepository;
 import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
@@ -109,8 +110,8 @@ public class RaceNewsService {
         StringBuilder content = new StringBuilder();
         content.append("🏆 ").append(winner.getDriver().getName())
                 .append(" wins the ").append(race.getName()).append(".\n");
-        if (winner.getDriver().getTeam() != null) {
-            content.append("Victory for ").append(winner.getDriver().getTeam().getName()).append(".\n");
+        if (teamOf(winner) != null) {
+            content.append("Victory for ").append(teamOf(winner).getName()).append(".\n");
         }
 
         if (classified.size() >= 3) {
@@ -118,8 +119,8 @@ public class RaceNewsService {
             for (int i = 0; i < 3; i++) {
                 RaceResult r = classified.get(i);
                 content.append(i + 1).append(". ").append(r.getDriver().getName());
-                if (r.getDriver().getTeam() != null) {
-                    content.append(" (").append(r.getDriver().getTeam().getName()).append(")");
+                if (teamOf(r) != null) {
+                    content.append(" (").append(teamOf(r).getName()).append(")");
                 }
                 content.append("\n");
             }
@@ -152,6 +153,11 @@ public class RaceNewsService {
                         .tag(TAG_RACE_REPORT)
                         .content(content.toString())
                         .build()));
+    }
+
+    /** Per-result team snapshot wins over the driver's current team. */
+    private static Team teamOf(RaceResult r) {
+        return r.getTeam() != null ? r.getTeam() : r.getDriver().getTeam();
     }
 
     private RaceNewsResponse toResponse(RaceNews n) {
