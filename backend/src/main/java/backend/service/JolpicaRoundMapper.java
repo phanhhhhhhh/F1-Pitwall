@@ -41,12 +41,17 @@ public final class JolpicaRoundMapper {
 
     /**
      * Converts a DB round number to the corresponding Jolpica round number.
+     * <p>
+     * The 2-cancelled-round offset (R4 Bahrain + R5 Saudi) exists only in the
+     * 2026 calendar. Every other season maps DB round → Jolpica round 1:1.
      *
      * @param dbRound race round number from the database
+     * @param season  season year of the race (e.g. 2025, 2026)
      * @return Jolpica round number, or {@value #CANCELLED} if the round was cancelled
      */
-    public static int toJolpicaRound(int dbRound) {
+    public static int toJolpicaRound(int dbRound, int season) {
         if (dbRound <= 0) return CANCELLED;
+        if (season != 2026) return dbRound;
         if (DB_TO_JOLPICA.containsKey(dbRound)) {
             return DB_TO_JOLPICA.get(dbRound);
         }
@@ -63,7 +68,7 @@ public final class JolpicaRoundMapper {
      * @return full Jolpica API URL
      */
     public static String buildResultsUrl(int dbRound, int season, boolean isSprint) {
-        int jolpicaRound = toJolpicaRound(dbRound);
+        int jolpicaRound = toJolpicaRound(dbRound, season);
         String endpoint = isSprint ? "/sprint" : "/results";
         return JOLPICA_BASE + "/" + season + "/" + jolpicaRound + endpoint + ".json";
     }
@@ -76,7 +81,7 @@ public final class JolpicaRoundMapper {
      * @return full Jolpica API URL
      */
     public static String buildQualifyingUrl(int dbRound, int season) {
-        int jolpicaRound = toJolpicaRound(dbRound);
+        int jolpicaRound = toJolpicaRound(dbRound, season);
         return JOLPICA_BASE + "/" + season + "/" + jolpicaRound + "/qualifying.json";
     }
 }

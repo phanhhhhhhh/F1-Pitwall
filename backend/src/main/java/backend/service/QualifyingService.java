@@ -280,13 +280,13 @@ public class QualifyingService {
     @Transactional
     public boolean syncFromJolpica(int dbRound, Race race) {
         try {
-            int jolpicaRound = JolpicaRoundMapper.toJolpicaRound(dbRound);
+            int season = race.getSeason() > 0 ? race.getSeason() : 2026;
+            int jolpicaRound = JolpicaRoundMapper.toJolpicaRound(dbRound, season);
             if (jolpicaRound == JolpicaRoundMapper.CANCELLED) {
                 log.debug("[Qualifying] Skipping cancelled round {}: {}", dbRound, race.getName());
                 return false;
             }
 
-            int season = race.getSeason() > 0 ? race.getSeason() : 2026;
             String url = JolpicaRoundMapper.buildQualifyingUrl(dbRound, season);
             log.info("[Qualifying] Fetching {} from Jolpica: {}", race.getName(), url);
 

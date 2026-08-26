@@ -35,19 +35,61 @@ public class Seeder2025 {
     private final ChampionshipRepository champRepo;
 
     public void seed() {
-        if (!raceRepo.findBySeason(2025).isEmpty()) {
-            log.info("[Pitwall] 2025 data already exists — skipping 2025 seeder");
+        boolean hasGpRaces = raceRepo.findBySeason(2025).stream()
+                .anyMatch(r -> r.getName() != null && !r.getName().toLowerCase().contains("sprint"));
+        if (hasGpRaces) {
+            log.info("[Pitwall] 2025 GP races already exist — skipping GP seeding");
+        } else {
+            log.info("[Pitwall] Seeder2025 starting...");
+
+            List<Team> teams = seedTeams();
+            seedDrivers(teams);
+            List<Circuit> circuits = seedCircuits();
+            seedRaces(circuits);
+            seedChampionships();
+
+            log.info("[Pitwall] 2025 season data seeded");
+        }
+
+        // Sprint races are seeded separately so existing 2025 deployments
+        // pick them up on the next startup (idempotent).
+        seedSprintRaces();
+    }
+
+    private void seedSprintRaces() {
+        boolean hasSprints = raceRepo.findBySeason(2025).stream()
+                .anyMatch(r -> r.getName() != null && r.getName().toLowerCase().contains("sprint"));
+        if (hasSprints) {
+            log.info("[Pitwall] 2025 sprint races already exist — skipping");
             return;
         }
-        log.info("[Pitwall] Seeder2025 starting...");
 
-        List<Team> teams = seedTeams();
-        seedDrivers(teams);
-        List<Circuit> circuits = seedCircuits();
-        seedRaces(circuits);
-        seedChampionships();
+        Map<String, Circuit> byName = circuitRepo.findAll().stream()
+                .collect(Collectors.toMap(Circuit::getName, c -> c));
 
-        log.info("[Pitwall] 2025 season data seeded");
+        // 6 sprint weekends of 2025: China, Miami, Belgium, USA, São Paulo, Qatar.
+        // Sprint round = its GP's round; date = the day before the GP.
+        raceRepo.saveAll(List.of(
+                Race.builder().name("Chinese Grand Prix Sprint").date(LocalDate.of(2025,3,22))
+                        .season(2025).roundNumber(2).status(RaceStatus.SCHEDULED)
+                        .circuit(byName.get("Shanghai International Circuit")).build(),
+                Race.builder().name("Miami Grand Prix Sprint").date(LocalDate.of(2025,5,3))
+                        .season(2025).roundNumber(6).status(RaceStatus.SCHEDULED)
+                        .circuit(byName.get("Miami International Autodrome")).build(),
+                Race.builder().name("Belgian Grand Prix Sprint").date(LocalDate.of(2025,7,26))
+                        .season(2025).roundNumber(13).status(RaceStatus.SCHEDULED)
+                        .circuit(byName.get("Circuit de Spa-Francorchamps")).build(),
+                Race.builder().name("United States Grand Prix Sprint").date(LocalDate.of(2025,10,18))
+                        .season(2025).roundNumber(19).status(RaceStatus.SCHEDULED)
+                        .circuit(byName.get("Circuit of the Americas")).build(),
+                Race.builder().name("São Paulo Grand Prix Sprint").date(LocalDate.of(2025,11,8))
+                        .season(2025).roundNumber(21).status(RaceStatus.SCHEDULED)
+                        .circuit(byName.get("Autodromo Jose Carlos Pace")).build(),
+                Race.builder().name("Qatar Grand Prix Sprint").date(LocalDate.of(2025,11,29))
+                        .season(2025).roundNumber(23).status(RaceStatus.SCHEDULED)
+                        .circuit(byName.get("Lusail International Circuit")).build()
+        ));
+        log.info("[Pitwall] 6 sprint races seeded (2025 season)");
     }
 
     private List<Team> seedTeams() {
