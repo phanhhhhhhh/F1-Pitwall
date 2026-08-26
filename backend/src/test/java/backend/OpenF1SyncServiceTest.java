@@ -10,6 +10,7 @@ import backend.repository.RaceResultRepository;
 import backend.repository.WeatherConditionRepository;
 import backend.service.NotificationService;
 import backend.service.OpenF1SyncService;
+import backend.service.RaceNewsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -135,6 +136,7 @@ class OpenF1SyncServiceTest {
                     mock(RaceResultRepository.class),
                     mock(DriverRepository.class),
                     mock(NotificationService.class),
+                    mock(RaceNewsService.class),
                     mock(PitStopRepository.class),
                     mock(LapTelemetryRepository.class),
                     mock(WeatherConditionRepository.class),
