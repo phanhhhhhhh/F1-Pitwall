@@ -11,6 +11,7 @@ import StatTilesGrid from "./components/StatTilesGrid";
 import SeasonProgress from "./components/SeasonProgress";
 import RaceCalendarSection from "./components/RaceCalendarSection";
 import RaceWeekendWidget from "./components/RaceWeekendWidget";
+import RoundNewsSection from "./components/RoundNewsSection";
 import { useCountUp } from "./lib/f1-theme";
 import type { DriverStanding, RaceInfo } from "./types/f1";
 
@@ -254,6 +255,11 @@ export default function Home() {
 
           {/* Recent calendar */}
           <RaceCalendarSection calendar={calendar} winners={winners} loading={loading} />
+        </div>
+
+        {/* Round news */}
+        <div className="rise mt-5" style={{ animationDelay: "300ms" }}>
+          <RoundNewsSection />
         </div>
 
         <p className="text-center f-mono text-[10px] text-zinc-700 mt-8 tracking-widest">F1 PITWALL · BROADCAST-GRADE TELEMETRY · SEASON {season}</p>
