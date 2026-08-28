@@ -39,6 +39,13 @@ const MAX_LAPS: Record<string, number> = {
 };
 const maxLapsFor = (t: string) => MAX_LAPS[(t || "").toUpperCase()] ?? 30;
 
+// Static fallback grid shown before the live feed connects.
+const MOCK_RUNNING_ORDER: TelemetryData[] = [
+  { driverName: "Max Verstappen", teamName: "Red Bull Racing", teamColor: "#3671C6", carNumber: 1, position: 1, speed: 312, gear: 7, rpm: 11800, drsActive: true, gap: 0, throttle: 94, brake: 0, tyreTemp: 104, fuelLoad: 42, lap: 28, lapTime: 81.42, tyreType: "SOFT", timestamp: 0 },
+  { driverName: "Charles Leclerc", teamName: "Ferrari", teamColor: "#E8002D", carNumber: 16, position: 2, speed: 308, gear: 7, rpm: 11600, drsActive: true, gap: 1.2, throttle: 90, brake: 0, tyreTemp: 101, fuelLoad: 41, lap: 28, lapTime: 81.65, tyreType: "MEDIUM", timestamp: 0 },
+  { driverName: "Lando Norris", teamName: "McLaren", teamColor: "#FF8000", carNumber: 4, position: 3, speed: 306, gear: 7, rpm: 11500, drsActive: false, gap: 2.8, throttle: 88, brake: 0, tyreTemp: 99, fuelLoad: 43, lap: 28, lapTime: 81.98, tyreType: "HARD", timestamp: 0 },
+];
+
 function SpeedChart({ data, color }: { data: number[]; color: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -424,11 +431,7 @@ export default function TelemetryPage() {
                   <p className="f-mono text-[11px] tracking-[0.3em] text-zinc-400 font-bold">RACE RUNNING ORDER</p>
                 </div>
                 <div className="space-y-2.5 max-h-[780px] overflow-y-auto pr-1">
-                  {(drivers.length > 0 ? drivers : [
-                    { driverName: "Max Verstappen", teamName: "Red Bull Racing", teamColor: "#3671C6", carNumber: 1, position: 1, speed: 312, gear: 7, rpm: 11800, drsActive: true, gap: 0, throttle: 94, brake: 0, tyreTemp: 104, fuelLoad: 42, lap: 28, lapTime: 81.42, tyreType: "SOFT", timestamp: Date.now() },
-                    { driverName: "Charles Leclerc", teamName: "Ferrari", teamColor: "#E8002D", carNumber: 16, position: 2, speed: 308, gear: 7, rpm: 11600, drsActive: true, gap: 1.2, throttle: 90, brake: 0, tyreTemp: 101, fuelLoad: 41, lap: 28, lapTime: 81.65, tyreType: "MEDIUM", timestamp: Date.now() },
-                    { driverName: "Lando Norris", teamName: "McLaren", teamColor: "#FF8000", carNumber: 4, position: 3, speed: 306, gear: 7, rpm: 11500, drsActive: false, gap: 2.8, throttle: 88, brake: 0, tyreTemp: 99, fuelLoad: 43, lap: 28, lapTime: 81.98, tyreType: "HARD", timestamp: Date.now() },
-                  ]).map((d, idx) => {
+                  {(drivers.length > 0 ? drivers : MOCK_RUNNING_ORDER).map((d, idx) => {
                     const col = getTeamColor(d.teamName, d.teamColor);
                     const isSelected = d.driverName === (selected || (drivers[0]?.driverName || "Max Verstappen"));
                     return (

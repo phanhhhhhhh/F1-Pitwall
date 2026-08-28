@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { playGantryLight, playLightsOut, playUiClick } from "../lib/f1-sound";
 
 export default function LightsOutGantry() {
