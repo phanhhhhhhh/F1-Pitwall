@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { F1, getTeamColor } from "../lib/f1-theme";
+import { getTeamColor } from "../lib/f1-theme";
 import type { TelemetryData } from "../types/f1";
 
 interface TrackDefinition {
@@ -76,6 +75,33 @@ interface LiveTrackMapProps {
   circuitKey?: string;
 }
 
+interface MockDriver {
+  driverName: string;
+  team: string;
+  color: string;
+  carNumber: number;
+  position: number;
+  gap: number;
+}
+
+const MOCK_DRIVERS: MockDriver[] = [
+  { driverName: "Max Verstappen", carNumber: 1, team: "Red Bull Racing", color: "#3671C6", position: 1, gap: 0 },
+  { driverName: "Lando Norris", carNumber: 4, team: "McLaren", color: "#FF8000", position: 2, gap: 1.4 },
+  { driverName: "Charles Leclerc", carNumber: 16, team: "Ferrari", color: "#E8002D", position: 3, gap: 3.2 },
+  { driverName: "Lewis Hamilton", carNumber: 44, team: "Ferrari", color: "#E8002D", position: 4, gap: 4.8 },
+  { driverName: "Oscar Piastri", carNumber: 81, team: "McLaren", color: "#FF8000", position: 5, gap: 6.1 },
+  { driverName: "George Russell", carNumber: 63, team: "Mercedes", color: "#27F4D2", position: 6, gap: 8.5 },
+];
+
+interface CarMarker {
+  x: number;
+  y: number;
+  driverName: string;
+  color: string;
+  position: number;
+  carNumber: number;
+}
+
 export default function LiveTrackMap({
   telemetryList = [],
   selectedDriverId,
@@ -86,41 +112,68 @@ export default function LiveTrackMap({
     TRACKS[circuitKey] ? circuitKey : "monza"
   );
   const pathRef = useRef<SVGPathElement>(null);
-  const [trackLength, setTrackLength] = useState<number>(0);
-  const [animTime, setAnimTime] = useState<number>(0);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [cars, setCars] = useState<CarMarker[]>([]);
 
   const track = TRACKS[activeTrackKey] || TRACKS.monza;
 
-  // Measure SVG path length
-  useEffect(() => {
-    if (pathRef.current) {
-      setTrackLength(pathRef.current.getTotalLength());
+  // Normalize live telemetry / mock drivers into a stable shape.
+  const drivers: CarMarker[] = (telemetryList.length > 0 ? telemetryList : MOCK_DRIVERS).map(
+    (d, index) => {
+      const isMock = !("teamName" in d);
+      const teamName = isMock ? (d as MockDriver).team : (d as TelemetryData).teamName;
+      const color =
+        (isMock ? (d as MockDriver).color : (d as TelemetryData).teamColor) ||
+        getTeamColor(teamName);
+      return {
+        x: 0,
+        y: 0,
+        driverName: d.driverName,
+        color,
+        position: d.position || index + 1,
+        carNumber: d.carNumber || d.position || index + 1,
+      };
     }
+  );
+
+  // Keep the animation loop reading the latest drivers without restarting it.
+  const driversRef = useRef(drivers);
+  useEffect(() => {
+    driversRef.current = drivers;
+  });
+
+  // Measure the racing line whenever the circuit changes.
+  useEffect(() => {
+    const path = pathRef.current;
+    if (!path) return;
+    const p = path.getPointAtLength(0);
+    setStartPoint({ x: p.x, y: p.y });
   }, [activeTrackKey]);
 
-  // Smooth car animation loop
+  // Animate car positions along the SVG path (geometry read in the RAF callback,
+  // never during render).
   useEffect(() => {
     let frameId: number;
+    let t = 0;
     const update = () => {
-      setAnimTime((t) => (t + 0.002) % 1);
+      const path = pathRef.current;
+      if (path) {
+        const len = path.getTotalLength();
+        setCars(
+          driversRef.current.map((d, index) => {
+            const baseOffset = (index * 0.08 + d.position * 0.015) % 1;
+            const progress = (1 + t - baseOffset) % 1;
+            const pt = path.getPointAtLength(progress * len);
+            return { ...d, x: pt.x, y: pt.y };
+          })
+        );
+      }
+      t = (t + 0.002) % 1;
       frameId = requestAnimationFrame(update);
     };
     frameId = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frameId);
   }, []);
-
-  // Mock drivers if none provided
-  const drivers =
-    telemetryList && telemetryList.length > 0
-      ? telemetryList
-      : [
-          { driverId: "1", driverName: "Max Verstappen", carNumber: 1, team: "Red Bull Racing", color: "#3671C6", speed: 312, position: 1, gap: 0 },
-          { driverId: "2", driverName: "Lando Norris", carNumber: 4, team: "McLaren", color: "#FF8000", speed: 308, position: 2, gap: 1.4 },
-          { driverId: "3", driverName: "Charles Leclerc", carNumber: 16, team: "Ferrari", color: "#E8002D", speed: 309, position: 3, gap: 3.2 },
-          { driverId: "4", driverName: "Lewis Hamilton", carNumber: 44, team: "Ferrari", color: "#E8002D", speed: 305, position: 4, gap: 4.8 },
-          { driverId: "5", driverName: "Oscar Piastri", carNumber: 81, team: "McLaren", color: "#FF8000", speed: 306, position: 5, gap: 6.1 },
-          { driverId: "6", driverName: "George Russell", carNumber: 63, team: "Mercedes", color: "#27F4D2", speed: 304, position: 6, gap: 8.5 },
-        ];
 
   return (
     <div className="relative w-full bg-gradient-to-b from-[#111217] to-[#0a0a0d] border border-zinc-800 rounded-3xl p-5 shadow-2xl overflow-hidden">
@@ -216,10 +269,10 @@ export default function LiveTrackMap({
           />
 
           {/* Start/Finish Line Indicator */}
-          {trackLength > 0 && pathRef.current && (
+          {startPoint && (
             <circle
-              cx={pathRef.current.getPointAtLength(0).x}
-              cy={pathRef.current.getPointAtLength(0).y}
+              cx={startPoint.x}
+              cy={startPoint.y}
               r="6"
               fill="#FFD200"
               stroke="#000"
@@ -228,90 +281,80 @@ export default function LiveTrackMap({
           )}
 
           {/* ── Real-time Car GPS Dots ────────────────────────────────────────── */}
-          {trackLength > 0 &&
-            pathRef.current &&
-            drivers.map((d, index) => {
-              // Interpolate distance along track
-              const baseOffset = (index * 0.08 + (d.gap ? d.gap * 0.015 : 0)) % 1;
-              const progress = (1 + animTime - baseOffset) % 1;
-              const point = pathRef.current!.getPointAtLength(progress * trackLength);
-              const driverName = d.driverName;
-              const isSelected = selectedDriverId === driverName;
-              const teamName = "teamName" in d ? d.teamName : (d as { team?: string }).team;
-              const color = ("teamColor" in d ? d.teamColor : (d as { color?: string }).color) || getTeamColor(teamName);
-              const carNumber = d.carNumber || d.position || index + 1;
+          {cars.map((d) => {
+            const isSelected = selectedDriverId === d.driverName;
 
-              return (
-                <g
-                  key={driverName}
-                  className="cursor-pointer transition-transform duration-75"
-                  onClick={() => onSelectDriver && onSelectDriver(driverName)}
-                >
-                  {/* Selected halo */}
-                  {isSelected && (
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r="16"
-                      fill="none"
-                      stroke={color}
-                      strokeWidth="2"
-                      className="animate-ping opacity-75"
-                    />
-                  )}
-
-                  {/* Outer Team Ring */}
+            return (
+              <g
+                key={d.driverName}
+                className="cursor-pointer transition-transform duration-75"
+                onClick={() => onSelectDriver && onSelectDriver(d.driverName)}
+              >
+                {/* Selected halo */}
+                {isSelected && (
                   <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r={isSelected ? 10 : 8}
-                    fill={color}
-                    stroke="#000"
+                    cx={d.x}
+                    cy={d.y}
+                    r="16"
+                    fill="none"
+                    stroke={d.color}
                     strokeWidth="2"
-                    filter="url(#trackGlow)"
+                    className="animate-ping opacity-75"
                   />
+                )}
 
-                  {/* Car Number Label */}
-                  <text
-                    x={point.x}
-                    y={point.y + 3.5}
-                    textAnchor="middle"
-                    fill="#000"
-                    fontSize={isSelected ? "9px" : "8px"}
-                    fontWeight="900"
-                    fontFamily="sans-serif"
-                  >
-                    {d.carNumber || d.position || index + 1}
-                  </text>
+                {/* Outer Team Ring */}
+                <circle
+                  cx={d.x}
+                  cy={d.y}
+                  r={isSelected ? 10 : 8}
+                  fill={d.color}
+                  stroke="#000"
+                  strokeWidth="2"
+                  filter="url(#trackGlow)"
+                />
 
-                  {/* Driver Name Tag on hover/selected */}
-                  {isSelected && (
-                    <g transform={`translate(${point.x + 12}, ${point.y - 12})`}>
-                      <rect
-                        x="0"
-                        y="0"
-                        width="80"
-                        height="20"
-                        rx="4"
-                        fill="rgba(10, 10, 13, 0.9)"
-                        stroke={color}
-                        strokeWidth="1"
-                      />
-                      <text
-                        x="6"
-                        y="14"
-                        fill="#fff"
-                        fontSize="10px"
-                        fontWeight="700"
-                        fontFamily="sans-serif"
-                      >
-                        P{d.position} {d.driverName.split(" ").pop()}
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })}
+                {/* Car Number Label */}
+                <text
+                  x={d.x}
+                  y={d.y + 3.5}
+                  textAnchor="middle"
+                  fill="#000"
+                  fontSize={isSelected ? "9px" : "8px"}
+                  fontWeight="900"
+                  fontFamily="sans-serif"
+                >
+                  {d.carNumber}
+                </text>
+
+                {/* Driver Name Tag on selected */}
+                {isSelected && (
+                  <g transform={`translate(${d.x + 12}, ${d.y - 12})`}>
+                    <rect
+                      x="0"
+                      y="0"
+                      width="80"
+                      height="20"
+                      rx="4"
+                      fill="rgba(10, 10, 13, 0.9)"
+                      stroke={d.color}
+                      strokeWidth="1"
+                    />
+                    <text
+                      x="6"
+                      y="14"
+                      fill="#fff"
+                      fontSize="10px"
+                      fontWeight="700"
+                      fontFamily="sans-serif"
+                    >
+                      P{d.position} {d.driverName.split(" ").pop()}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
         </svg>
 
         {/* Legend Overlay */}

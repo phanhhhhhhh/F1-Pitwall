@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { F1 } from "../lib/f1-theme";
 
 type RaceFlag = "GREEN" | "YELLOW" | "VSC" | "SC" | "RED";
 
@@ -12,7 +11,6 @@ interface RaceControlBannerProps {
   trackTemp?: number;
   humidity?: number;
   windSpeed?: number;
-  rainRisk?: number;
 }
 
 export default function RaceControlBanner({
@@ -21,7 +19,6 @@ export default function RaceControlBanner({
   trackTemp = 38.2,
   humidity = 58,
   windSpeed = 14,
-  rainRisk = 15,
 }: RaceControlBannerProps) {
   const [currentFlag, setCurrentFlag] = useState<RaceFlag>(flag);
   const [tickerIndex, setTickerIndex] = useState(0);

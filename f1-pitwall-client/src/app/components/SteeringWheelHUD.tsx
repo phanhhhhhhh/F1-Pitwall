@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { F1, getTeamColor } from "../lib/f1-theme";
+import { getTeamColor } from "../lib/f1-theme";
 import { playShiftBeep, playDrsBeep } from "../lib/f1-sound";
 import type { TelemetryData } from "../types/f1";
 
@@ -23,6 +23,7 @@ export default function SteeringWheelHUD({
 }: SteeringWheelHUDProps) {
   const [prevGear, setPrevGear] = useState<number>(telemetry?.gear ?? 1);
   const [prevDrs, setPrevDrs] = useState<boolean>(telemetry?.drsActive ?? false);
+  const [now, setNow] = useState<number>(0);
 
   const speed = telemetry?.speed ?? 284;
   const rpm = telemetry?.rpm ?? 11200;
@@ -31,7 +32,6 @@ export default function SteeringWheelHUD({
   const brake = telemetry?.brake ?? 0.0;
   const drs = telemetry?.drsActive ?? false;
   const tyreTemp = telemetry?.tyreTemp ?? 102;
-  const fuelLoad = telemetry?.fuelLoad ?? 42.5;
 
   const resolvedColor = getTeamColor(teamName, teamColor);
 
@@ -54,6 +54,12 @@ export default function SteeringWheelHUD({
     }
   }, [telemetry?.drsActive, prevDrs]);
 
+  // Drive the animated G-force readout without reading a clock during render
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, []);
+
   // Compute 15 Shift Lights (5 Green, 5 Red, 5 Purple)
   const minRpm = 8000;
   const maxRpm = 12500;
@@ -62,7 +68,7 @@ export default function SteeringWheelHUD({
   const isRevLimiter = rpm >= 12200;
 
   // G-force estimation from speed and cornering
-  const gLat = (Math.sin(Date.now() / 1500) * 3.2).toFixed(1);
+  const gLat = (Math.sin(now / 1500) * 3.2).toFixed(1);
   const gLong = (brake > 0.1 ? -4.5 * brake : throttle > 0.5 ? 1.8 * throttle : 0.2).toFixed(1);
 
   return (
