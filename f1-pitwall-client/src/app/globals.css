@@ -1,17 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Saira:ital,wght@0,400;0,500;0,600;0,700;1,600;1,800&family=Saira+Condensed:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0c;
-  --foreground: #ededed;
+  --background: #08080a;
+  --foreground: #f4f4f5;
   /* Pit Wall OS palette */
   --f1-red: #E10600;
   --f1-red-bright: #ff2a1f;
-  --f1-orange: #ff5a3c;
+  --f1-orange: #FF8000;
   --f1-gold: #FFD200;
   --f1-green: #00E676;
-  --card: rgba(18, 18, 21, 0.78);
-  --hairline: rgba(255, 255, 255, 0.06);
+  --f1-purple: #9C27B0;
+  --f1-cyan: #00E5FF;
+  --card: rgba(14, 15, 19, 0.82);
+  --card-glow: rgba(225, 6, 0, 0.12);
+  --hairline: rgba(255, 255, 255, 0.08);
 }
 
 @theme inline {
@@ -21,6 +24,8 @@
   --color-f1-orange: var(--f1-orange);
   --color-f1-gold: var(--f1-gold);
   --color-f1-green: var(--f1-green);
+  --color-f1-purple: var(--f1-purple);
+  --color-f1-cyan: var(--f1-cyan);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -30,45 +35,104 @@ body {
   color: var(--foreground);
   font-family: 'Saira', var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 /* ── Pit Wall OS font utilities ─────────────────────────────────────────── */
 .f-cond { font-family: 'Saira Condensed', 'Saira', system-ui, sans-serif; }
 .f-disp { font-family: 'Saira', system-ui, sans-serif; }
-.f-mono { font-family: var(--font-geist-mono), ui-monospace, 'SFMono-Regular', monospace; }
+.f-orbitron { font-family: 'Orbitron', monospace, sans-serif; }
+.f-mono { font-family: 'JetBrains Mono', var(--font-geist-mono), monospace; }
+
+/* ── Carbon fiber texture & racing backgrounds ─────────────────────────── */
+.bg-carbon {
+  background-color: #0c0d10;
+  background-image: 
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0),
+    radial-gradient(rgba(255, 255, 255, 0.02) 1px, #0a0b0e 0);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+.bg-carbon-mesh {
+  background: 
+    linear-gradient(27deg, #151515 5px, transparent 5px) 0 5px,
+    linear-gradient(207deg, #151515 5px, transparent 5px) 10px 0px,
+    linear-gradient(27deg, #222 5px, transparent 5px) 0px 10px,
+    linear-gradient(207deg, #222 5px, transparent 5px) 10px 5px,
+    linear-gradient(90deg, #1b1b1b 10px, transparent 10px),
+    linear-gradient(#1d1d1d 25%, #1a1a1a 25%, #1a1a1a 50%, transparent 50%, transparent 75%, #242424 75%, #242424);
+  background-color: #131313;
+  background-size: 20px 20px;
+}
+
+.bg-glass {
+  background: rgba(16, 17, 22, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.bg-glass-card {
+  background: linear-gradient(135deg, rgba(24, 25, 32, 0.7) 0%, rgba(14, 15, 19, 0.85) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
 
 /* ── Chamfered (cut-corner) racing panels ───────────────────────────────── */
 .chamfer { clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
 .chamfer-sm { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
-.chamfer-lg { clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px)); }
+.chamfer-lg { clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px)); }
+.chamfer-top { clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
 
-/* ── Shared keyframes (Pit Wall OS) ─────────────────────────────────────── */
+/* ── Glowing LED & neon utility classes ─────────────────────────────────── */
+.led-red { box-shadow: 0 0 10px #ff2a1f, 0 0 20px rgba(255, 42, 31, 0.4); }
+.led-green { box-shadow: 0 0 10px #00E676, 0 0 20px rgba(0, 230, 118, 0.4); }
+.led-purple { box-shadow: 0 0 10px #D500F9, 0 0 20px rgba(213, 0, 249, 0.4); }
+.led-gold { box-shadow: 0 0 10px #FFD200, 0 0 20px rgba(255, 210, 0, 0.4); }
+.led-cyan { box-shadow: 0 0 10px #00E5FF, 0 0 20px rgba(0, 229, 255, 0.4); }
+
+.glow-text-red { text-shadow: 0 0 12px rgba(225, 6, 0, 0.65); }
+.glow-text-green { text-shadow: 0 0 12px rgba(0, 230, 118, 0.65); }
+.glow-text-purple { text-shadow: 0 0 12px rgba(156, 39, 176, 0.65); }
+.glow-text-gold { text-shadow: 0 0 12px rgba(255, 210, 0, 0.65); }
+
+/* ── Keyframes ─────────────────────────────────────────────────────────── */
 @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes rise-sm { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes grid-pan { from { background-position: 0 0; } to { background-position: 0 80px; } }
 @keyframes streak { 0% { transform: translateX(-100%); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(60vw); opacity: 0; } }
 @keyframes shimmer { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+@keyframes glow-pulse { 0%, 100% { opacity: .4; transform: scale(1); } 50% { opacity: .9; transform: scale(1.02); } }
+@keyframes live-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(225,6,0,.7); } 70% { box-shadow: 0 0 0 8px rgba(225,6,0,0); } }
+@keyframes rev-strobe { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+@keyframes radar-sweep { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(1000%); } }
+
+/* ── Legacy keyframes still referenced across pages (auth, timing tower, cards) ── */
 @keyframes glow { 0%, 100% { opacity: .4; } 50% { opacity: .9; } }
-@keyframes glow-pulse { 0%, 100% { opacity: .3; } 50% { opacity: .8; } }
 @keyframes live { 0%, 100% { box-shadow: 0 0 0 0 rgba(225,6,0,.6); } 70% { box-shadow: 0 0 0 6px rgba(225,6,0,0); } }
 @keyframes scan { 0% { transform: translateY(-100%); opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { transform: translateY(2000%); opacity: 0; } }
 @keyframes scan-v { 0% { transform: translateY(-100vh); } 100% { transform: translateY(100vh); } }
 @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
 @keyframes fadeUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-/* ── Auth page keyframes (Pit Wall Command Center) ──────────────────────── */
 @keyframes border-glow { 0%, 100% { opacity: .3; } 50% { opacity: .8; } }
 @keyframes holographic { 0% { transform: translateX(-100%) translateY(-100%); } 100% { transform: translateX(100%) translateY(100%); } }
 @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 @keyframes digit-pop { 0% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes sector-fill { 0% { width: 0%; } 100% { width: 100%; } }
 
-/* ── Animation utility classes ──────────────────────────────────────────── */
 .rise { animation: rise .55s cubic-bezier(.16,1,.3,1) both; }
 .rise-sm { animation: rise-sm .45s cubic-bezier(.16,1,.3,1) both; }
 .shimmer { animation: shimmer 2.6s ease-in-out infinite; }
 .glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+.live-pulse { animation: live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.rev-strobe { animation: rev-strobe 0.12s steps(2, start) infinite; }
+.radar-sweep { animation: radar-sweep 4s linear infinite; transform-origin: center; }
+.scanline { animation: scanline 3s linear infinite; }
 .fade-up { animation: fadeUp .6s ease-out both; }
 .float { animation: float 6s ease-in-out infinite; }
 .border-glow { animation: border-glow 3s ease-in-out infinite; }
@@ -79,13 +143,20 @@ body {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
 
-/* ── Custom scrollbar (broadcast feel) ──────────────────────────────────── */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #0a0a0c; }
-::-webkit-scrollbar-thumb { background: #27272a; border-radius: 6px; border: 2px solid #0a0a0c; }
-::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
-* { scrollbar-color: #27272a #0a0a0c; }
+/* ── Timing tower row hover (shared by home + standings) ────────────────── */
+.tower-row:hover { background: rgba(255, 255, 255, .03); }
+.tower-row:hover .pos { color: #E10600; }
 
-::selection { background: rgba(225,6,0,.3); color: #fff; }
+/* ── 3D Card Hover Perspective ─────────────────────────────────────────── */
+.perspective-1000 { perspective: 1000px; }
+.transform-gpu-3d { transform-style: preserve-3d; transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
+/* ── Custom scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #08080a; }
+::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; border: 2px solid #08080a; }
+::-webkit-scrollbar-thumb:hover { background: #E10600; }
+* { scrollbar-color: #27272a #08080a; }
+
+::selection { background: rgba(225,6,0,.45); color: #fff; }
 .tabular-nums { font-variant-numeric: tabular-nums; }

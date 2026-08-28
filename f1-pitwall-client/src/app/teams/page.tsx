@@ -5,59 +5,138 @@ import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonCard } from "../components/LoadingSkeleton";
-import { ErrorBanner } from "../components/auth";
 import { NATIONALITY_FLAGS, COUNTRY_FLAGS, useCountUp } from "../lib/f1-theme";
 import type { TeamInfo, DriverCard } from "../types/f1";
 
+const ENGINE_SUPPLIERS: Record<string, string> = {
+  "Red Bull Racing": "Honda RBPT",
+  "Ferrari": "Ferrari 066/12",
+  "Scuderia Ferrari": "Ferrari 066/12",
+  "McLaren": "Mercedes-AMG M15",
+  "Mercedes-AMG Petronas": "Mercedes-AMG M15",
+  "Aston Martin": "Honda HRC",
+  "Williams": "Mercedes-AMG M15",
+  "Haas": "Ferrari 066/12",
+  "Racing Bulls": "Honda RBPT",
+  "Alpine": "Mercedes-AMG M15",
+  "Audi": "Audi F1 Power Unit",
+  "Cadillac": "Ferrari Power Unit",
+};
+
 function TeamCard({ team, drivers, idx }: { team: TeamInfo; drivers: DriverCard[]; idx: number }) {
   const [hov, setHov] = useState(false);
-  const col = team.colorHex || "#666";
+  const col = team.colorHex || "#E10600";
   const td = drivers.filter((d) => d.team?.name === team.name);
   const titles = useCountUp(team.championships, 900, idx * 80);
   const budget = useCountUp(team.annualBudgetM, 900, idx * 80 + 150);
 
+  const engine = ENGINE_SUPPLIERS[team.name] || "1.6L V6 Turbo Hybrid";
+
   return (
-    <div className="group relative rise" style={{ animationDelay: `${idx * 60}ms` }} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}>
-      <div className="absolute inset-0 rounded-2xl transition-opacity duration-500 pointer-events-none" style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 44px ${col}22` }} />
-      <div className="relative border rounded-2xl overflow-hidden transition-all duration-300 chamfer" style={{ borderColor: hov ? `${col}40` : "rgba(255,255,255,.06)", transform: hov ? "translateY(-3px)" : "none", background: "rgba(18,18,21,.78)" }}>
-        <div className="h-1 w-full" style={{ background: col, boxShadow: hov ? `0 0 16px ${col}` : "none" }} />
-        <div className="absolute right-4 top-4 f-cond font-black select-none pointer-events-none transition-all duration-500" style={{ fontSize: "6.5rem", lineHeight: .8, color: col, opacity: hov ? 0.07 : 0.035, transform: hov ? "scale(1.08)" : "none" }}>{team.championships}</div>
-        <div className="relative z-10 p-6">
+    <div
+      className="group relative rise"
+      style={{ animationDelay: `${idx * 60}ms` }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+    >
+      <div
+        className="absolute inset-0 rounded-3xl transition-opacity duration-500 pointer-events-none"
+        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 44px ${col}30` }}
+      />
+      <div
+        className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/90 to-black/95 p-6 shadow-xl"
+        style={{
+          borderColor: hov ? `${col}80` : "rgba(255,255,255,.08)",
+          transform: hov ? "translateY(-5px)" : "none",
+        }}
+      >
+        <div className="h-1 w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
+        
+        {/* Championship watermark */}
+        <div
+          className="absolute right-3 top-4 f-cond font-black select-none pointer-events-none transition-all duration-500 text-8xl"
+          style={{
+            lineHeight: 0.8,
+            color: col,
+            opacity: hov ? 0.12 : 0.04,
+            transform: hov ? "scale(1.08)" : "none",
+          }}
+        >
+          {team.championships}
+        </div>
+
+        <div className="relative z-10">
           <div className="flex items-start justify-between mb-5">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="f-mono text-[10px] text-zinc-600 border border-white/10 px-2 py-0.5 rounded">#{idx + 1}</span>
-                <span className="text-base">{COUNTRY_FLAGS[team.country] || "🏴"}</span>
-                <span className="f-mono text-[11px] text-zinc-600">{team.country}</span>
+                <span className="f-orbitron text-[10px] text-zinc-400 border border-zinc-700/80 px-2 py-0.5 rounded-lg bg-black/40">
+                  RANK #{idx + 1}
+                </span>
+                <span className="text-base">{COUNTRY_FLAGS[team.country] || "🏁"}</span>
+                <span className="f-mono text-[11px] text-zinc-400 font-bold">{team.country}</span>
               </div>
-              <h2 className="f-cond font-black text-3xl uppercase tracking-tight transition-colors" style={{ color: hov ? col : "#fff" }}>{team.name}</h2>
-              <p className="f-mono text-[11px] text-zinc-500 mt-1">EST. {team.foundedYear} · {team.base}</p>
+              <h2 className="f-cond font-black text-3xl uppercase tracking-tight text-white transition-colors" style={{ color: hov ? col : "#fff" }}>
+                {team.name}
+              </h2>
+              <p className="f-mono text-[11px] text-zinc-400 mt-1 font-semibold">
+                EST. {team.foundedYear} · {team.base}
+              </p>
             </div>
             <div className="text-right">
-              <p className="f-cond font-black tabular-nums leading-none" style={{ fontSize: "56px", color: col, textShadow: hov ? `0 0 24px ${col}60` : "none" }}>{titles}</p>
-              <p className="f-mono text-[9px] text-zinc-600 tracking-widest mt-1">TITLES</p>
+              <p className="f-orbitron font-black text-4xl tabular-nums leading-none" style={{ color: col }}>
+                {titles}
+              </p>
+              <p className="f-mono text-[9px] text-zinc-500 tracking-widest mt-1 uppercase font-bold">WCC TITLES</p>
             </div>
           </div>
+
+          {/* Power Unit Spec Pill */}
+          <div className="mb-4 p-2 rounded-xl bg-black/40 border border-zinc-800 flex items-center justify-between text-[11px] f-mono">
+            <span className="text-zinc-500">POWER UNIT</span>
+            <span className="font-bold text-zinc-200">{engine}</span>
+          </div>
+
+          {/* Driver Lineup */}
           {td.length > 0 && (
             <div className="flex gap-2 mb-5">
               {td.map((d) => (
-                <div key={d.id} className="flex items-center gap-2.5 flex-1 rounded-xl px-3 py-2.5 border transition-all" style={{ background: hov ? `${col}08` : "rgba(255,255,255,.02)", borderColor: hov ? `${col}30` : "rgba(255,255,255,.06)" }}>
-                  <span className="text-base flex-shrink-0">{NATIONALITY_FLAGS[d.nationality] || "🏴"}</span>
+                <div
+                  key={d.id}
+                  className="flex items-center gap-2.5 flex-1 rounded-2xl px-3 py-2.5 border transition-all bg-black/40"
+                  style={{ borderColor: hov ? `${col}40` : "rgba(255,255,255,.08)" }}
+                >
+                  <span className="text-base flex-shrink-0">{NATIONALITY_FLAGS[d.nationality] || "🏁"}</span>
                   <div className="min-w-0">
                     <p className="f-cond font-bold text-sm text-white truncate uppercase">{d.name.split(" ").pop()}</p>
-                    <p className="f-mono text-[10px]" style={{ color: col }}>#{d.carNumber}</p>
+                    <p className="f-mono text-[10px] font-bold" style={{ color: col }}>#{d.carNumber}</p>
                   </div>
                 </div>
               ))}
             </div>
           )}
-          <div className="h-px mb-4" style={{ background: `linear-gradient(90deg,${col}50,transparent)`, opacity: hov ? 1 : 0.4 }} />
+
+          <div className="h-px mb-4 bg-gradient-to-r from-zinc-700 to-transparent" />
+
           <div className="grid grid-cols-2 gap-4">
-            <div><p className="f-mono text-[9px] text-zinc-600 tracking-widest mb-1">BASE</p><p className="f-cond font-bold text-sm text-zinc-200">{team.base}</p></div>
-            <div><p className="f-mono text-[9px] text-zinc-600 tracking-widest mb-1">BUDGET</p><p className="f-cond font-black text-sm tabular-nums" style={{ color: col }}>${budget}M</p></div>
+            <div>
+              <p className="f-mono text-[9px] text-zinc-500 tracking-widest mb-0.5">HEADQUARTERS</p>
+              <p className="f-cond font-bold text-sm text-zinc-200 truncate">{team.base}</p>
+            </div>
+            <div>
+              <p className="f-mono text-[9px] text-zinc-500 tracking-widest mb-0.5">COST CAP BUDGET</p>
+              <p className="f-orbitron font-black text-sm tabular-nums" style={{ color: col }}>${budget}M</p>
+            </div>
           </div>
-          <div className="mt-4 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,.07)" }}>
-            <div className="h-full rounded-full transition-all duration-1000" style={{ width: hov ? `${Math.min((team.annualBudgetM / 500) * 100, 100)}%` : "0%", background: col, boxShadow: `0 0 6px ${col}` }} />
+
+          <div className="mt-4 h-1.5 rounded-full overflow-hidden bg-zinc-800">
+            <div
+              className="h-full rounded-full transition-all duration-1000"
+              style={{
+                width: hov ? `${Math.min((team.annualBudgetM / 500) * 100, 100)}%` : "30%",
+                background: col,
+                boxShadow: `0 0 8px ${col}`,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -71,73 +150,68 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTeams = () => {
-    setError(null); setLoading(true);
-    Promise.all([authFetch(`${API}/api/teams`).then(r => r.json()), authFetch(`${API}/api/drivers`).then(r => r.json())])
-      .then(([t, d]) => { setTeams(t); setDrivers(d); }).catch(() => setError("Failed to load teams")).finally(() => setLoading(false));
-  };
-  // Initial load: error/loading already start at their post-fetch values, so the
-  // mount effect fetches directly instead of calling fetchTeams, whose
-  // synchronous state resets are only needed by the Retry handler.
   useEffect(() => {
-    Promise.all([authFetch(`${API}/api/teams`).then(r => r.json()), authFetch(`${API}/api/drivers`).then(r => r.json())])
-      .then(([t, d]) => { setTeams(t); setDrivers(d); }).catch(() => setError("Failed to load teams")).finally(() => setLoading(false));
+    Promise.all([
+      authFetch(`${API}/api/teams`).then((r) => r.json()),
+      authFetch(`${API}/api/drivers`).then((r) => r.json()),
+    ])
+      .then(([t, d]) => {
+        setTeams(t);
+        setDrivers(d);
+      })
+      .catch(() => setError("Failed to load teams data"))
+      .finally(() => setLoading(false));
   }, []);
 
-  const totalBudget = teams.reduce((s, t) => s + (t.annualBudgetM || 0), 0);
   const totalTitles = teams.reduce((s, t) => s + (t.championships || 0), 0);
 
   return (
-    <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
-      <style>{`
-        .f-cond{font-family:'Saira Condensed','Saira',system-ui,sans-serif}
-        .f-mono{font-family:var(--font-geist-mono),ui-monospace,monospace}
-        @keyframes grid-pan{from{background-position:0 0}to{background-position:0 80px}}
-        @keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes streak{0%{transform:translateX(-100%);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translateX(60vw);opacity:0}}
-        .rise{animation:rise .45s cubic-bezier(.16,1,.3,1) both}
-        .chamfer{clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px))}
-      `}</style>
-
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0" style={{ background: "radial-gradient(120% 80% at 35% -10%, rgba(225,6,0,.10), transparent 55%)" }} />
-        <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px)", backgroundSize: "80px 80px", animation: "grid-pan 6s linear infinite", maskImage: "radial-gradient(circle at 50% 20%,black,transparent 80%)" }} />
-        <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 2px,transparent 2px 5px)" }} />
-        <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 220px 60px rgba(0,0,0,.9)" }} />
-        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="absolute h-px" style={{ width: `${120 + i * 50}px`, top: `${18 + i * 20}%`, left: "-10%", background: "linear-gradient(90deg,transparent,rgba(225,6,0,.5),transparent)", animation: `streak ${5 + i * 1.4}s linear infinite`, animationDelay: `${i * 1.3}s` }} />)}
-      </div>
-
+    <div className="min-h-screen text-white relative overflow-x-hidden bg-carbon">
       <Navbar />
 
-      <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
-        <div className="flex items-end justify-between mb-10 flex-wrap gap-4 rise">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 mb-8">
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="inline-block w-8 h-[3px] bg-[#E10600]" />
-              <span className="f-mono text-[11px] tracking-[0.3em] text-zinc-500">2026 SEASON · {teams.length} CONSTRUCTORS</span>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-8 h-[3px] bg-red-600 rounded-full shadow-[0_0_8px_#E10600]" />
+              <span className="f-mono text-xs text-red-500 font-bold tracking-widest uppercase">
+                CONSTRUCTORS CHAMPIONSHIP
+              </span>
             </div>
-            <h1 className="f-cond font-black tracking-tight leading-[0.82]" style={{ fontSize: "clamp(44px,6.5vw,80px)" }}>
-              <span className="block text-white">CONSTRUCTORS</span>
-              <span className="block text-transparent bg-clip-text" style={{ backgroundImage: "linear-gradient(90deg,#E10600,#ff5a3c)" }}>THE GRID</span>
+            <h1 className="text-4xl sm:text-6xl font-black f-cond tracking-tight uppercase">
+              2026 FORMULA 1 <span className="text-red-600">TEAMS</span>
             </h1>
           </div>
-          {error && <div className="max-w-2xl mx-auto mb-6"><ErrorBanner msg={error} /><button onClick={fetchTeams} className="block mx-auto mt-2 f-mono text-xs text-red-400 hover:text-red-300 transition-colors">↻ Retry</button></div>}
-          {!error && !loading && (
-            <div className="flex gap-3 rise" style={{ animationDelay: "150ms" }}>
-              {[{ l: "TOTAL TITLES", v: totalTitles.toLocaleString() }, { l: "COMBINED BUDGET", v: `$${totalBudget.toLocaleString()}M` }].map(s => (
-                <div key={s.l} className="rounded-xl border border-white/8 px-5 py-3 text-right chamfer" style={{ background: "rgba(18,18,21,.7)" }}>
-                  <p className="f-mono text-[9px] text-zinc-600 tracking-widest mb-1">{s.l}</p>
-                  <p className="f-cond font-black text-2xl text-white">{s.v}</p>
-                </div>
-              ))}
+
+          <div className="flex items-center gap-4 bg-black/60 px-4 py-2 rounded-2xl border border-zinc-800 f-mono text-xs">
+            <div>
+              <span className="text-zinc-500">TOTAL TEAMS: </span>
+              <span className="font-bold text-white">{teams.length}</span>
             </div>
-          )}
+            <div className="w-px h-4 bg-zinc-800" />
+            <div>
+              <span className="text-zinc-500">TOTAL TITLES: </span>
+              <span className="font-bold text-amber-400">{totalTitles}</span>
+            </div>
+          </div>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="p-8 rounded-2xl bg-red-950/40 border border-red-500/30 text-center">
+            <p className="f-mono text-sm text-red-400">{error}</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{teams.map((t, i) => <TeamCard key={t.id} team={t} drivers={drivers} idx={i} />)}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {teams.map((team, idx) => (
+              <TeamCard key={team.id || team.name} team={team} drivers={drivers} idx={idx} />
+            ))}
+          </div>
         )}
       </main>
     </div>
