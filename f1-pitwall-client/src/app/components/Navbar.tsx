@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { useSeason } from "../context/SeasonContext";
 import NotificationBell from "./NotificationBell";
 import SeasonSelector from "./SeasonSelector";
+import { isSoundEnabled, setSoundEnabled, playUiClick } from "../lib/f1-sound";
 
 interface NavItem { href: string; label: string; live?: boolean; }
 
@@ -65,9 +66,9 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
     const active = pathname === item.href || pathname.startsWith(item.href + "/");
     return (
       <Link href={item.href}
-        className={`f-mono px-4 py-4 text-[11px] font-bold tracking-[0.15em] border-b-2 transition-all flex items-center gap-1.5 ${active
+        className={`f-mono px-3.5 py-4 text-[11px] font-bold tracking-[0.15em] border-b-2 transition-all flex items-center gap-1.5 ${active
           ? "border-[#E10600] text-white"
-          : "border-transparent text-zinc-500 hover:text-zinc-200 hover:border-zinc-700"
+          : "border-transparent text-zinc-400 hover:text-zinc-100 hover:border-zinc-700"
           }`}>
         {item.live && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />}
         {item.label.toUpperCase()}
@@ -78,7 +79,7 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(p => !p)}
-        className={`f-mono px-4 py-4 text-[11px] font-bold tracking-[0.15em] border-b-2 transition-all flex items-center gap-1.5 ${isActive ? "border-[#E10600] text-white" : "border-transparent text-zinc-500 hover:text-zinc-200 hover:border-zinc-700"
+        className={`f-mono px-3.5 py-4 text-[11px] font-bold tracking-[0.15em] border-b-2 transition-all flex items-center gap-1.5 ${isActive ? "border-[#E10600] text-white" : "border-transparent text-zinc-400 hover:text-zinc-100 hover:border-zinc-700"
           }`}>
         {group.label}
         <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +114,29 @@ export default function Navbar() {
   const { season } = useSeason();
   const [imgError, setImgError] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
+  const [utcTime, setUtcTime] = useState("");
   const mobileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSoundOn(isSoundEnabled());
+    const tickClock = () => {
+      const now = new Date();
+      setUtcTime(
+        now.toTimeString().split(" ")[0] + " UTC"
+      );
+    };
+    tickClock();
+    const interval = setInterval(tickClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+    if (next) playUiClick();
+  };
 
   const handleLogout = () => { clearTokens(); window.location.href = "/login"; };
 
@@ -137,9 +160,9 @@ export default function Navbar() {
   const displayName = user?.displayName || user?.username || "";
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-white/[0.07] bg-zinc-950/80 backdrop-blur-xl" ref={mobileRef}>
-      {/* top hairline accent */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#E10600]/40 to-transparent" />
+    <nav className="sticky top-0 z-50 border-b border-white/[0.08] bg-zinc-950/85 backdrop-blur-2xl" ref={mobileRef}>
+      {/* top hairline red laser accent */}
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#E10600] to-transparent shadow-[0_0_8px_#E10600]" />
       <div className="px-4 sm:px-6 py-0 flex items-center justify-between h-14">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 group">
@@ -147,28 +170,55 @@ export default function Navbar() {
           <span className="f-cond text-white font-black tracking-widest text-base sm:text-lg">
             <span className="text-[#E10600]">PIT</span>WALL
           </span>
-          <span className="f-mono text-zinc-600 text-[10px] tracking-widest hidden lg:block border border-white/10 rounded px-1.5 py-0.5">F1 · {season}</span>
+          <span className="f-mono text-zinc-500 text-[10px] tracking-widest hidden lg:block border border-white/10 rounded px-1.5 py-0.5 bg-black/40">F1 · {season}</span>
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center flex-1 ml-2">
+        <div className="hidden md:flex items-center flex-1 ml-4">
           {visibleGroups.map(group => (
             <NavDropdown key={group.label} group={group} pathname={pathname} />
           ))}
         </div>
 
-        {/* Right side */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Right side controls */}
+        <div className="flex items-center gap-2.5 flex-shrink-0">
+          {/* UTC Track Clock */}
+          {utcTime && (
+            <div className="hidden xl:flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 f-mono bg-black/40 px-2 py-1 rounded-lg border border-zinc-800">
+              <span className="text-zinc-600">🕒</span>
+              <span>{utcTime}</span>
+            </div>
+          )}
+
+          {/* Sound FX Toggle Button */}
+          <button
+            onClick={toggleSound}
+            title={soundOn ? "Mute F1 Audio FX" : "Unmute F1 Audio FX"}
+            className={`p-1.5 rounded-lg border transition-all flex items-center justify-center ${
+              soundOn
+                ? "bg-zinc-800/80 text-emerald-400 border-emerald-500/30 hover:bg-zinc-700"
+                : "bg-zinc-900/60 text-zinc-600 border-zinc-800 hover:text-zinc-400"
+            }`}
+          >
+            {soundOn ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+              </svg>
+            )}
+          </button>
+
           {/* Season selector */}
           <SeasonSelector />
 
-          {/* Live indicator — desktop only */}
-          <div className="hidden sm:flex items-center gap-1.5 mr-1">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-[#00E676] opacity-75 animate-ping" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00E676]" />
-            </span>
-            <span className="f-mono text-zinc-500 text-[10px] tracking-widest">LIVE</span>
+          {/* Live STOMP Indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse" />
+            <span className="f-mono text-emerald-400 font-bold text-[10px] tracking-widest">LIVE</span>
           </div>
 
           {/* Profile avatar */}
@@ -189,7 +239,7 @@ export default function Navbar() {
               </span>
             </Link>
           ) : (
-            <Link href="/login" className="f-mono text-[11px] text-zinc-600 hover:text-zinc-300 transition-colors">
+            <Link href="/login" className="f-mono text-[11px] text-zinc-400 hover:text-zinc-100 transition-colors font-bold px-2 py-1 rounded bg-white/[0.04]">
               LOGIN
             </Link>
           )}
@@ -197,10 +247,12 @@ export default function Navbar() {
           <NotificationBell />
 
           {/* Logout — desktop only */}
-          <button onClick={handleLogout}
-            className="f-mono hidden sm:block text-[11px] text-zinc-600 hover:text-[#E10600] transition-colors">
-            LOGOUT
-          </button>
+          {user && (
+            <button onClick={handleLogout}
+              className="f-mono hidden sm:block text-[11px] text-zinc-500 hover:text-[#E10600] transition-colors">
+              LOGOUT
+            </button>
+          )}
 
           {/* Hamburger — mobile only */}
           <button
@@ -219,7 +271,7 @@ export default function Navbar() {
         <div className="md:hidden bg-zinc-950/95 backdrop-blur-xl border-t border-white/[0.06] px-4 py-4 space-y-1">
           {visibleGroups.map(group => (
             <div key={group.label} className="mb-3">
-              <p className="f-mono text-zinc-600 text-[10px] tracking-widest mb-1.5 px-2">{group.label}</p>
+              <p className="f-mono text-zinc-500 text-[10px] tracking-widest mb-1.5 px-2">{group.label}</p>
               {group.items.map(item => {
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
@@ -242,12 +294,14 @@ export default function Navbar() {
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse" />
-              <span className="f-mono text-zinc-500 text-[10px] tracking-widest">LIVE</span>
+              <span className="f-mono text-zinc-400 text-[10px] tracking-widest font-bold">LIVE STOMP</span>
             </div>
-            <button onClick={() => { setMobileOpen(false); handleLogout(); }}
-              className="f-mono text-[11px] text-[#E10600]/70 hover:text-[#E10600] transition-colors border border-[#E10600]/20 hover:border-[#E10600]/40 px-3 py-1.5 rounded-lg">
-              LOGOUT
-            </button>
+            {user && (
+              <button onClick={() => { setMobileOpen(false); handleLogout(); }}
+                className="f-mono text-[11px] text-[#E10600]/80 hover:text-[#E10600] transition-colors border border-[#E10600]/20 hover:border-[#E10600]/40 px-3 py-1.5 rounded-lg">
+                LOGOUT
+              </button>
+            )}
           </div>
         </div>
       )}
