@@ -1,6 +1,8 @@
 package backend.controller;
 
+import backend.dto.DriverProfileResponse;
 import backend.model.Driver;
+import backend.service.DriverRatingService;
 import backend.service.DriverService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +22,32 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DriverController {
     private final DriverService driverService;
+    private final DriverRatingService ratingService;
 
     @GetMapping
     public List<Driver> getAll() { return driverService.getAll(); }
+
+    /**
+     * Ability ratings for the whole grid, derived from the season's race data, ordered best first.
+     * Each profile carries the measurements behind it so the UI can show why a driver is rated
+     * where they are.
+     */
+    @GetMapping("/profiles")
+    public List<DriverProfileResponse> getProfiles(@RequestParam(required = false) Integer season) {
+        return ratingService.getProfiles(resolveSeason(season));
+    }
+
+    /** Ability ratings for one driver. */
+    @GetMapping("/{id}/profile")
+    public DriverProfileResponse getProfile(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer season) {
+        return ratingService.getProfile(id, resolveSeason(season));
+    }
+
+    private int resolveSeason(Integer season) {
+        return season != null ? season : java.time.Year.now().getValue();
+    }
 
     /**
      * Paginated driver list.

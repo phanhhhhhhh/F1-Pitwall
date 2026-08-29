@@ -22,6 +22,18 @@ public class Team {
 
     private String country;
     private String colorHex;
+
+    /** Secondary livery colour, used for accents on the 3D car and team badges. */
+    private String accentHex;
+
+    /** Power unit manufacturer — not always the same as the team. */
+    private String engineSupplier;
+
+    /** Chassis designation for the current season, e.g. {@code SF-26}. */
+    private String carName;
+
+    private String teamPrincipal;
+
     private int championships;
     private float annualBudgetM;
     private String base;

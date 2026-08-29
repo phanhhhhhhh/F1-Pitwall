@@ -5,6 +5,7 @@ import backend.model.enums.RaceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,10 @@ public interface RaceResultRepository extends JpaRepository<RaceResult, Long> {
     @Transactional
     @Query("DELETE FROM RaceResult r WHERE r.race.id = :raceId")
     void deleteByRaceId(Long raceId);
+
+    /** Career starts per driver across every completed race — feeds the experience rating. */
+    @Query("SELECT r.driver.id, COUNT(r) FROM RaceResult r WHERE r.race.status = :status AND r.driver IS NOT NULL GROUP BY r.driver.id")
+    List<Object[]> countStartsByDriver(@Param("status") RaceStatus status);
 
     boolean existsByRaceId(Long raceId);
 }
