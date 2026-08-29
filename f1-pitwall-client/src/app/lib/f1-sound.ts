@@ -5,7 +5,6 @@
 
 let audioCtx: AudioContext | null = null;
 
-// Initialize on client only
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!audioCtx) {
@@ -200,5 +199,57 @@ export function playUiClick(): void {
 
     osc.start();
     osc.stop(ctx.currentTime + 0.03);
+  } catch {}
+}
+
+/** Pneumatic Wheel Gun torque rattle sound */
+export function playWheelGun(): void {
+  if (!isSoundEnabled()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    for (let i = 0; i < 6; i++) {
+      const timeOffset = ctx.currentTime + i * 0.04;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "square";
+      osc.frequency.setValueAtTime(120 + Math.random() * 80, timeOffset);
+
+      gain.gain.setValueAtTime(0.15, timeOffset);
+      gain.gain.exponentialRampToValueAtTime(0.01, timeOffset + 0.03);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(timeOffset);
+      osc.stop(timeOffset + 0.03);
+    }
+  } catch {}
+}
+
+/** Pneumatic Car Jack drop clank */
+export function playCarJack(): void {
+  if (!isSoundEnabled()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(90, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.15);
+
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
   } catch {}
 }

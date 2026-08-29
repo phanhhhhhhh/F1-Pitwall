@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonCard } from "../components/LoadingSkeleton";
 import { flagForCountry } from "../lib/f1-theme";
 import type { CircuitInfo } from "../types/f1";
+
+const Track3DViewer = dynamic(() => import("../components/Track3DViewer"), { ssr: false });
 
 const typeConfig: Record<string, { color: string; label: string }> = {
   PERMANENT: { color: "#3B82F6", label: "PERMANENT TRACK" },
@@ -231,6 +234,11 @@ export default function CircuitsPage() {
             </div>
           </div>
         </div>
+
+        {/* ── 3D CIRCUIT ELEVATION VIEWER ── */}
+        <section className="mb-8">
+          <Track3DViewer />
+        </section>
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

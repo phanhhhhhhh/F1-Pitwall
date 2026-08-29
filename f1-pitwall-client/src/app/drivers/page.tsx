@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
 import Navbar from "../components/Navbar";
 import { SkeletonCard } from "../components/LoadingSkeleton";
-import { NATIONALITY_FLAGS, getDriverSkill, useCountUp } from "../lib/f1-theme";
+import { getDriverSkill, flagForNationality, getTeamColor, useCountUp } from "../lib/f1-theme";
 import type { DriverCareer } from "../types/f1";
+
+const HologramHelmet3D = dynamic(() => import("../components/HologramHelmet3D"), { ssr: false });
 
 function DriverCard({
   driver,
@@ -16,19 +19,16 @@ function DriverCard({
 }: {
   driver: DriverCareer;
   idx: number;
-  onSelect: (driver: DriverCareer) => void;
+  onSelect: (d: DriverCareer) => void;
 }) {
   const [hov, setHov] = useState(false);
-  const isChamp = driver.carNumber === 1;
-  const col = driver.team?.colorHex || "#666";
-  const flag = NATIONALITY_FLAGS[driver.nationality] || "🏁";
-  const first = driver.name.split(" ")[0];
-  const last = driver.name.split(" ").slice(1).join(" ");
-  const wins = useCountUp(driver.careerWins, 900, idx * 40);
-  const poles = useCountUp(driver.careerPoles, 900, idx * 40 + 100);
-  const pts = useCountUp(driver.careerPoints, 900, idx * 40 + 200);
-
+  const col = getTeamColor(driver.team?.name, driver.team?.colorHex);
+  const flag = flagForNationality(driver.nationality);
   const skill = getDriverSkill(driver.name);
+
+  const wins = useCountUp(driver.careerWins, 800, idx * 30);
+  const poles = useCountUp(driver.careerPoles, 800, idx * 30);
+  const pts = useCountUp(Math.round(driver.careerPoints), 1000, idx * 30);
 
   return (
     <div
@@ -40,73 +40,52 @@ function DriverCard({
     >
       <div
         className="absolute inset-0 rounded-3xl transition-opacity duration-500 pointer-events-none"
-        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 36px ${col}35` }}
+        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 36px ${col}30` }}
       />
       <div
         className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/90 to-black/95 p-5 shadow-xl"
         style={{
-          borderColor: hov ? `${col}80` : isChamp ? "rgba(255,210,63,.4)" : "rgba(255,255,255,.08)",
-          transform: hov ? "translateY(-6px)" : "none",
+          borderColor: hov ? `${col}80` : "rgba(255,255,255,.08)",
+          transform: hov ? "translateY(-5px)" : "none",
         }}
       >
-        {/* Team Color Top Accent */}
-        <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
-
-        {/* Huge Ghost Car Number */}
-        <div
-          className="absolute -bottom-4 -right-2 f-cond font-black select-none pointer-events-none transition-all duration-500 text-8xl"
-          style={{
-            lineHeight: 0.8,
-            color: col,
-            opacity: hov ? 0.16 : 0.06,
-            transform: hov ? "scale(1.1) rotate(-4deg)" : "none",
-          }}
-        >
-          {driver.carNumber}
-        </div>
+        <div className="h-[3px] w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
 
         <div className="relative z-10">
-          {/* Header row */}
           <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{flag}</span>
-              <span
-                className="f-orbitron text-xs font-black px-2.5 py-0.5 rounded-lg border shadow-sm"
-                style={{ color: col, borderColor: `${col}50`, background: `${col}15` }}
-              >
-                #{driver.carNumber}
-              </span>
+            <span
+              className="f-orbitron font-black text-3xl tabular-nums leading-none"
+              style={{ color: col, textShadow: `0 0 16px ${col}40` }}
+            >
+              #{driver.carNumber}
+            </span>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/40 border border-zinc-800">
+              <span className="text-sm leading-none">{flag}</span>
+              <span className="f-mono text-[10px] text-zinc-400 font-bold uppercase">{driver.nationality}</span>
             </div>
-            {isChamp && (
-              <span className="f-orbitron text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5 font-black tracking-wider">
-                👑 WORLD CHAMPION
-              </span>
-            )}
           </div>
 
-          {/* Name & Team */}
           <div className="mb-4">
-            <p className="f-mono text-[11px] text-zinc-400 leading-none mb-1 font-bold">{first}</p>
             <h2
-              className="f-cond font-black text-3xl leading-none uppercase tracking-tight transition-colors"
+              className="f-cond font-black text-2xl uppercase tracking-tight text-white transition-colors"
               style={{ color: hov ? col : "#fff" }}
             >
-              {last || first}
+              {driver.name}
             </h2>
-            <p className="f-mono text-[11px] font-bold tracking-wider mt-1.5 uppercase" style={{ color: col }}>
-              {driver.team?.name}
+            <p className="f-mono text-[11px] font-bold mt-1" style={{ color: col }}>
+              {driver.team?.name || "Independent"}
             </p>
           </div>
 
-          {/* ── Skill Radar Quick Bar ────────────────────────────────────────── */}
-          <div className="mb-4 p-2.5 rounded-xl bg-black/50 border border-zinc-800/80 space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] f-mono">
-              <span className="text-zinc-500">PACE RATING</span>
-              <span className="font-bold text-white">{skill.pace} / 100</span>
+          {/* Skill Radar Mini Bars */}
+          <div className="space-y-1 mb-4 p-2.5 rounded-2xl bg-black/50 border border-zinc-800/80">
+            <div className="flex items-center justify-between text-[10px] f-mono text-zinc-400">
+              <span>PACE RATING</span>
+              <span className="font-bold text-white">{skill.pace}/100</span>
             </div>
-            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full"
+                className="h-full rounded-full transition-all duration-700"
                 style={{ width: `${skill.pace}%`, background: `linear-gradient(90deg, ${col}, #00E676)` }}
               />
             </div>
@@ -239,6 +218,11 @@ export default function DriversPage() {
           </div>
         </div>
 
+        {/* ── 3D HOLOGRAPHIC DRIVER HELMET SHOWCASE ── */}
+        <section className="mb-8">
+          <HologramHelmet3D />
+        </section>
+
         {/* Drivers Grid */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -263,7 +247,7 @@ export default function DriversPage() {
           </div>
         )}
 
-        {/* Driver Detail Modal */}
+        {/* Modal Driver Detail */}
         <AnimatePresence>
           {selectedDriver && (
             <motion.div
@@ -278,21 +262,17 @@ export default function DriversPage() {
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-lg bg-zinc-950 border border-zinc-700 rounded-3xl p-6 shadow-2xl relative overflow-hidden"
+                className="w-full max-w-md bg-zinc-950 border border-zinc-700 rounded-3xl p-6 shadow-2xl relative overflow-hidden"
               >
-                <div
-                  className="absolute top-0 left-0 right-0 h-1.5"
-                  style={{ background: selectedDriver.team?.colorHex || "#E10600" }}
-                />
-
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <span className="f-mono text-xs text-zinc-400 font-bold">
-                      {selectedDriver.team?.name} · #{selectedDriver.carNumber}
+                    <span className="f-mono text-xs text-red-500 font-bold">
+                      {flagForNationality(selectedDriver.nationality)} {selectedDriver.nationality}
                     </span>
                     <h2 className="text-3xl font-black f-cond uppercase text-white mt-1">
                       {selectedDriver.name}
                     </h2>
+                    <p className="f-mono text-xs text-zinc-400 mt-0.5">{selectedDriver.team?.name}</p>
                   </div>
                   <button
                     onClick={() => setSelectedDriver(null)}
@@ -302,44 +282,28 @@ export default function DriversPage() {
                   </button>
                 </div>
 
-                {/* Radar Breakdown */}
-                {(() => {
-                  const skill = getDriverSkill(selectedDriver.name);
-                  return (
-                    <div className="space-y-3 my-6 p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
-                      <div className="text-xs font-black f-orbitron text-zinc-300 tracking-wider uppercase mb-2">
-                        TELEMETRY & DRIVER SKILL ANALYSIS
-                      </div>
-                      {[
-                        { label: "QUALIFYING PACE", val: skill.pace, col: "#00E676" },
-                        { label: "RACECRAFT & OVERTAKING", val: skill.racecraft, col: "#FFD200" },
-                        { label: "TYRE PRESERVATION", val: skill.tyreMgmt, col: "#FF8000" },
-                        { label: "WET WEATHER MASTERY", val: skill.wetSkill, col: "#00E5FF" },
-                      ].map((bar) => (
-                        <div key={bar.label}>
-                          <div className="flex justify-between text-[11px] f-mono mb-1">
-                            <span className="text-zinc-400">{bar.label}</span>
-                            <span className="font-black" style={{ color: bar.col }}>
-                              {bar.val} / 100
-                            </span>
-                          </div>
-                          <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${bar.val}%`, background: bar.col }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                <div className="grid grid-cols-3 gap-3 my-6 p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-center">
+                  <div>
+                    <span className="text-[10px] f-mono text-zinc-500">CAREER WINS</span>
+                    <p className="text-xl font-black f-orbitron text-amber-400">{selectedDriver.careerWins}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] f-mono text-zinc-500">CAREER POLES</span>
+                    <p className="text-xl font-black f-orbitron text-white">{selectedDriver.careerPoles}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] f-mono text-zinc-500">TOTAL PTS</span>
+                    <p className="text-xl font-black f-orbitron text-red-500">
+                      {Math.round(selectedDriver.careerPoints)}
+                    </p>
+                  </div>
+                </div>
 
                 <button
                   onClick={() => setSelectedDriver(null)}
                   className="w-full py-3 bg-red-600 hover:bg-red-500 font-black f-orbitron text-xs rounded-xl text-white transition-all uppercase tracking-wider"
                 >
-                  CLOSE DRIVER TELEMETRY
+                  CLOSE DRIVER PROFILE
                 </button>
               </motion.div>
             </motion.div>
