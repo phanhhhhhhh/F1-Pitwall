@@ -237,7 +237,7 @@ export default function CircuitsPage() {
 
         {/* ── 3D CIRCUIT ELEVATION VIEWER ── */}
         <section className="mb-8">
-          <Track3DViewer />
+          <Track3DViewer circuits={circuits} />
         </section>
 
         {loading ? (

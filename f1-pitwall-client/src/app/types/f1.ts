@@ -36,6 +36,122 @@ export interface DriverRef {
   team: { name: string; colorHex: string };
 }
 
+/* ── Driver ratings (GET /api/drivers/profiles) ─────────────────────────── */
+
+export interface DriverSkills {
+  pace: number;
+  racecraft: number;
+  tyreMgmt: number;
+  experience: number;
+  wetSkill: number;
+  overall: number;
+}
+
+/** How much real data backs each rating, 0–100. Low values mean the rating leans on the baseline. */
+export interface DriverConfidence {
+  pace: number;
+  racecraft: number;
+  tyreMgmt: number;
+  experience: number;
+  wetSkill: number;
+}
+
+/** The measurements behind the ratings. `null` means there was no data for that measure. */
+export interface DriverEvidence {
+  teammateName: string | null;
+
+  qualifyingSessions: number;
+  qualifyingHeadToHeadSessions: number;
+  qualifyingH2HPct: number | null;
+  teammateGapPct: number | null;
+  avgQualifyingPosition: number | null;
+
+  racesStarted: number;
+  racesClassified: number;
+  finishRatePct: number | null;
+  avgPositionsGained: number | null;
+  raceH2HPct: number | null;
+  avgFinishPosition: number | null;
+
+  pitStops: number;
+  avgPitStopSec: number | null;
+  avgStopsPerRace: number | null;
+  fieldAvgStopsPerRace: number | null;
+  degradationSecPerLap: number | null;
+  fieldDegradationSecPerLap: number | null;
+  stintsAnalysed: number;
+
+  wetRaces: number;
+  wetAvgFinish: number | null;
+  dryAvgFinish: number | null;
+
+  confidence: DriverConfidence;
+}
+
+export interface DriverProfile {
+  driverId: number;
+  name: string;
+  carNumber: number;
+  nationality: string;
+  teamName: string | null;
+  teamColorHex: string | null;
+  age: number | null;
+  careerWins: number;
+  careerPoles: number;
+  careerPoints: number;
+  season: number;
+  skills: DriverSkills;
+  evidence: DriverEvidence;
+}
+
+/* ── Team livery (GET /api/teams/livery) ────────────────────────────────── */
+export interface TeamLivery {
+  id: number;
+  name: string;
+  country: string;
+  colorHex: string | null;
+  accentHex: string | null;
+  engineSupplier: string | null;
+  carName: string | null;
+  teamPrincipal: string | null;
+  base: string | null;
+  championships: number;
+  foundedYear: number;
+  annualBudgetM: number;
+  drivers: { id: number; name: string; carNumber: number; nationality: string }[];
+}
+
+/* ── Pit stop benchmark (GET /api/races/pit-stops/benchmark/{season}) ───── */
+export interface PitStopBenchmark {
+  season: number;
+  totalStops: number;
+  greenFlagStops: number;
+  fastestSec: number | null;
+  medianSec: number | null;
+  meanSec: number | null;
+  topQuartileSec: number | null;
+  fastest: {
+    id: number;
+    durationSec: number;
+    lapNumber: number;
+    driverName: string;
+    driverNumber: number;
+    teamName: string;
+    teamColor: string;
+    raceName: string;
+    round: number;
+    tyreOut: string | null;
+    underSafetyCar: boolean;
+  }[];
+  crews: {
+    teamName: string;
+    teamColor: string;
+    stops: number;
+    medianSec: number | null;
+    bestSec: number | null;
+  }[];
+}
+
 /* ── Team (constructor) ─────────────────────────────────────────────────── */
 export interface TeamInfo {
   id: number;
@@ -63,6 +179,46 @@ export interface CircuitInfo {
 }
 
 export type CircuitType = "PERMANENT" | "STREET" | "OVAL";
+
+/* ── Circuit 3D geometry (GET /api/circuits/{id}/geometry) ──────────────── */
+
+/** Where the racing line came from — the UI must show this, the three differ in accuracy. */
+export type GeometrySource = "OPENF1" | "GEOJSON" | "SYNTHETIC";
+
+/**
+ * A racing line ready for 3D rendering. Each point is `[x, y, z]`: `x`/`z` are plan-view
+ * coordinates normalised to [-1, 1] with the true aspect ratio kept, and `y` is elevation in
+ * metres above the lowest point of the lap — the renderer scales `y` itself.
+ */
+export interface CircuitGeometry {
+  circuitId: number;
+  circuitName: string;
+  country: string;
+  city: string | null;
+  source: GeometrySource;
+  sourceLabel: string;
+  hasRealElevation: boolean;
+  points: [number, number, number][];
+  pointCount: number;
+  spanXM: number | null;
+  spanZM: number | null;
+  elevationMinM: number | null;
+  elevationMaxM: number | null;
+  elevationGainM: number | null;
+  measuredLengthKm: number | null;
+  lengthKm: number;
+  turnCount: number;
+  drsZones: number;
+  totalLaps: number;
+  firstGpYear: number | null;
+  direction: "CLOCKWISE" | "ANTI_CLOCKWISE" | null;
+  lapRecordSec: number;
+  lapRecordHolder: string | null;
+  openf1SessionKey: number | null;
+  openf1DriverNumber: number | null;
+  openf1LapNumber: number | null;
+  fetchedAt: string | null;
+}
 
 /* ── Circuit (lightweight — used by strategy simulator) ─────────────────── */
 export interface CircuitRef {

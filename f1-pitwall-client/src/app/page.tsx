@@ -19,7 +19,7 @@ import LiveTrackMap from "./components/LiveTrackMap";
 import LightsOutGantry from "./components/LightsOutGantry";
 import PitStop3DGame from "./components/PitStop3DGame";
 import { useCountUp } from "./lib/f1-theme";
-import type { DriverStanding, RaceInfo } from "./types/f1";
+import type { CircuitInfo, DriverStanding, RaceInfo } from "./types/f1";
 
 // Dynamic 3D WebGL Inspector
 const F1CarInspector3D = dynamic(() => import("./components/F1CarInspector3D"), { ssr: false });
@@ -30,6 +30,7 @@ export default function Home() {
   const [sprintCount, setSprintCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [allRaces, setAllRaces] = useState<RaceInfo[]>([]);
+  const [circuits, setCircuits] = useState<CircuitInfo[]>([]);
   const [calendar, setCalendar] = useState<RaceInfo[]>([]);
   const [standings, setStandings] = useState<DriverStanding[]>([]);
   const [winners, setWinners] = useState<Record<string, { driver: string; team: string }>>({});
@@ -97,8 +98,9 @@ export default function Home() {
 
       try {
         if (circuitsRes.status === "fulfilled") {
-          const circuits = await circuitsRes.value.json();
-          setStats(s => ({ ...s, circuits: circuits.length }));
+          const list: CircuitInfo[] = await circuitsRes.value.json();
+          setCircuits(list);
+          setStats(s => ({ ...s, circuits: list.length }));
         } else { errors.push(`Circuits: ${circuitsRes.reason?.message || circuitsRes.reason}`); }
       } catch { errors.push("Circuits: parse error"); }
 
@@ -223,7 +225,7 @@ export default function Home() {
 
         {/* ── 3D F1 CAR & AERO WIND TUNNEL INSPECTOR ── */}
         <section className="mb-6">
-          <F1CarInspector3D initialTeam="Ferrari" />
+          <F1CarInspector3D />
         </section>
 
         {/* TOP 3 PODIUM SPOTLIGHT */}
@@ -247,8 +249,13 @@ export default function Home() {
 
         {/* LIVE TRACK RADAR & INTERACTIVE PIT STOP CHALLENGE */}
         <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6 mb-6">
-          <LiveTrackMap circuitKey="monza" />
-          <PitStop3DGame />
+          {/* Opens on the circuit the championship is actually heading to next */}
+          <LiveTrackMap
+            circuitId={nextRace?.circuit?.id}
+            circuits={circuits}
+            demoDrivers={standings}
+          />
+          <PitStop3DGame season={season} />
         </div>
 
         {/* STARTING GANTRY REACTION TESTER */}
