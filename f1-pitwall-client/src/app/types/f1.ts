@@ -208,7 +208,7 @@ export interface CircuitGeometry {
   measuredLengthKm: number | null;
   lengthKm: number;
   turnCount: number;
-  drsZones: number;
+  drsZones: number | null;
   totalLaps: number;
   firstGpYear: number | null;
   direction: "CLOCKWISE" | "ANTI_CLOCKWISE" | null;

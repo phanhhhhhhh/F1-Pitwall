@@ -527,7 +527,7 @@ public class CircuitGeometryService {
             circuit.setLongitude(doubleOf(location.get("lon")));
             dirty = true;
         }
-        if (circuit.getFirstGpYear() == 0 && properties.get("firstgp") != null) {
+        if (circuit.getFirstGpYear() == null && properties.get("firstgp") != null) {
             circuit.setFirstGpYear(intOf(properties.get("firstgp")));
             dirty = true;
         }
@@ -586,7 +586,7 @@ public class CircuitGeometryService {
                 .turnCount(circuit.getTurnCount())
                 .drsZones(circuit.getDrsZones())
                 .totalLaps(circuit.getTotalLaps())
-                .firstGpYear(circuit.getFirstGpYear() > 0 ? circuit.getFirstGpYear() : null)
+                .firstGpYear(circuit.getFirstGpYear())
                 .direction(circuit.getDirection() == null ? null : circuit.getDirection().name())
                 .lapRecordSec(circuit.getLapRecordSec())
                 .lapRecordHolder(circuit.getLapRecordHolder())
