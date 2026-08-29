@@ -43,7 +43,7 @@ public class CircuitGeometryResponse {
 
     private Float lengthKm;
     private int turnCount;
-    private int drsZones;
+    private Integer drsZones;
     private int totalLaps;
     private Integer firstGpYear;
     private String direction;

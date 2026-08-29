@@ -34,11 +34,19 @@ public class Circuit {
     private String lapRecordHolder;
     private int turnCount;
 
-    /** Number of DRS activation zones on the lap. */
-    private int drsZones;
+    /**
+     * Number of DRS activation zones on the lap, or {@code null} when unknown.
+     *
+     * <p>Boxed deliberately. A primitive {@code int} makes Hibernate emit the column as
+     * {@code NOT NULL}, and PostgreSQL refuses to add a NOT NULL column without a default to a
+     * table that already has rows — so {@code ddl-auto=update} skips it on an existing deployment
+     * and every later SELECT fails on the missing column. The same applies to every numeric column
+     * added to an already-populated table.
+     */
+    private Integer drsZones;
 
-    /** Year this circuit first hosted a championship Grand Prix. */
-    private int firstGpYear;
+    /** Year this circuit first hosted a championship Grand Prix, or {@code null} when unknown. */
+    private Integer firstGpYear;
 
     /** Elevation delta (highest minus lowest point) in metres, from real track geometry. */
     private Float elevationGainM;
