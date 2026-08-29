@@ -1,5 +1,6 @@
 package backend.controller;
 
+import backend.dto.TeamLiveryResponse;
 import backend.model.Team;
 import backend.service.TeamService;
 import jakarta.validation.Valid;
@@ -20,6 +21,10 @@ public class TeamController {
 
     @GetMapping
     public List<Team> getAll() { return teamService.getAll(); }
+
+    /** Livery colours, car designation and current line-up for every team — feeds the 3D car inspector. */
+    @GetMapping("/livery")
+    public List<TeamLiveryResponse> getLiveries() { return teamService.getLiveries(); }
 
     @GetMapping("/{id}")
     public Team getById(@PathVariable Long id) { return teamService.getById(id); }
