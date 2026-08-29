@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { authFetch } from "./lib/pitwall-auth";
 import { BASE_URL as API } from "./lib/api-client";
 import { useSeason } from "./context/SeasonContext";
@@ -16,8 +17,12 @@ import RaceControlBanner from "./components/RaceControlBanner";
 import PodiumSpotlight from "./components/PodiumSpotlight";
 import LiveTrackMap from "./components/LiveTrackMap";
 import LightsOutGantry from "./components/LightsOutGantry";
+import PitStop3DGame from "./components/PitStop3DGame";
 import { useCountUp } from "./lib/f1-theme";
 import type { DriverStanding, RaceInfo } from "./types/f1";
+
+// Dynamic 3D WebGL Inspector
+const F1CarInspector3D = dynamic(() => import("./components/F1CarInspector3D"), { ssr: false });
 
 export default function Home() {
   const { season } = useSeason();
@@ -139,7 +144,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen text-white relative overflow-x-hidden bg-carbon">
-      {/* Background Atmosphere */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0" style={{ background: "radial-gradient(120% 80% at 15% -10%, rgba(225,6,0,.15), transparent 55%), radial-gradient(90% 60% at 100% 0%, rgba(255,128,0,.10), transparent 50%)" }} />
         <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px)", backgroundSize: "80px 80px", animation: "grid-pan 6s linear infinite", maskImage: "radial-gradient(circle at 50% 30%,black,transparent 80%)" }} />
@@ -148,7 +152,6 @@ export default function Home() {
 
       <Navbar />
 
-      {/* API error banner */}
       {fetchError && (
         <div className="relative z-20 bg-red-950/70 border-b border-red-500/30 px-5 py-2 text-center">
           <span className="f-mono text-[11px] text-red-400">⚠ API notice — {fetchError}</span>
@@ -218,6 +221,11 @@ export default function Home() {
           <NextRaceCard nextRace={nextRace} countdown={cd} />
         </section>
 
+        {/* ── 3D F1 CAR & AERO WIND TUNNEL INSPECTOR ── */}
+        <section className="mb-6">
+          <F1CarInspector3D initialTeam="Ferrari" />
+        </section>
+
         {/* TOP 3 PODIUM SPOTLIGHT */}
         {standings.length >= 3 && (
           <PodiumSpotlight standings={standings} />
@@ -225,13 +233,8 @@ export default function Home() {
 
         {/* BENTO GRID */}
         <div className="grid lg:grid-cols-3 gap-6 mb-6">
-          {/* Timing tower */}
           <TimingTower standings={standings.slice(0, 6)} loading={loading} />
-
-          {/* Stat tiles 2x2 */}
           <StatTilesGrid tiles={statTiles} />
-
-          {/* Season progress */}
           <SeasonProgress
             gpDone={gpDone}
             totalGP={totalGP}
@@ -242,9 +245,14 @@ export default function Home() {
           />
         </div>
 
-        {/* LIVE TRACK RADAR & STARTING GANTRY ROW */}
-        <div className="grid lg:grid-cols-[1.5fr_1fr] gap-6 mb-6">
+        {/* LIVE TRACK RADAR & INTERACTIVE PIT STOP CHALLENGE */}
+        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6 mb-6">
           <LiveTrackMap circuitKey="monza" />
+          <PitStop3DGame />
+        </div>
+
+        {/* STARTING GANTRY REACTION TESTER */}
+        <div className="mb-6">
           <LightsOutGantry />
         </div>
 
