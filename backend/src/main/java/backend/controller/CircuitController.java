@@ -1,6 +1,8 @@
 package backend.controller;
 
+import backend.dto.CircuitGeometryResponse;
 import backend.model.Circuit;
+import backend.service.CircuitGeometryService;
 import backend.service.CircuitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,9 +21,36 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CircuitController {
     private final CircuitService service;
+    private final CircuitGeometryService geometryService;
 
     @GetMapping
     public List<Circuit> getAll() { return service.getAll(); }
+
+    /**
+     * The circuit's racing line as a 3D poly-line, for the track viewer and the live map.
+     * Built from external sources on first request, then served from the database.
+     */
+    @GetMapping("/{id}/geometry")
+    public CircuitGeometryResponse getGeometry(@PathVariable Long id) {
+        return geometryService.get(id);
+    }
+
+    /** Forces a rebuild of one circuit's geometry from the external sources. */
+    @PostMapping("/{id}/geometry/sync")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CircuitGeometryResponse syncGeometry(@PathVariable Long id) {
+        return geometryService.sync(id);
+    }
+
+    /**
+     * Builds geometry for every circuit that is missing it. Pass {@code force=true} to refresh
+     * circuits that already have cached geometry.
+     */
+    @PostMapping("/geometry/sync-all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Map<String, Object> syncAllGeometry(@RequestParam(defaultValue = "false") boolean force) {
+        return geometryService.syncAll(force);
+    }
 
     /**
      * Paginated circuit list.

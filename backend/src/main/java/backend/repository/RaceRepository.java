@@ -21,6 +21,9 @@ public interface RaceRepository extends JpaRepository<Race, Long> {
     @Query("SELECT r FROM Race r LEFT JOIN FETCH r.circuit WHERE r.season = :season ORDER BY r.roundNumber")
     List<Race> findBySeasonWithCircuit(@Param("season") int season);
 
+    @Query("SELECT r FROM Race r LEFT JOIN FETCH r.circuit WHERE r.circuit.id = :circuitId ORDER BY r.season DESC, r.roundNumber DESC")
+    List<Race> findByCircuitIdWithCircuit(@Param("circuitId") Long circuitId);
+
     @Query("SELECT r FROM Race r LEFT JOIN FETCH r.circuit ORDER BY r.season DESC, r.roundNumber")
     List<Race> findAllWithCircuit();
 
