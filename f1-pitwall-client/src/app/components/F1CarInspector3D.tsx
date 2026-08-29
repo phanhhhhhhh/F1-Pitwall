@@ -1,47 +1,95 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { playUiClick, playDrsBeep } from "../lib/f1-sound";
+import { fetchTeamLiveries } from "../lib/f1-data";
+import { getTeamColor } from "../lib/f1-theme";
+import type { TeamLivery } from "../types/f1";
 
 interface F1CarInspector3DProps {
+  /** Team to open on, by name. Falls back to the first team returned. */
   initialTeam?: string;
+  /** Liveries already loaded by the host page, to avoid a second request. */
+  liveries?: TeamLivery[];
 }
 
-const TEAMS_LIVERY = [
-  { name: "Ferrari", color: "#E8002D", accent: "#FFD200", num: "16" },
-  { name: "McLaren", color: "#FF8000", accent: "#00E5FF", num: "4" },
-  { name: "Red Bull Racing", color: "#162846", accent: "#E10600", num: "1" },
-  { name: "Mercedes-AMG", color: "#27F4D2", accent: "#C0C0C0", num: "63" },
-  { name: "Aston Martin", color: "#00594F", accent: "#00FF66", num: "14" },
-  { name: "Audi F1 Team", color: "#C3002F", accent: "#EDEDED", num: "27" },
-  { name: "Cadillac F1", color: "#990000", accent: "#FFD200", num: "99" },
-];
+/**
+ * 2026 technical regulation figures. These are rulebook constants rather than measurements, and the
+ * panel labels them as such — the car being inspected is a procedural model, not a scanned chassis.
+ */
+const REGULATION_SPEC = {
+  minWeightKg: 768,
+  dragClosed: 1.08,
+  dragOpen: 0.72,
+  downforceKg: 2140,
+  downforceAtKmh: 250,
+};
 
-export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspector3DProps) {
+export default function F1CarInspector3D({ initialTeam, liveries: liveriesProp }: F1CarInspector3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [selectedTeam, setSelectedTeam] = useState(initialTeam);
+
+  // Liveries either arrive as a prop or are fetched here. Keeping the fetched list separate and
+  // deriving the effective one avoids mirroring a prop into state, which would go stale.
+  const [fetchedLiveries, setFetchedLiveries] = useState<TeamLivery[] | null>(null);
+  const [pickedTeamName, setPickedTeamName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const liveries = useMemo(
+    () => (liveriesProp?.length ? liveriesProp : (fetchedLiveries ?? [])),
+    [liveriesProp, fetchedLiveries]
+  );
+  const loading = !liveriesProp?.length && fetchedLiveries === null && error === null;
+  const selectedTeamName = pickedTeamName ?? initialTeam ?? null;
+
   const [windTunnel, setWindTunnel] = useState(true);
   const [xrayMode, setXrayMode] = useState(false);
   const [drsOpen, setDrsOpen] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
 
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const carGroupRef = useRef<THREE.Group | null>(null);
-  const drsFlapRef = useRef<THREE.Mesh | null>(null);
-  const particlesRef = useRef<THREE.Points | null>(null);
-  const liveryMaterialsRef = useRef<THREE.MeshPhysicalMaterial[]>([]);
+  // The render loop reads the toggles every frame. Holding them in refs keeps the WebGL scene alive
+  // across a toggle — the previous version listed them as effect dependencies, which tore down and
+  // rebuilt the entire renderer on every button press.
+  const windTunnelRef = useRef(windTunnel);
+  const drsOpenRef = useRef(drsOpen);
+  const autoRotateRef = useRef(autoRotate);
+  useEffect(() => { windTunnelRef.current = windTunnel; }, [windTunnel]);
+  useEffect(() => { drsOpenRef.current = drsOpen; }, [drsOpen]);
+  useEffect(() => { autoRotateRef.current = autoRotate; }, [autoRotate]);
 
-  const currentLivery = TEAMS_LIVERY.find((t) => t.name === selectedTeam) || TEAMS_LIVERY[0];
+  const bodyMaterialRef = useRef<THREE.MeshPhysicalMaterial | null>(null);
+  const accentMaterialRef = useRef<THREE.MeshPhysicalMaterial | null>(null);
 
+  useEffect(() => {
+    if (liveriesProp?.length) return;
+    let cancelled = false;
+    fetchTeamLiveries()
+      .then((data) => {
+        if (!cancelled) setFetchedLiveries(data);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load team liveries");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveriesProp]);
+
+  const selected = useMemo(() => {
+    if (liveries.length === 0) return null;
+    return liveries.find((t) => t.name === selectedTeamName) ?? liveries[0];
+  }, [liveries, selectedTeamName]);
+
+  const bodyColor = getTeamColor(selected?.name, selected?.colorHex);
+  // Teams without a recorded accent fall back to their primary colour rather than to an invented one.
+  const accentColor = selected?.accentHex || bodyColor;
+
+  // ── Scene ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Scene & Camera
     const scene = new THREE.Scene();
-    sceneRef.current = scene;
     scene.background = new THREE.Color(0x0a0b0e);
     scene.fog = new THREE.FogExp2(0x0a0b0e, 0.035);
 
@@ -51,11 +99,12 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
       0.1,
       1000
     );
-    camera.position.set(12, 6, 16);
 
-    // 2. WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-    rendererRef.current = renderer;
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -63,14 +112,11 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
 
-    while (container.firstChild) {
-      container.removeChild(container.firstChild);
-    }
+    while (container.firstChild) container.removeChild(container.firstChild);
     container.appendChild(renderer.domElement);
 
-    // 3. Lighting (Studio Setup)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
-    scene.add(ambientLight);
+    // Studio lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 
     const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
     keyLight.position.set(15, 20, 15);
@@ -83,49 +129,41 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
     rimLight.position.set(-15, 10, -15);
     scene.add(rimLight);
 
-    const redUnderglow = new THREE.PointLight(0xe10600, 2.5, 15);
-    redUnderglow.position.set(0, 0.2, 0);
-    scene.add(redUnderglow);
+    const underglow = new THREE.PointLight(0xe10600, 2.5, 15);
+    underglow.position.set(0, 0.2, 0);
+    scene.add(underglow);
 
-    // 4. Ground Grid Mirror
-    const gridHelper = new THREE.GridHelper(30, 30, 0xe10600, 0x1f242e);
-    gridHelper.position.y = -0.01;
-    scene.add(gridHelper);
+    const grid = new THREE.GridHelper(30, 30, 0xe10600, 0x1f242e);
+    grid.position.y = -0.01;
+    scene.add(grid);
 
-    // 5. Build 3D F1 Car Geometry (Procedural)
     const carGroup = new THREE.Group();
-    carGroupRef.current = carGroup;
     scene.add(carGroup);
 
-    // Materials
     const bodyMat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(currentLivery.color),
+      color: new THREE.Color("#888888"),
       roughness: 0.25,
       metalness: 0.7,
       clearcoat: 0.8,
       clearcoatRoughness: 0.2,
     });
-    liveryMaterialsRef.current = [bodyMat];
+    bodyMaterialRef.current = bodyMat;
 
-    const carbonMat = new THREE.MeshStandardMaterial({
-      color: 0x111113,
-      roughness: 0.4,
-      metalness: 0.9,
+    // Endplates and the DRS flap take the team's secondary colour, which is where real liveries
+    // put their accent too.
+    const accentMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color("#cccccc"),
+      roughness: 0.2,
+      metalness: 0.75,
+      clearcoat: 0.8,
     });
+    accentMaterialRef.current = accentMat;
 
-    const tyreMat = new THREE.MeshStandardMaterial({
-      color: 0x151515,
-      roughness: 0.9,
-      metalness: 0.1,
-    });
+    const carbonMat = new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.4, metalness: 0.9 });
+    const tyreMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9, metalness: 0.1 });
+    const haloMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1f, roughness: 0.3, metalness: 0.8 });
 
-    const haloMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a1f,
-      roughness: 0.3,
-      metalness: 0.8,
-    });
-
-    // ── Main Chassis Body (Nose to Engine Cover) ──
+    // ── Chassis ──────────────────────────────────────────────────────────────
     const noseGeo = new THREE.ConeGeometry(0.55, 3.8, 16);
     noseGeo.rotateZ(Math.PI / 2);
     const nose = new THREE.Mesh(noseGeo, bodyMat);
@@ -134,14 +172,11 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
     nose.castShadow = true;
     carGroup.add(nose);
 
-    // Cockpit & Monocoque
-    const monocoqueGeo = new THREE.BoxGeometry(3.6, 0.85, 1.25);
-    const monocoque = new THREE.Mesh(monocoqueGeo, bodyMat);
+    const monocoque = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.85, 1.25), bodyMat);
     monocoque.position.set(-0.5, 0.65, 0);
     monocoque.castShadow = true;
     carGroup.add(monocoque);
 
-    // Engine Airbox & Sharkfin
     const engineCoverGeo = new THREE.ConeGeometry(0.7, 3.2, 16);
     engineCoverGeo.rotateZ(-Math.PI / 2);
     const engineCover = new THREE.Mesh(engineCoverGeo, bodyMat);
@@ -150,19 +185,16 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
     engineCover.castShadow = true;
     carGroup.add(engineCover);
 
-    const sharkFinGeo = new THREE.BoxGeometry(2.0, 0.6, 0.05);
-    const sharkFin = new THREE.Mesh(sharkFinGeo, carbonMat);
+    const sharkFin = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.6, 0.05), accentMat);
     sharkFin.position.set(-2.0, 1.35, 0);
     carGroup.add(sharkFin);
 
-    // ── Halo Cockpit Protection Ring ──
     const haloGeo = new THREE.TorusGeometry(0.5, 0.06, 12, 24, Math.PI);
     haloGeo.rotateX(Math.PI / 2);
     const halo = new THREE.Mesh(haloGeo, haloMat);
     halo.position.set(0.1, 1.15, 0);
     carGroup.add(halo);
 
-    // ── Sidepods (Left & Right) with Venturi Inlets ──
     const podGeo = new THREE.BoxGeometry(2.8, 0.6, 0.8);
     const leftPod = new THREE.Mesh(podGeo, bodyMat);
     leftPod.position.set(-0.6, 0.5, 0.95);
@@ -174,69 +206,67 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
     rightPod.castShadow = true;
     carGroup.add(rightPod);
 
-    // ── Front Wing & Endplates ──
-    const frontWingMain = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 3.2), carbonMat);
-    frontWingMain.position.set(3.6, 0.22, 0);
-    frontWingMain.castShadow = true;
-    carGroup.add(frontWingMain);
+    // ── Wings ────────────────────────────────────────────────────────────────
+    const frontWing = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 3.2), carbonMat);
+    frontWing.position.set(3.6, 0.22, 0);
+    frontWing.castShadow = true;
+    carGroup.add(frontWing);
 
-    const leftEndplate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.05), bodyMat);
+    const leftEndplate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.05), accentMat);
     leftEndplate.position.set(3.6, 0.35, 1.6);
     carGroup.add(leftEndplate);
 
-    const rightEndplate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.05), bodyMat);
+    const rightEndplate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.05), accentMat);
     rightEndplate.position.set(3.6, 0.35, -1.6);
     carGroup.add(rightEndplate);
 
-    // ── Rear Wing & DRS Actuator ──
-    const rearWingPillarL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2), carbonMat);
-    rearWingPillarL.position.set(-3.2, 0.85, 0.3);
-    carGroup.add(rearWingPillarL);
+    const pillarL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2), carbonMat);
+    pillarL.position.set(-3.2, 0.85, 0.3);
+    carGroup.add(pillarL);
 
-    const rearWingPillarR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2), carbonMat);
-    rearWingPillarR.position.set(-3.2, 0.85, -0.3);
-    carGroup.add(rearWingPillarR);
+    const pillarR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2), carbonMat);
+    pillarR.position.set(-3.2, 0.85, -0.3);
+    carGroup.add(pillarR);
 
-    const rearWingMain = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.06, 2.2), carbonMat);
-    rearWingMain.position.set(-3.2, 1.45, 0);
-    carGroup.add(rearWingMain);
+    const rearWing = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.06, 2.2), carbonMat);
+    rearWing.position.set(-3.2, 1.45, 0);
+    carGroup.add(rearWing);
 
-    // DRS Upper Flap
-    const drsFlap = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.04, 2.15), bodyMat);
+    const drsFlap = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.04, 2.15), accentMat);
     drsFlap.position.set(-3.35, 1.6, 0);
-    drsFlapRef.current = drsFlap;
     carGroup.add(drsFlap);
 
-    // ── 4 Wheels (18" Pirelli Low Profile) ──
+    // ── Wheels ───────────────────────────────────────────────────────────────
     const wheelPositions = [
-      { x: 2.5, y: 0.48, z: 1.4 },  // Front Left
-      { x: 2.5, y: 0.48, z: -1.4 }, // Front Right
-      { x: -2.3, y: 0.52, z: 1.45 }, // Rear Left
-      { x: -2.3, y: 0.52, z: -1.45 },// Rear Right
+      { x: 2.5, y: 0.48, z: 1.4 },
+      { x: 2.5, y: 0.48, z: -1.4 },
+      { x: -2.3, y: 0.52, z: 1.45 },
+      { x: -2.3, y: 0.52, z: -1.45 },
     ];
 
     wheelPositions.forEach((pos) => {
-      const wheelGroup = new THREE.Group();
-      wheelGroup.position.set(pos.x, pos.y, pos.z);
+      const wheel = new THREE.Group();
+      wheel.position.set(pos.x, pos.y, pos.z);
 
       const tyreGeo = new THREE.CylinderGeometry(0.48, 0.48, 0.45, 24);
       tyreGeo.rotateX(Math.PI / 2);
-      const tyreMesh = new THREE.Mesh(tyreGeo, tyreMat);
-      tyreMesh.castShadow = true;
-      wheelGroup.add(tyreMesh);
+      const tyre = new THREE.Mesh(tyreGeo, tyreMat);
+      tyre.castShadow = true;
+      wheel.add(tyre);
 
-      // Coloured Pirelli Red Soft Tyre Ring
       const ringGeo = new THREE.RingGeometry(0.36, 0.42, 24);
       ringGeo.rotateY(Math.PI / 2);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0xff2a1f, side: THREE.DoubleSide });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
+      const ring = new THREE.Mesh(
+        ringGeo,
+        new THREE.MeshBasicMaterial({ color: 0xff2a1f, side: THREE.DoubleSide })
+      );
       ring.position.set(0, 0, pos.z > 0 ? 0.23 : -0.23);
-      wheelGroup.add(ring);
+      wheel.add(ring);
 
-      carGroup.add(wheelGroup);
+      carGroup.add(wheel);
     });
 
-    // 6. 3D Particle Wind Tunnel Streamlines
+    // ── Airflow particles ────────────────────────────────────────────────────
     const particleCount = 350;
     const particleGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
@@ -248,93 +278,80 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
       positions[i * 3 + 2] = (Math.random() - 0.5) * 4.0;
       velocities[i] = 0.15 + Math.random() * 0.15;
     }
-
     particleGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const particleMat = new THREE.PointsMaterial({
-      color: 0x00e5ff,
-      size: 0.08,
-      transparent: true,
-      opacity: 0.75,
-      blending: THREE.AdditiveBlending,
-    });
 
-    const particles = new THREE.Points(particleGeo, particleMat);
-    particlesRef.current = particles;
+    const particles = new THREE.Points(
+      particleGeo,
+      new THREE.PointsMaterial({
+        color: 0x00e5ff,
+        size: 0.08,
+        transparent: true,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+      })
+    );
     scene.add(particles);
 
-    // 7. Mouse Orbit Drag Handling
-    let isDragging = false;
-    let prevMouseX = 0;
-    let prevMouseY = 0;
+    // ── Orbit ────────────────────────────────────────────────────────────────
+    let dragging = false;
+    let prevX = 0;
+    let prevY = 0;
     let rotY = 0.6;
     let rotX = 0.3;
 
-    const onMouseDown = (e: MouseEvent) => {
-      isDragging = true;
-      prevMouseX = e.clientX;
-      prevMouseY = e.clientY;
+    const onPointerDown = (e: PointerEvent) => {
+      dragging = true;
+      prevX = e.clientX;
+      prevY = e.clientY;
     };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const deltaX = e.clientX - prevMouseX;
-      const deltaY = e.clientY - prevMouseY;
-      rotY += deltaX * 0.008;
-      rotX = Math.max(0.05, Math.min(Math.PI / 2.2, rotX + deltaY * 0.008));
-      prevMouseX = e.clientX;
-      prevMouseY = e.clientY;
+    const onPointerMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      rotY += (e.clientX - prevX) * 0.008;
+      rotX = Math.max(0.05, Math.min(Math.PI / 2.2, rotX + (e.clientY - prevY) * 0.008));
+      prevX = e.clientX;
+      prevY = e.clientY;
     };
-
-    const onMouseUp = () => {
-      isDragging = false;
+    const onPointerUp = () => {
+      dragging = false;
     };
 
     const dom = renderer.domElement;
-    dom.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    dom.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
 
-    // 8. Animation Loop
-    let reqId: number;
+    // ── Loop ─────────────────────────────────────────────────────────────────
+    let reqId = 0;
     const animate = () => {
       reqId = requestAnimationFrame(animate);
+      if (autoRotateRef.current && !dragging) rotY += 0.004;
 
-      if (autoRotate && !isDragging) {
-        rotY += 0.004;
-      }
-
-      // Camera Orbit Spherical Positioning
       const radius = 18;
-      camera.position.x = radius * Math.sin(rotY) * Math.cos(rotX);
-      camera.position.y = radius * Math.sin(rotX);
-      camera.position.z = radius * Math.cos(rotY) * Math.cos(rotX);
+      camera.position.set(
+        radius * Math.sin(rotY) * Math.cos(rotX),
+        radius * Math.sin(rotX),
+        radius * Math.cos(rotY) * Math.cos(rotX)
+      );
       camera.lookAt(0, 0.8, 0);
 
-      // DRS Flap animation
-      if (drsFlapRef.current) {
-        const targetRotX = drsOpen ? -0.45 : 0;
-        drsFlapRef.current.rotation.z = THREE.MathUtils.lerp(
-          drsFlapRef.current.rotation.z,
-          targetRotX,
-          0.15
-        );
-      }
+      drsFlap.rotation.z = THREE.MathUtils.lerp(
+        drsFlap.rotation.z,
+        drsOpenRef.current ? -0.45 : 0,
+        0.15
+      );
 
-      // Wind tunnel particle flow
-      if (particlesRef.current) {
-        particlesRef.current.visible = windTunnel;
-        if (windTunnel) {
-          const pos = particlesRef.current.geometry.attributes.position.array as Float32Array;
-          for (let i = 0; i < particleCount; i++) {
-            pos[i * 3] -= velocities[i];
-            if (pos[i * 3] < -7) {
-              pos[i * 3] = 7;
-              pos[i * 3 + 1] = Math.random() * 2.2 + 0.1;
-              pos[i * 3 + 2] = (Math.random() - 0.5) * 4.0;
-            }
+      particles.visible = windTunnelRef.current;
+      if (windTunnelRef.current) {
+        const pos = particles.geometry.attributes.position.array as Float32Array;
+        for (let i = 0; i < particleCount; i++) {
+          pos[i * 3] -= velocities[i];
+          if (pos[i * 3] < -7) {
+            pos[i * 3] = 7;
+            pos[i * 3 + 1] = Math.random() * 2.2 + 0.1;
+            pos[i * 3 + 2] = (Math.random() - 0.5) * 4.0;
           }
-          particlesRef.current.geometry.attributes.position.needsUpdate = true;
         }
+        particles.geometry.attributes.position.needsUpdate = true;
       }
 
       renderer.render(scene, camera);
@@ -342,7 +359,6 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
     animate();
 
     const onResize = () => {
-      if (!container) return;
       camera.aspect = container.clientWidth / container.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -351,65 +367,74 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
 
     return () => {
       cancelAnimationFrame(reqId);
-      dom.removeEventListener("mousedown", onMouseDown);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      dom.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("resize", onResize);
+      scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Points) {
+          obj.geometry.dispose();
+          const material = obj.material;
+          if (Array.isArray(material)) material.forEach((m) => m.dispose());
+          else material.dispose();
+        }
+      });
       renderer.dispose();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRotate, drsOpen, windTunnel]);
+  }, []);
 
-  // Update livery color dynamically
+  // Livery and x-ray are pushed straight onto the materials, so neither rebuilds the scene.
   useEffect(() => {
-    liveryMaterialsRef.current.forEach((mat) => {
-      mat.color.set(new THREE.Color(currentLivery.color));
-      mat.wireframe = xrayMode;
-    });
-  }, [selectedTeam, xrayMode, currentLivery]);
+    const body = bodyMaterialRef.current;
+    const accent = accentMaterialRef.current;
+    if (body) {
+      body.color.set(new THREE.Color(bodyColor));
+      body.wireframe = xrayMode;
+    }
+    if (accent) {
+      accent.color.set(new THREE.Color(accentColor));
+      accent.wireframe = xrayMode;
+    }
+  }, [bodyColor, accentColor, xrayMode]);
 
   const toggleDrs = () => {
-    const next = !drsOpen;
-    setDrsOpen(next);
+    setDrsOpen((open) => !open);
     playDrsBeep();
-  };
-
-  const selectTeam = (teamName: string) => {
-    playUiClick();
-    setSelectedTeam(teamName);
   };
 
   return (
     <div className="w-full bg-gradient-to-b from-[#14151b] to-[#0a0a0d] border border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-2xl overflow-hidden relative">
-      {/* Header Bar */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 mb-4 border-b border-zinc-800">
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 live-pulse" />
             <h3 className="text-base font-black f-cond tracking-wide text-white uppercase">
-              3D AERO WIND TUNNEL & LIVERY INSPECTOR (2026 GROUND EFFECT)
+              3D AERO &amp; LIVERY INSPECTOR · 2026 GROUND EFFECT
             </h3>
           </div>
-          <p className="text-xs text-zinc-400 f-mono">
-            Drag to rotate 360° · Real-time CFD Aerodynamic Flow Particles · FIA Technical Regulations
+          <p className="text-xs text-zinc-400 f-mono truncate">
+            {selected
+              ? `${selected.name} ${selected.carName ?? ""} · ${selected.engineSupplier ?? "engine n/a"} power unit`
+              : loading
+                ? "Loading team liveries…"
+                : "No team data"}
           </p>
         </div>
 
-        {/* 3D View Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setWindTunnel(!windTunnel)}
+            onClick={() => setWindTunnel((v) => !v)}
             className={`px-3 py-1.5 text-xs font-bold f-orbitron uppercase rounded-xl border transition-all ${
               windTunnel
                 ? "bg-cyan-950/80 text-cyan-400 border-cyan-500/50 shadow-[0_0_12px_rgba(0,229,255,0.3)]"
                 : "bg-black/40 text-zinc-500 border-zinc-800 hover:text-zinc-300"
             }`}
           >
-            💨 CFD AERO {windTunnel ? "ON" : "OFF"}
+            💨 AIRFLOW {windTunnel ? "ON" : "OFF"}
           </button>
 
           <button
-            onClick={() => setXrayMode(!xrayMode)}
+            onClick={() => setXrayMode((v) => !v)}
             className={`px-3 py-1.5 text-xs font-bold f-orbitron uppercase rounded-xl border transition-all ${
               xrayMode
                 ? "bg-purple-950/80 text-purple-400 border-purple-500/50 shadow-[0_0_12px_rgba(156,39,176,0.3)]"
@@ -427,62 +452,109 @@ export default function F1CarInspector3D({ initialTeam = "Ferrari" }: F1CarInspe
                 : "bg-black/40 text-zinc-400 border-zinc-800 hover:text-white"
             }`}
           >
-            DRS {drsOpen ? "OPEN (ACTIVE)" : "CLOSED"}
+            DRS {drsOpen ? "OPEN" : "CLOSED"}
           </button>
 
           <button
-            onClick={() => setAutoRotate(!autoRotate)}
+            onClick={() => setAutoRotate((v) => !v)}
             className="p-1.5 bg-black/40 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white"
-            title="Toggle Auto Rotation"
+            title="Toggle auto rotation"
           >
             🔄
           </button>
         </div>
       </div>
 
-      {/* 3D WebGL Canvas Container */}
       <div className="relative w-full aspect-[16/9] max-h-[460px] rounded-2xl overflow-hidden border border-zinc-800 bg-black shadow-inner">
         <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-        {/* Floating Spec HUD */}
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+            <p className="f-mono text-xs text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* Rulebook figures, labelled as such — the model is procedural, not a scanned car */}
         <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md p-3 rounded-xl border border-zinc-800 text-[11px] f-mono pointer-events-none space-y-1">
-          <div className="text-zinc-500 font-bold uppercase">AERODYNAMIC TELEMETRY</div>
+          <div className="text-zinc-500 font-bold uppercase">2026 FIA TECHNICAL LIMITS</div>
           <div className="text-white font-bold">
-            DOWNFORCE: <span className="text-cyan-400">2,140 KG @ 250 KM/H</span>
+            DOWNFORCE:{" "}
+            <span className="text-cyan-400">
+              ~{REGULATION_SPEC.downforceKg.toLocaleString()} KG @ {REGULATION_SPEC.downforceAtKmh} KM/H
+            </span>
           </div>
           <div className="text-white font-bold">
-            DRAG COEFFICIENT: <span className="text-amber-400">{drsOpen ? "0.72 Cd (DRS)" : "1.08 Cd"}</span>
+            DRAG:{" "}
+            <span className="text-amber-400">
+              {drsOpen ? `${REGULATION_SPEC.dragOpen} Cd (DRS)` : `${REGULATION_SPEC.dragClosed} Cd`}
+            </span>
           </div>
           <div className="text-white font-bold">
-            MIN WEIGHT: <span className="text-emerald-400">768 KG (2026 SPEC)</span>
+            MIN WEIGHT: <span className="text-emerald-400">{REGULATION_SPEC.minWeightKg} KG</span>
           </div>
         </div>
+
+        {/* Team facts, straight from the team record */}
+        {selected && (
+          <div className="absolute bottom-4 right-4 bg-black/80 backdrop-blur-md p-3 rounded-xl border border-zinc-800 text-[11px] f-mono pointer-events-none space-y-1 max-w-[52%]">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-sm" style={{ background: bodyColor }} />
+              <span className="w-3 h-3 rounded-sm" style={{ background: accentColor }} />
+              <span className="text-zinc-500 font-bold uppercase truncate">{selected.name}</span>
+            </div>
+            <div className="text-zinc-300">
+              BASE: <span className="text-white">{selected.base ?? "—"}</span>
+            </div>
+            <div className="text-zinc-300">
+              TITLES: <span className="text-amber-400">{selected.championships}</span>
+              {selected.foundedYear > 0 && <span className="text-zinc-600"> · EST {selected.foundedYear}</span>}
+            </div>
+            {selected.drivers.length > 0 && (
+              <div className="text-zinc-300 truncate">
+                LINE-UP:{" "}
+                <span className="text-white">
+                  {selected.drivers.map((d) => `#${d.carNumber} ${d.name.split(" ").pop()}`).join("  ")}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Team Livery Selector Palette */}
-      <div className="mt-4 flex items-center justify-between gap-2 overflow-x-auto pb-1">
+      {/* Every team in the championship, not a hand-picked seven */}
+      <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1">
         <span className="text-[10px] font-bold f-mono text-zinc-500 uppercase tracking-widest shrink-0">
-          SELECT LIVERY:
+          LIVERY:
         </span>
-        <div className="flex items-center gap-2">
-          {TEAMS_LIVERY.map((team) => (
+        {liveries.map((team) => {
+          const color = getTeamColor(team.name, team.colorHex);
+          return (
             <button
-              key={team.name}
-              onClick={() => selectTeam(team.name)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all text-xs font-bold f-cond uppercase ${
-                selectedTeam === team.name
+              key={team.id}
+              onClick={() => {
+                playUiClick();
+                setPickedTeamName(team.name);
+              }}
+              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all text-xs font-bold f-cond uppercase ${
+                selected?.name === team.name
                   ? "bg-zinc-800 border-zinc-400 text-white shadow-lg"
                   : "bg-black/40 border-zinc-800 text-zinc-400 hover:text-zinc-200"
               }`}
             >
-              <span
-                className="w-3 h-3 rounded-full border border-black/50"
-                style={{ background: team.color }}
-              />
+              <span className="flex">
+                <span
+                  className="w-3 h-3 rounded-l-full border border-black/50"
+                  style={{ background: color }}
+                />
+                <span
+                  className="w-3 h-3 rounded-r-full border border-black/50"
+                  style={{ background: team.accentHex || color }}
+                />
+              </span>
               <span>{team.name}</span>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
