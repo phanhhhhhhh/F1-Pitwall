@@ -34,6 +34,52 @@ public class CircuitGeometryResponse {
     private List<List<Double>> points;
     private int pointCount;
 
+    /**
+     * True when the racing line is backed by car telemetry from the same lap, so {@link #samples},
+     * {@link #corners} and {@link #drsRanges} are measurements rather than empty lists.
+     */
+    private boolean hasLapTelemetry;
+
+    /** What the car was doing at each entry of {@link #points}, empty without lap telemetry. */
+    private List<TrackSample> samples;
+
+    /** Corners read off the traced lap's speed trace, numbered in track order from the finish line. */
+    private List<TrackCorner> corners;
+
+    /** Stretches where the traced driver actually had DRS open. Empty is a real answer, not a gap. */
+    private List<DrsRange> drsRanges;
+
+    /**
+     * One point of the traced lap.
+     *
+     * <p>The two G figures are derived from the line and the speed rather than measured: lateral
+     * from the curvature of the racing line, longitudinal from how the speed changes along it.
+     * Point spacing averages the curvature, so lateral load reads low through the tightest corners.
+     */
+    public record TrackSample(
+            float speedKmh,
+            int gear,
+            float throttlePct,
+            float brakePct,
+            boolean drsOpen,
+            float lateralG,
+            float longitudinalG
+    ) {}
+
+    /** A corner as driven on the traced lap. {@code brakingM} is measured back to the entry peak. */
+    public record TrackCorner(
+            int number,
+            int pointIndex,
+            float apexSpeedKmH,
+            int gear,
+            float entrySpeedKmH,
+            float brakingM,
+            float lateralG
+    ) {}
+
+    /** A DRS stretch. Wraps past the finish line when {@code endIndex} is below {@code startIndex}. */
+    public record DrsRange(int startIndex, int endIndex, float lengthM) {}
+
     private Float spanXM;
     private Float spanZM;
     private Float elevationMinM;

@@ -168,7 +168,8 @@ public class CircuitGeometryService {
                         "circuit", circuit.getName(),
                         "source", geometry.getSource().name(),
                         "points", geometry.getPointCount(),
-                        "elevationGainM", geometry.getElevationGainM() == null ? 0f : geometry.getElevationGainM()
+                        "elevationGainM", geometry.getElevationGainM() == null ? 0f : geometry.getElevationGainM(),
+                        "lapTelemetry", geometry.getSamples() != null
                 ));
             } catch (Exception e) {
                 failed++;
@@ -188,13 +189,18 @@ public class CircuitGeometryService {
 
     // ─── Build pipeline ───────────────────────────────────────────────────────
 
-    /** A racing line together with where it came from. */
+    /**
+     * A racing line together with where it came from, and — for telemetry sources — what the car
+     * was doing at each of its points. {@code samples} is aligned index-for-index with {@code path}
+     * and is empty for sources that carry position only.
+     */
     private record SourcedPath(
             TrackPathMath.RawPath path,
             GeometrySource source,
             Integer sessionKey,
             Integer driverNumber,
-            Integer lapNumber
+            Integer lapNumber,
+            List<LapTraceMath.Sample> samples
     ) {}
 
     private CircuitGeometry build(Circuit circuit) {
@@ -221,12 +227,18 @@ public class CircuitGeometryService {
         TrackPathMath.NormalisedPath normalised = TrackPathMath.normalise(path);
         float elevationGain = (float) (normalised.elevationMaxM() - normalised.elevationMinM());
 
+        // The clean-up reorders and drops points, so the telemetry is carried across by position
+        // against the untouched source path rather than by index.
+        List<LapTraceMath.Sample> aligned =
+                LapTraceMath.alignToPath(path, sourced.path(), sourced.samples());
+
         CircuitGeometry geometry = geometryRepository.findByCircuitId(circuit.getId())
                 .orElseGet(CircuitGeometry::new);
         geometry.setCircuit(circuit);
         geometry.setSource(sourced.source());
         geometry.setPoints(writeJson(normalised.points()));
         geometry.setPointCount(normalised.points().size());
+        geometry.setSamples(aligned.isEmpty() ? null : writeSamples(aligned));
         geometry.setSpanXM((float) normalised.spanXM());
         geometry.setSpanZM((float) normalised.spanZM());
         geometry.setElevationMinM((float) normalised.elevationMinM());
@@ -245,8 +257,9 @@ public class CircuitGeometryService {
             circuitRepository.save(circuit);
         }
 
-        log.info("[Geometry] {} built from {} — {} points, {}m elevation delta",
-                circuit.getName(), sourced.source(), geometry.getPointCount(), Math.round(elevationGain));
+        log.info("[Geometry] {} built from {} — {} points, {}m elevation delta, lap telemetry {}",
+                circuit.getName(), sourced.source(), geometry.getPointCount(),
+                Math.round(elevationGain), aligned.isEmpty() ? "unavailable" : "captured");
         return geometry;
     }
 
@@ -314,6 +327,7 @@ public class CircuitGeometryService {
             double[] x = new double[n];
             double[] y = new double[n];
             double[] z = new double[n];
+            long[] takenAt = new long[n];
             for (int i = 0; i < n; i++) {
                 Map<String, Object> s = samples.get(i);
                 // OpenF1 lays the track out in x/y and puts altitude in z; our renderer wants
@@ -321,16 +335,96 @@ public class CircuitGeometryService {
                 x[i] = doubleOf(s.get("x")) / OPENF1_UNITS_PER_METRE;
                 y[i] = doubleOf(s.get("z")) / OPENF1_UNITS_PER_METRE;
                 z[i] = doubleOf(s.get("y")) / OPENF1_UNITS_PER_METRE;
+                takenAt[i] = epochMillis(s.get("date"));
             }
 
             return Optional.of(new SourcedPath(
                     new TrackPathMath.RawPath(x, y, z),
-                    GeometrySource.OPENF1, sessionKey, driverNumber, lapNumber));
+                    GeometrySource.OPENF1, sessionKey, driverNumber, lapNumber,
+                    fetchCarData(circuit, sessionKey, driverNumber, from, to, takenAt)));
 
         } catch (Exception e) {
             log.debug("[Geometry] {} — session {} unusable: {}",
                     circuit.getName(), sessionKey, e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Reads what the car was doing over the same lap the racing line was traced from.
+     *
+     * <p>Position and car telemetry are published as separate feeds sampled on their own clocks, so
+     * each position sample takes the car reading closest to it in time. Missing telemetry is not
+     * fatal — the geometry is still worth caching without it, and the client is told the analytics
+     * are unavailable rather than being handed something invented.
+     *
+     * @param takenAt when each position sample was recorded, in epoch milliseconds
+     * @return one reading per position sample, or empty when the feed had nothing usable
+     */
+    @SuppressWarnings("unchecked")
+    private List<LapTraceMath.Sample> fetchCarData(Circuit circuit, int sessionKey, int driverNumber,
+                                                   String from, String to, long[] takenAt) {
+        try {
+            URI uri = URI.create(OPENF1_BASE + "/car_data"
+                    + "?session_key=" + sessionKey
+                    + "&driver_number=" + driverNumber
+                    + "&date%3E" + from
+                    + "&date%3C" + to);
+
+            throttleOpenF1();
+            List<Map<String, Object>> readings = restTemplate.getForObject(uri, List.class);
+            if (readings == null || readings.isEmpty()) {
+                log.debug("[Geometry] {} — no car telemetry for session {}", circuit.getName(), sessionKey);
+                return List.of();
+            }
+
+            readings.sort(Comparator.comparing(r -> String.valueOf(r.getOrDefault("date", ""))));
+
+            int m = readings.size();
+            long[] readingAt = new long[m];
+            List<LapTraceMath.Sample> byTime = new ArrayList<>(m);
+            for (int i = 0; i < m; i++) {
+                Map<String, Object> r = readings.get(i);
+                readingAt[i] = epochMillis(r.get("date"));
+                byTime.add(new LapTraceMath.Sample(
+                        (float) doubleOf(r.get("speed")),
+                        intOf(r.get("n_gear")),
+                        (float) doubleOf(r.get("throttle")),
+                        (float) doubleOf(r.get("brake")),
+                        intOf(r.get("drs"))));
+            }
+
+            List<LapTraceMath.Sample> aligned = new ArrayList<>(takenAt.length);
+            for (long when : takenAt) {
+                aligned.add(when <= 0 ? LapTraceMath.Sample.EMPTY : byTime.get(nearest(readingAt, when)));
+            }
+            return aligned;
+
+        } catch (Exception e) {
+            log.debug("[Geometry] {} — car telemetry unavailable for session {}: {}",
+                    circuit.getName(), sessionKey, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** Index of the timestamp closest to {@code when} in an ascending array. */
+    private static int nearest(long[] ascending, long when) {
+        int found = Arrays.binarySearch(ascending, when);
+        if (found >= 0) return found;
+
+        int after = -found - 1;
+        if (after == 0) return 0;
+        if (after >= ascending.length) return ascending.length - 1;
+        return when - ascending[after - 1] <= ascending[after] - when ? after - 1 : after;
+    }
+
+    /** Parses an ISO-8601 instant, returning {@code 0} for anything unreadable. */
+    private static long epochMillis(Object date) {
+        if (date == null) return 0;
+        try {
+            return OffsetDateTime.parse(String.valueOf(date)).toInstant().toEpochMilli();
+        } catch (Exception e) {
+            return 0;
         }
     }
 
@@ -488,7 +582,7 @@ public class CircuitGeometryService {
 
             applyGeoJsonMetadata(circuit, match.get(), properties);
             return Optional.of(new SourcedPath(
-                    new TrackPathMath.RawPath(x, y, z), GeometrySource.GEOJSON, null, null, null));
+                    new TrackPathMath.RawPath(x, y, z), GeometrySource.GEOJSON, null, null, null, List.of()));
 
         } catch (Exception e) {
             log.warn("[Geometry] Map source failed for {}: {}", circuit.getName(), e.getMessage());
@@ -560,12 +654,24 @@ public class CircuitGeometryService {
             z[i] = r * Math.sin(t);
         }
         log.info("[Geometry] {} has no external data — using a synthetic outline", circuit.getName());
-        return new SourcedPath(new TrackPathMath.RawPath(x, y, z), GeometrySource.SYNTHETIC, null, null, null);
+        return new SourcedPath(new TrackPathMath.RawPath(x, y, z), GeometrySource.SYNTHETIC, null, null, null, List.of());
     }
 
     // ─── Mapping ──────────────────────────────────────────────────────────────
 
     private CircuitGeometryResponse toResponse(Circuit circuit, CircuitGeometry geometry) {
+        List<List<Double>> points = readPoints(geometry.getPoints());
+
+        // Derived on the way out rather than at build time: it costs a few hundred arithmetic
+        // operations on an already-loaded lap, and keeping it out of the database means the
+        // analytics can be improved without re-fetching every circuit from OpenF1.
+        LapTraceMath.Derived derived = LapTraceMath.derive(
+                points,
+                readSamples(geometry.getSamples()),
+                geometry.getSpanXM(),
+                geometry.getSpanZM(),
+                circuit.getTurnCount());
+
         return CircuitGeometryResponse.builder()
                 .circuitId(circuit.getId())
                 .circuitName(circuit.getName())
@@ -574,8 +680,23 @@ public class CircuitGeometryService {
                 .source(geometry.getSource())
                 .sourceLabel(sourceLabel(geometry))
                 .hasRealElevation(geometry.getSource() == GeometrySource.OPENF1)
-                .points(readPoints(geometry.getPoints()))
+                .points(points)
                 .pointCount(geometry.getPointCount())
+                .hasLapTelemetry(!derived.samples().isEmpty())
+                .samples(derived.samples().stream()
+                        .map(s -> new CircuitGeometryResponse.TrackSample(
+                                s.speedKmh(), s.gear(), s.throttlePct(), s.brakePct(),
+                                s.drsOpen(), s.lateralG(), s.longitudinalG()))
+                        .toList())
+                .corners(derived.corners().stream()
+                        .map(c -> new CircuitGeometryResponse.TrackCorner(
+                                c.number(), c.pointIndex(), c.apexSpeedKmH(), c.gear(),
+                                c.entrySpeedKmH(), c.brakingM(), c.lateralG()))
+                        .toList())
+                .drsRanges(derived.drsRanges().stream()
+                        .map(r -> new CircuitGeometryResponse.DrsRange(
+                                r.startIndex(), r.endIndex(), r.lengthM()))
+                        .toList())
                 .spanXM(geometry.getSpanXM())
                 .spanZM(geometry.getSpanZM())
                 .elevationMinM(geometry.getElevationMinM())
@@ -632,6 +753,44 @@ public class CircuitGeometryService {
         } catch (Exception e) {
             throw new IllegalStateException("Failed to serialise track points", e);
         }
+    }
+
+    /**
+     * Stores the lap telemetry as bare number quintuples rather than named objects. At one entry per
+     * stored point this is the larger half of the row, and the field names would repeat every one.
+     */
+    private String writeSamples(List<LapTraceMath.Sample> samples) {
+        List<List<Number>> rows = samples.stream()
+                .map(s -> List.<Number>of(
+                        round(s.speedKmh()), s.gear(),
+                        round(s.throttlePct()), round(s.brakePct()), s.drs()))
+                .toList();
+        try {
+            return JSON.writeValueAsString(rows);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to serialise lap telemetry", e);
+        }
+    }
+
+    private List<LapTraceMath.Sample> readSamples(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            List<List<Number>> rows = JSON.readValue(json, new TypeReference<List<List<Number>>>() {});
+            return rows.stream()
+                    .filter(r -> r.size() >= 5)
+                    .map(r -> new LapTraceMath.Sample(
+                            r.get(0).floatValue(), r.get(1).intValue(),
+                            r.get(2).floatValue(), r.get(3).floatValue(), r.get(4).intValue()))
+                    .toList();
+        } catch (Exception e) {
+            log.warn("[Geometry] Corrupt stored lap telemetry: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** One decimal is the precision the feed itself reports; more only inflates the stored row. */
+    private static float round(float value) {
+        return Math.round(value * 10f) / 10f;
     }
 
     private List<List<Double>> readPoints(String json) {
