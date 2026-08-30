@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getTeamColor } from "../lib/f1-theme";
 import { fetchCircuitGeometry } from "../lib/f1-data";
-import type { CircuitGeometry, CircuitInfo, DriverStanding, TelemetryData } from "../types/f1";
+import type {
+  CircuitGeometry,
+  CircuitInfo,
+  DriverStanding,
+  TelemetryData,
+  TrackCorner,
+} from "../types/f1";
 
 interface LiveTrackMapProps {
   /** Live car telemetry. When empty the map runs a demo lap and says so. */
@@ -32,20 +38,32 @@ interface CarMarker {
 
 export type MapOverlayMode = "STANDARD" | "MINI_SECTORS" | "SPEED_HEATMAP" | "DRS_ZONES";
 
-interface TurnInfo {
-  number: number;
+/** A corner from the traced lap, placed on the SVG canvas. */
+type TurnInfo = TrackCorner & { x: number; y: number };
+
+interface Point {
   x: number;
   y: number;
-  name: string;
-  gear: number;
-  apexSpeedKmH: number;
-  brakingM: number;
 }
 
 const VIEW_WIDTH = 800;
 const VIEW_HEIGHT = 500;
 /** Room for the track stroke and the car markers, which sit on top of the line. */
 const PADDING = 60;
+/** Sectors the lap is split into for the pace and speed overlays. */
+const SECTOR_COUNT = 24;
+
+/** The speed bands a timing screen uses, so the colours mean the same thing here as on TV. */
+function speedColour(kmh: number): string {
+  if (kmh > 300) return "#A855F7";
+  if (kmh > 240) return "#3B82F6";
+  if (kmh > 150) return "#FACC15";
+  return "#EF4444";
+}
+
+function toPath(points: Point[]): string {
+  return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+}
 
 export default function LiveTrackMap({
   telemetryList = [],
@@ -110,68 +128,70 @@ export default function LiveTrackMap({
     );
   }, [projectedPoints]);
 
-  // Generate turn markers along the track
-  const turns: TurnInfo[] = useMemo(() => {
-    if (!geometry || projectedPoints.length < 5) return [];
-    const count = Math.min(24, Math.max(10, geometry.turnCount || 16));
-    const step = Math.floor(projectedPoints.length / count);
+  /**
+   * The overlays read a real lap driven at this circuit — the same lap the racing line was traced
+   * from. Circuits whose geometry came from map data have no such lap, and there is nothing
+   * honest to draw for them, so the overlays are switched off rather than filled in.
+   */
+  const samples = useMemo(() => geometry?.samples ?? [], [geometry]);
+  const hasTrace = Boolean(geometry?.hasLapTelemetry) && samples.length === projectedPoints.length;
 
-    return Array.from({ length: count }, (_, i) => {
-      const idx = (i * step + Math.floor(step / 2)) % projectedPoints.length;
-      const pt = projectedPoints[idx];
-      const speed = 75 + Math.round(Math.sin(i * 1.7) * 45 + 50);
-      const gear = speed < 90 ? 2 : speed < 140 ? 3 : speed < 200 ? 4 : speed < 260 ? 6 : 7;
-      const braking = speed < 110 ? 120 : speed < 160 ? 90 : 60;
+  // The picked mode is remembered, but switching to a circuit with no traced lap falls back to the
+  // plain map rather than showing an overlay with nothing behind it.
+  const activeMode: MapOverlayMode = hasTrace ? overlayMode : "STANDARD";
 
-      return {
-        number: i + 1,
-        x: pt.x,
-        y: pt.y,
-        name: `Turn ${i + 1}`,
-        gear,
-        apexSpeedKmH: speed,
-        brakingM: braking,
-      };
-    });
-  }, [geometry, projectedPoints]);
+  const turns = useMemo<TurnInfo[]>(() => {
+    if (!geometry || !hasTrace) return [];
+    return geometry.corners
+      .filter((corner) => corner.pointIndex < projectedPoints.length)
+      .map((corner) => ({
+        ...corner,
+        x: projectedPoints[corner.pointIndex].x,
+        y: projectedPoints[corner.pointIndex].y,
+      }));
+  }, [geometry, hasTrace, projectedPoints]);
 
-  // Generate mini-sectors segments (24 sectors)
+  /** The lap split into equal stretches, each carrying the speed the car actually held over it. */
   const miniSectors = useMemo(() => {
-    if (projectedPoints.length < 10) return [];
-    const totalSectors = 24;
-    const ptsPerSector = Math.max(2, Math.floor(projectedPoints.length / totalSectors));
+    if (!hasTrace || projectedPoints.length < SECTOR_COUNT * 2) return [];
 
-    return Array.from({ length: totalSectors }, (_, i) => {
-      const startIdx = i * ptsPerSector;
-      const endIdx = i === totalSectors - 1 ? projectedPoints.length : (i + 1) * ptsPerSector;
-      const pts = projectedPoints.slice(startIdx, endIdx + 1);
+    const perSector = Math.floor(projectedPoints.length / SECTOR_COUNT);
+    const lapAverage = samples.reduce((sum, s) => sum + s.speedKmh, 0) / samples.length;
 
-      if (pts.length < 2) return null;
+    return Array.from({ length: SECTOR_COUNT }, (_, i) => {
+      const start = i * perSector;
+      const end = i === SECTOR_COUNT - 1 ? projectedPoints.length : (i + 1) * perSector;
 
-      const pathStr = pts
-        .map((p, j) => `${j === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-        .join(" ");
+      // Reaching one point past the end joins each stretch to the next, and wraps the last one
+      // back to the start line rather than leaving a gap there.
+      const pts: Point[] = [];
+      for (let k = start; k <= end; k++) pts.push(projectedPoints[k % projectedPoints.length]);
 
-      // Driver 1 (e.g. Verstappen / Norris) faster in green, Driver 2 in gold/red
-      const isDriver1Faster = (i % 3 !== 0 && (i * 7) % 5 > 1);
-      const speedBand = (i * 37) % 4; // 0: hairpin, 1: mid, 2: fast, 3: straight
+      const within = samples.slice(start, end);
+      const averageKmH = within.reduce((sum, s) => sum + s.speedKmh, 0) / within.length;
 
       return {
         id: i,
-        path: pathStr,
-        isDriver1Faster,
-        speedColor:
-          speedBand === 3
-            ? "#A855F7" // Purple >310km/h
-            : speedBand === 2
-            ? "#3B82F6" // Blue 240-300km/h
-            : speedBand === 1
-            ? "#FACC15" // Yellow 150-240km/h
-            : "#EF4444", // Red <150km/h
-        isDrs: i >= 4 && i <= 8 || i >= 16 && i <= 20,
+        path: toPath(pts),
+        averageKmH,
+        aboveLapAverage: averageKmH >= lapAverage,
+        colour: speedColour(averageKmH),
       };
-    }).filter(Boolean);
-  }, [projectedPoints]);
+    });
+  }, [hasTrace, projectedPoints, samples]);
+
+  /** The stretches the traced driver actually ran with the wing open. */
+  const drsPaths = useMemo(() => {
+    if (!geometry || !hasTrace) return [];
+    const n = projectedPoints.length;
+
+    return geometry.drsRanges.map((range, i) => {
+      const span = ((range.endIndex - range.startIndex + n) % n) + 1;
+      const pts: Point[] = [];
+      for (let k = 0; k < span; k++) pts.push(projectedPoints[(range.startIndex + k) % n]);
+      return { id: i, path: toPath(pts), lengthM: range.lengthM };
+    });
+  }, [geometry, hasTrace, projectedPoints]);
 
   const isLive = telemetryList.length > 0;
 
@@ -250,23 +270,30 @@ export default function LiveTrackMap({
           {/* Overlay Modes Picker */}
           <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-zinc-800">
             {[
-              { id: "STANDARD", label: "GPS LIVE" },
-              { id: "MINI_SECTORS", label: "MINI-SECTOR DELTA" },
-              { id: "SPEED_HEATMAP", label: "APEX SPEED" },
-              { id: "DRS_ZONES", label: "DRS ZONES" },
-            ].map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setOverlayMode(m.id as MapOverlayMode)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] f-mono font-bold uppercase transition-all ${
-                  overlayMode === m.id
-                    ? "bg-red-600 text-white shadow-sm"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
+              { id: "STANDARD", label: "GPS LIVE", needsTrace: false },
+              { id: "MINI_SECTORS", label: "SECTOR PACE", needsTrace: true },
+              { id: "SPEED_HEATMAP", label: "SPEED TRACE", needsTrace: true },
+              { id: "DRS_ZONES", label: "DRS ZONES", needsTrace: true },
+            ].map((m) => {
+              const locked = m.needsTrace && !hasTrace;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setOverlayMode(m.id as MapOverlayMode)}
+                  disabled={locked}
+                  title={locked ? "No lap telemetry recorded for this circuit" : undefined}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] f-mono font-bold uppercase transition-all ${
+                    activeMode === m.id
+                      ? "bg-red-600 text-white shadow-sm"
+                      : locked
+                      ? "text-zinc-700 cursor-not-allowed"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
           </div>
 
           {circuits.length > 0 && (
@@ -328,46 +355,50 @@ export default function LiveTrackMap({
             />
 
             {/* Overlay Layers */}
-            {overlayMode === "MINI_SECTORS" && (
+            {activeMode === "MINI_SECTORS" && (
               <g>
-                {miniSectors.map((sec) => sec && (
+                {miniSectors.map((sec) => (
                   <path
                     key={sec.id}
                     d={sec.path}
                     fill="none"
-                    stroke={sec.isDriver1Faster ? "#00E676" : "#E10600"}
+                    stroke={sec.aboveLapAverage ? "#00E676" : "#E10600"}
                     strokeWidth="10"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     opacity={0.85}
-                  />
+                  >
+                    <title>{`Sector ${sec.id + 1} · ${Math.round(sec.averageKmH)} km/h average`}</title>
+                  </path>
                 ))}
               </g>
             )}
 
-            {overlayMode === "SPEED_HEATMAP" && (
+            {activeMode === "SPEED_HEATMAP" && (
               <g>
-                {miniSectors.map((sec) => sec && (
+                {miniSectors.map((sec) => (
                   <path
                     key={sec.id}
                     d={sec.path}
                     fill="none"
-                    stroke={sec.speedColor}
+                    stroke={sec.colour}
                     strokeWidth="10"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     opacity={0.9}
-                  />
+                  >
+                    <title>{`Sector ${sec.id + 1} · ${Math.round(sec.averageKmH)} km/h average`}</title>
+                  </path>
                 ))}
               </g>
             )}
 
-            {overlayMode === "DRS_ZONES" && (
+            {activeMode === "DRS_ZONES" && (
               <g>
-                {miniSectors.map((sec) => sec && sec.isDrs && (
+                {drsPaths.map((zone) => (
                   <path
-                    key={sec.id}
-                    d={sec.path}
+                    key={zone.id}
+                    d={zone.path}
                     fill="none"
                     stroke="#00E676"
                     strokeWidth="14"
@@ -375,7 +406,9 @@ export default function LiveTrackMap({
                     strokeLinejoin="round"
                     opacity={0.9}
                     filter="url(#trackGlow)"
-                  />
+                  >
+                    <title>{`DRS open for ${Math.round(zone.lengthM)} m`}</title>
+                  </path>
                 ))}
               </g>
             )}
@@ -385,7 +418,7 @@ export default function LiveTrackMap({
               ref={pathRef}
               d={svgPath}
               fill="none"
-              stroke={overlayMode === "STANDARD" ? "#4a4d5e" : "rgba(255,255,255,0.4)"}
+              stroke={activeMode === "STANDARD" ? "#4a4d5e" : "rgba(255,255,255,0.4)"}
               strokeWidth="2"
               strokeDasharray="6 4"
               strokeLinecap="round"
@@ -506,48 +539,63 @@ export default function LiveTrackMap({
           <div className="absolute top-4 left-4 bg-zinc-950/90 backdrop-blur-xl border border-amber-500/60 p-3 rounded-2xl shadow-2xl f-mono text-xs z-30 pointer-events-none">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="font-bold text-white uppercase">{hoveredTurn.name} TELEMETRY</span>
+              <span className="font-bold text-white uppercase">TURN {hoveredTurn.number}</span>
             </div>
-            <div className="grid grid-cols-3 gap-3 text-[11px] mt-1 pt-1 border-t border-zinc-800">
+            <div className="grid grid-cols-4 gap-3 text-[11px] mt-1 pt-1 border-t border-zinc-800">
               <div>
                 <span className="text-zinc-500 block text-[9px]">APEX SPEED</span>
-                <span className="text-amber-400 font-black">{hoveredTurn.apexSpeedKmH} KM/H</span>
+                <span className="text-amber-400 font-black">
+                  {Math.round(hoveredTurn.apexSpeedKmH)} KM/H
+                </span>
               </div>
               <div>
                 <span className="text-zinc-500 block text-[9px]">GEAR</span>
-                <span className="text-white font-black">{hoveredTurn.gear}TH</span>
+                <span className="text-white font-black">
+                  {hoveredTurn.gear > 0 ? hoveredTurn.gear : "—"}
+                </span>
               </div>
               <div>
-                <span className="text-zinc-500 block text-[9px]">BRAKE POINT</span>
-                <span className="text-emerald-400 font-black">{hoveredTurn.brakingM}M</span>
+                <span className="text-zinc-500 block text-[9px]">ENTRY</span>
+                <span className="text-white font-black">
+                  {Math.round(hoveredTurn.entrySpeedKmH)} KM/H
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 block text-[9px]">BRAKING</span>
+                <span className="text-emerald-400 font-black">
+                  {Math.round(hoveredTurn.brakingM)} M
+                </span>
               </div>
             </div>
+            <p className="text-[9px] text-zinc-500 mt-2 pt-1.5 border-t border-zinc-800/80">
+              Measured on {geometry?.sourceLabel?.toLowerCase() ?? "the traced lap"}
+            </p>
           </div>
         )}
 
         {/* Bottom Legend */}
         <div className="absolute bottom-3 left-3 bg-black/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-800 flex items-center gap-4 text-[10px] text-zinc-400 f-mono flex-wrap">
-          {overlayMode === "STANDARD" && (
+          {activeMode === "STANDARD" && (
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
               <span>START / FINISH LINE</span>
             </div>
           )}
 
-          {overlayMode === "MINI_SECTORS" && (
+          {activeMode === "MINI_SECTORS" && (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" />
-                <span>LEADER FASTER</span>
+                <span>ABOVE LAP AVERAGE</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-red-600 inline-block" />
-                <span>CHASER FASTER</span>
+                <span>BELOW LAP AVERAGE</span>
               </div>
             </div>
           )}
 
-          {overlayMode === "SPEED_HEATMAP" && (
+          {activeMode === "SPEED_HEATMAP" && (
             <div className="flex items-center gap-3">
               <span className="text-purple-400 font-bold">■ &gt;300 KM/H</span>
               <span className="text-blue-400 font-bold">■ 240-300</span>
@@ -556,11 +604,29 @@ export default function LiveTrackMap({
             </div>
           )}
 
-          {overlayMode === "DRS_ZONES" && (
+          {activeMode === "DRS_ZONES" && (
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded bg-emerald-400 inline-block shadow-[0_0_8px_#00E676]" />
-              <span className="text-emerald-400 font-bold">ACTIVE DRS DETECTION & ZONE</span>
+              {drsPaths.length > 0 ? (
+                <>
+                  <span className="w-2.5 h-2.5 rounded bg-emerald-400 inline-block shadow-[0_0_8px_#00E676]" />
+                  <span className="text-emerald-400 font-bold">
+                    WING OPEN OVER {drsPaths.length} {drsPaths.length === 1 ? "STRETCH" : "STRETCHES"}
+                  </span>
+                </>
+              ) : (
+                // A driver in clean air never opens it, and that is a fact about the lap rather
+                // than a hole to paint the published zones into.
+                <span className="text-zinc-500 font-bold">
+                  DRS NEVER OPENED ON THE TRACED LAP
+                </span>
+              )}
             </div>
+          )}
+
+          {activeMode !== "STANDARD" && (
+            <span className="text-zinc-600">
+              {geometry?.sourceLabel?.toUpperCase()}
+            </span>
           )}
         </div>
       </div>
