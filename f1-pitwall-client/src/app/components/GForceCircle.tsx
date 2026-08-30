@@ -1,78 +1,103 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import type { TrackSample } from "../types/f1";
 
 interface GForceCircleProps {
-  speed?: number;
-  throttle?: number;
-  brake?: number;
-  gear?: number;
+  /**
+   * The lap to play back, one entry per point of the circuit's racing line. Both G axes come from
+   * the trace: lateral from how tightly the line curves where the car was, longitudinal from how
+   * the speed changed along it. Without a trace the widget says so rather than animating a
+   * plausible-looking one.
+   */
+  trace?: TrackSample[];
+  /** Where the lap came from, so what is on screen stays attributable. */
+  sourceLabel?: string;
   size?: number;
   className?: string;
 }
 
-interface GPoint {
-  x: number; // Lateral G (-5 to +5)
-  y: number; // Longitudinal G (-5.5 to +2.0)
-  id: number;
-}
+/** How long each point of the lap is held on screen. */
+const STEP_MS = 110;
+/** Points of history drawn behind the marker. */
+const TRAIL_LENGTH = 14;
 
 export default function GForceCircle({
-  speed = 280,
-  throttle = 85,
-  brake = 0,
-  gear = 6,
+  trace = [],
+  sourceLabel,
   size = 260,
   className = "",
 }: GForceCircleProps) {
   const center = size / 2;
-  const maxG = 5.5; // Max G scale
   const radius = size * 0.42;
+  const [cursor, setCursor] = useState(0);
 
-  // Trail history
-  const [trail, setTrail] = useState<GPoint[]>([]);
-  const [peakG, setPeakG] = useState({ lateral: 4.2, braking: 5.1, accel: 1.8 });
-  const pointCounter = useRef(0);
-
-  // Derive current G from telemetry physics
-  const currentLongG = brake > 10 ? -(brake / 100) * 5.2 : (throttle / 100) * 1.6;
-  // Lateral G oscillation simulating cornering forces
-  const currentLatG =
-    speed > 100
-      ? Math.sin(Date.now() * 0.002) * (speed / 300) * (gear < 5 ? 4.5 : 3.2)
-      : 0;
+  /**
+   * The rings are scaled to the lap rather than to a fixed maximum, so a street circuit's trace
+   * fills the circle instead of huddling in the middle of one drawn for a high-speed track.
+   */
+  const { peakLateral, peakBraking, peakAccel, maxG } = useMemo(() => {
+    let lateral = 0;
+    let braking = 0;
+    let accel = 0;
+    for (const s of trace) {
+      lateral = Math.max(lateral, Math.abs(s.lateralG));
+      braking = Math.max(braking, -s.longitudinalG);
+      accel = Math.max(accel, s.longitudinalG);
+    }
+    return {
+      peakLateral: lateral,
+      peakBraking: braking,
+      peakAccel: accel,
+      maxG: Math.max(1, Math.ceil(Math.max(lateral, braking, accel))),
+    };
+  }, [trace]);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      pointCounter.current += 1;
-      const pt: GPoint = {
-        x: currentLatG + (Math.random() - 0.5) * 0.3,
-        y: currentLongG + (Math.random() - 0.5) * 0.2,
-        id: pointCounter.current,
-      };
-
-      setTrail((prev) => [...prev.slice(-12), pt]);
-
-      setPeakG((p) => ({
-        lateral: Math.max(p.lateral, Math.abs(pt.x)),
-        braking: Math.max(p.braking, Math.abs(Math.min(0, pt.y))),
-        accel: Math.max(p.accel, Math.max(0, pt.y)),
-      }));
-    }, 120);
-
+    if (trace.length === 0) return;
+    const id = setInterval(() => setCursor((c) => c + 1), STEP_MS);
     return () => clearInterval(id);
-  }, [currentLatG, currentLongG]);
+  }, [trace.length]);
 
-  // Convert G values to SVG pixel coordinates
-  const getCoords = (latG: number, longG: number) => {
-    const px = center + (latG / maxG) * radius;
-    // Invert Y so positive G (acceleration) goes UP, negative G (braking) goes DOWN
-    const py = center - (longG / maxG) * radius;
-    return { x: px, y: py };
-  };
+  // The cursor counts on without bound and is wrapped on read, so a trace that changes length
+  // mid-playback lands somewhere valid instead of needing to be reset from an effect.
+  const position = trace.length === 0 ? 0 : cursor % trace.length;
 
-  const currentCoords = getCoords(currentLatG, currentLongG);
+  const trail = useMemo(() => {
+    if (trace.length === 0) return [];
+    const depth = Math.min(TRAIL_LENGTH, trace.length);
+    return Array.from({ length: depth }, (_, k) => {
+      const index = (position - (depth - 1 - k) + trace.length * 2) % trace.length;
+      return { index, sample: trace[index], fade: (k + 1) / depth };
+    });
+  }, [trace, position]);
+
+  const current = trace[position];
+
+  const coordsOf = (latG: number, longG: number) => ({
+    x: center + (latG / maxG) * radius,
+    // Inverted so acceleration goes up and braking goes down, as a driver would read it.
+    y: center - (longG / maxG) * radius,
+  });
+
+  if (trace.length === 0) {
+    return (
+      <div
+        className={`p-4 rounded-3xl bg-zinc-950/90 border border-zinc-800 shadow-2xl flex flex-col items-center justify-center backdrop-blur-xl ${className}`}
+        style={{ minHeight: size }}
+      >
+        <span className="text-2xl mb-2 opacity-40">◎</span>
+        <h3 className="f-cond font-black text-xs uppercase tracking-wider text-zinc-400">
+          G-FORCE TRACTION CIRCLE
+        </h3>
+        <p className="f-mono text-[10px] text-zinc-600 mt-2 text-center max-w-[220px]">
+          No lap telemetry recorded for this circuit, so there are no loads to plot.
+        </p>
+      </div>
+    );
+  }
+
+  const marker = coordsOf(current.lateralG, current.longitudinalG);
 
   return (
     <div
@@ -85,10 +110,9 @@ export default function GForceCircle({
             G-FORCE TRACTION CIRCLE
           </h3>
         </div>
-        <span className="f-mono text-[10px] text-cyan-400 font-bold">KAMM'S DIAGRAM</span>
+        <span className="f-mono text-[10px] text-cyan-400 font-bold">KAMM&apos;S DIAGRAM</span>
       </div>
 
-      {/* SVG Canvas */}
       <div className="relative">
         <svg width={size} height={size} className="overflow-visible select-none">
           <defs>
@@ -98,11 +122,10 @@ export default function GForceCircle({
             </radialGradient>
           </defs>
 
-          {/* Background glow */}
           <circle cx={center} cy={center} r={radius} fill="url(#gCircleGlow)" />
 
-          {/* Concentric rings: 1G, 2G, 3G, 4G, 5G */}
-          {[1, 2, 3, 4, 5].map((g) => {
+          {/* One ring per G, out to the hardest load this lap recorded */}
+          {Array.from({ length: maxG }, (_, i) => i + 1).map((g) => {
             const r = (g / maxG) * radius;
             return (
               <g key={g}>
@@ -112,8 +135,8 @@ export default function GForceCircle({
                   r={r}
                   fill="none"
                   stroke="rgba(255,255,255,0.08)"
-                  strokeWidth={g === 5 ? "1.5" : "1"}
-                  strokeDasharray={g === 5 ? undefined : "3 3"}
+                  strokeWidth={g === maxG ? "1.5" : "1"}
+                  strokeDasharray={g === maxG ? undefined : "3 3"}
                 />
                 <text
                   x={center + 3}
@@ -129,7 +152,6 @@ export default function GForceCircle({
             );
           })}
 
-          {/* Crosshair Axes */}
           <line
             x1={center - radius}
             y1={center}
@@ -147,7 +169,6 @@ export default function GForceCircle({
             strokeWidth="1"
           />
 
-          {/* Axis Labels */}
           <text
             x={center}
             y={center - radius - 8}
@@ -193,26 +214,23 @@ export default function GForceCircle({
             RIGHT
           </text>
 
-          {/* Trail Points */}
-          {trail.map((pt, idx) => {
-            const coords = getCoords(pt.x, pt.y);
-            const opacity = (idx + 1) / trail.length;
+          {trail.map((point) => {
+            const coords = coordsOf(point.sample.lateralG, point.sample.longitudinalG);
             return (
               <circle
-                key={pt.id}
+                key={point.index}
                 cx={coords.x}
                 cy={coords.y}
                 r="2.5"
                 fill="#22D3EE"
-                opacity={opacity * 0.45}
+                opacity={point.fade * 0.45}
               />
             );
           })}
 
-          {/* Current Live G-Force Marker */}
           <circle
-            cx={currentCoords.x}
-            cy={currentCoords.y}
+            cx={marker.x}
+            cy={marker.y}
             r="8"
             fill="none"
             stroke="#22D3EE"
@@ -220,8 +238,8 @@ export default function GForceCircle({
             className="animate-ping opacity-75"
           />
           <circle
-            cx={currentCoords.x}
-            cy={currentCoords.y}
+            cx={marker.x}
+            cy={marker.y}
             r="5"
             fill="#22D3EE"
             stroke="#000"
@@ -231,29 +249,49 @@ export default function GForceCircle({
         </svg>
       </div>
 
-      {/* Live Readout Bar */}
-      <div className="w-full grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-zinc-800/80 text-center text-xs f-mono">
+      <div className="w-full grid grid-cols-4 gap-2 mt-3 pt-2 border-t border-zinc-800/80 text-center text-xs f-mono">
         <div className="p-1.5 rounded-xl bg-black/50 border border-zinc-800">
-          <span className="text-[8px] text-zinc-500 block uppercase">LATERAL</span>
+          <span className="text-[8px] text-zinc-500 block uppercase">
+            Lateral {current.lateralG >= 0 ? "R" : "L"}
+          </span>
           <span className="font-black text-cyan-400">
-            {Math.abs(currentLatG).toFixed(2)}G
+            {Math.abs(current.lateralG).toFixed(2)}G
           </span>
         </div>
         <div className="p-1.5 rounded-xl bg-black/50 border border-zinc-800">
-          <span className="text-[8px] text-zinc-500 block uppercase">LONGITUDINAL</span>
+          <span className="text-[8px] text-zinc-500 block uppercase">Longitudinal</span>
           <span
             className={`font-black ${
-              currentLongG < 0 ? "text-red-400" : "text-emerald-400"
+              current.longitudinalG < 0 ? "text-red-400" : "text-emerald-400"
             }`}
           >
-            {currentLongG.toFixed(2)}G
+            {current.longitudinalG.toFixed(2)}G
           </span>
         </div>
         <div className="p-1.5 rounded-xl bg-black/50 border border-zinc-800">
-          <span className="text-[8px] text-zinc-500 block uppercase">PEAK BRAKE</span>
-          <span className="font-black text-amber-400">{peakG.braking.toFixed(1)}G</span>
+          <span className="text-[8px] text-zinc-500 block uppercase">Speed</span>
+          <span className="font-black text-white">
+            {Math.round(current.speedKmh)}
+            <span className="text-[8px] text-zinc-500"> KM/H</span>
+          </span>
+        </div>
+        <div className="p-1.5 rounded-xl bg-black/50 border border-zinc-800">
+          <span className="text-[8px] text-zinc-500 block uppercase">Lap peaks</span>
+          <span className="font-black text-amber-400">
+            {peakLateral.toFixed(1)}
+            <span className="text-zinc-600">/</span>
+            {peakBraking.toFixed(1)}
+            <span className="text-zinc-600">/</span>
+            {peakAccel.toFixed(1)}
+          </span>
         </div>
       </div>
+
+      <p className="w-full mt-2 pt-2 border-t border-zinc-800/60 f-mono text-[9px] text-zinc-600 leading-relaxed">
+        {sourceLabel ? `${sourceLabel}. ` : ""}
+        Loads derived from the racing line — points sit tens of metres apart, so the tightest
+        corners read lower than the car actually pulled.
+      </p>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,7 +15,14 @@ import TelemetryComparator from "../components/TelemetryComparator";
 import TyreThermalDisplay from "../components/TyreThermalDisplay";
 import GForceCircle from "../components/GForceCircle";
 import { BASE_URL as API } from "../lib/api-client";
-import type { TelemetryData, LiveTyreData, LiveStatus } from "../types/f1";
+import { fetchCircuitGeometry } from "../lib/f1-data";
+import type {
+  TelemetryData,
+  LiveTyreData,
+  LiveStatus,
+  CircuitInfo,
+  CircuitGeometry,
+} from "../types/f1";
 
 declare global {
   interface Window {
@@ -168,6 +175,47 @@ function TyreChip({ type, size = "sm" }: { type: string; size?: "sm" | "lg" }) {
   );
 }
 
+/** Words shared by most circuit names, which therefore say nothing about which one this is. */
+const CIRCUIT_STOPWORDS = new Set([
+  "circuit", "international", "autodromo", "autodrome", "street", "racing",
+  "grand", "prix", "the", "and", "park", "ring", "speedway",
+]);
+
+function nameTokens(text: string): Set<string> {
+  const words = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 2 && !CIRCUIT_STOPWORDS.has(word));
+  return new Set(words);
+}
+
+/**
+ * The circuit a live session is being held at.
+ *
+ * Matching on shared name words rather than on the country is deliberate: several countries host
+ * more than one Grand Prix, and country alone would happily put a neighbouring circuit's racing
+ * line and lap trace on screen. No shared word means no match rather than a guess.
+ */
+function matchCircuit(circuits: CircuitInfo[], sessionCircuit?: string): CircuitInfo | null {
+  if (!sessionCircuit) return null;
+  const wanted = nameTokens(sessionCircuit);
+
+  let best: CircuitInfo | null = null;
+  let bestScore = 0;
+  for (const circuit of circuits) {
+    const shared = [...nameTokens(`${circuit.name} ${circuit.city}`)]
+      .filter((token) => wanted.has(token)).length;
+    if (shared > bestScore) {
+      best = circuit;
+      bestScore = shared;
+    }
+  }
+  return best;
+}
+
 const STAGGER = { hidden: { opacity: 0, y: 14 }, show: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.02, duration: 0.4, ease: [0.16, 1, 0.3, 1] as const } }) };
 const PANEL = { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 }, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] as const } };
 
@@ -181,6 +229,8 @@ export default function TelemetryPage() {
   const [throttleHistory, setThrottleHistory] = useState<Record<string, number[]>>({});
   const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
   const [liveTyreData, setLiveTyreData] = useState<LiveTyreData[]>([]);
+  const [circuits, setCircuits] = useState<CircuitInfo[]>([]);
+  const [geometry, setGeometry] = useState<CircuitGeometry | null>(null);
   const stompRef = useRef<StompClient | null>(null);
 
   useEffect(() => {
@@ -240,6 +290,34 @@ export default function TelemetryPage() {
     const id = setInterval(checkLiveStatus, 15000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    authFetch(`${API}/api/circuits`)
+      .then((res) => res.json())
+      .then(setCircuits)
+      .catch(() => setCircuits([]));
+  }, []);
+
+  /**
+   * The circuit whose racing line and lap trace the map and the G-force plot read. Between
+   * sessions there is no live circuit to match, so the first one on record stands in until the
+   * viewer picks another from the map's own switcher.
+   */
+  const activeCircuit = useMemo(
+    () => matchCircuit(circuits, liveStatus?.circuitName) ?? circuits[0] ?? null,
+    [circuits, liveStatus?.circuitName]
+  );
+
+  useEffect(() => {
+    if (!activeCircuit) return;
+    let cancelled = false;
+
+    fetchCircuitGeometry(activeCircuit.id)
+      .then((data) => { if (!cancelled) setGeometry(data); })
+      .catch(() => { if (!cancelled) setGeometry(null); });
+
+    return () => { cancelled = true; };
+  }, [activeCircuit]);
 
   const selectedDriver = drivers.find(d => d.driverName === selected) || drivers[0];
 
@@ -335,7 +413,13 @@ export default function TelemetryPage() {
         <AnimatePresence mode="wait">
           {mode === "radar" && (
             <motion.div key="radar" {...PANEL}>
-              <LiveTrackMap telemetryList={drivers} selectedDriverId={selectedDriver?.driverName} onSelectDriver={(name) => setSelected(name)} />
+              <LiveTrackMap
+                telemetryList={drivers}
+                selectedDriverId={selectedDriver?.driverName}
+                onSelectDriver={(name) => setSelected(name)}
+                circuits={circuits}
+                circuitId={activeCircuit?.id}
+              />
             </motion.div>
           )}
 
@@ -502,17 +586,20 @@ export default function TelemetryPage() {
                       <div className="md:col-span-7">
                         <TyreThermalDisplay
                           compound={selectedDriver.tyreType}
-                          baseTemp={selectedDriver.tyreTemp || 101}
-                          tyreAge={selectedDriver.lap || 12}
+                          measuredTempC={selectedDriver.tyreTemp}
+                          tyreAge={selectedDriver.lap}
                           driverName={selectedDriver.driverName}
+                          trace={geometry?.samples ?? []}
                         />
                       </div>
                       <div className="md:col-span-5">
                         <GForceCircle
-                          speed={selectedDriver.speed}
-                          throttle={selectedDriver.throttle}
-                          brake={selectedDriver.brake}
-                          gear={selectedDriver.gear}
+                          trace={geometry?.samples ?? []}
+                          sourceLabel={
+                            geometry
+                              ? `${geometry.circuitName} · ${geometry.sourceLabel}`
+                              : undefined
+                          }
                           size={280}
                         />
                       </div>
