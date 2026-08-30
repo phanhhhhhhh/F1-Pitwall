@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { isSoundEnabled, setSoundEnabled, playUiClick } from "../lib/f1-sound";
@@ -76,6 +76,21 @@ export default function CommandPalette({
           c.category.toLowerCase().includes(query.toLowerCase())
       );
 
+  // Declared before the key handler that calls it, so the listener is rebound to the current
+  // version whenever it changes rather than holding on to the one from its first render.
+  const executeCommand = useCallback(
+    (cmd: CommandItem) => {
+      playUiClick();
+      onClose();
+      if (cmd.href) {
+        router.push(cmd.href);
+      } else if (cmd.action) {
+        cmd.action();
+      }
+    },
+    [onClose, router]
+  );
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -100,17 +115,7 @@ export default function CommandPalette({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, filtered, selectedIndex]);
-
-  const executeCommand = (cmd: CommandItem) => {
-    playUiClick();
-    onClose();
-    if (cmd.href) {
-      router.push(cmd.href);
-    } else if (cmd.action) {
-      cmd.action();
-    }
-  };
+  }, [isOpen, filtered, selectedIndex, executeCommand, onClose]);
 
   return (
     <AnimatePresence>
