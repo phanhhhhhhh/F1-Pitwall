@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { authFetch } from "../lib/pitwall-auth";
@@ -302,6 +303,16 @@ export default function DriversPage() {
             <h1 className="text-4xl sm:text-6xl font-black f-cond tracking-tight uppercase">
               WORLD CHAMPIONSHIP <span className="text-red-600">DRIVERS</span>
             </h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/drivers/compare"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black f-cond text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(225,6,0,0.4)] hover:shadow-[0_0_20px_rgba(225,6,0,0.7)] transition-all flex items-center gap-2"
+            >
+              <span>⚔️</span>
+              <span>1V1 HEAD-TO-HEAD BATTLE</span>
+            </Link>
           </div>
 
           {/* Controls: Search, Team Filter, Sort */}
