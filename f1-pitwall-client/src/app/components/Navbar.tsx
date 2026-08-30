@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { useSeason } from "../context/SeasonContext";
 import NotificationBell from "./NotificationBell";
 import SeasonSelector from "./SeasonSelector";
+import CommandPalette from "./CommandPalette";
 import { isSoundEnabled, setSoundEnabled, playUiClick } from "../lib/f1-sound";
 
 interface NavItem { href: string; label: string; live?: boolean; }
@@ -28,6 +29,7 @@ const navGroups: { label: string; items: NavItem[]; roles: string[] }[] = [
     label: "GRID",
     items: [
       { href: "/drivers", label: "Drivers" },
+      { href: "/drivers/compare", label: "Driver 1v1 Battle" },
       { href: "/teams", label: "Teams" },
     ],
     roles: ["ADMIN", "ENGINEER", "VIEWER"],
@@ -116,7 +118,20 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
   const [utcTime, setUtcTime] = useState("");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const mobileRef = useRef<HTMLDivElement>(null);
+
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     setSoundOn(isSoundEnabled());
@@ -189,6 +204,19 @@ export default function Navbar() {
               <span>{utcTime}</span>
             </div>
           )}
+
+          {/* Quick Command Palette Search Button */}
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="flex items-center gap-2 bg-black/50 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-600 rounded-xl px-2.5 py-1.5 transition-all text-zinc-400 hover:text-white group"
+            title="Open Command Palette (Ctrl+K)"
+          >
+            <span className="text-xs">🔍</span>
+            <span className="f-mono text-[10px] hidden sm:block font-bold">SEARCH</span>
+            <kbd className="hidden lg:inline-block px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[9px] f-mono text-zinc-400 group-hover:text-zinc-200">
+              Ctrl+K
+            </kbd>
+          </button>
 
           {/* Sound FX Toggle Button */}
           <button
@@ -305,6 +333,8 @@ export default function Navbar() {
           </div>
         </div>
       )}
+      {/* Global Command Palette Modal */}
+      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </nav>
   );
 }
