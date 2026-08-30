@@ -7,6 +7,7 @@ import { F1, tyre } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
 import { SkeletonCard } from "../components/LoadingSkeleton";
+import UndercutCalculator from "../components/UndercutCalculator";
 
 import { BASE_URL as API } from "../lib/api-client";
 import type { CircuitRef } from "../types/f1";
@@ -816,6 +817,9 @@ export default function StrategyPage() {
                   Base lap = circuit record + 2 s · Pit stop loss = {PIT_LOSS}s · Tyre degradation modelled as linear per lap · Last stint auto-fills to complete race distance
                 </p>
               </motion.div>
+
+              {/* ── UNDERCUT & PIT WINDOW CALCULATOR ── */}
+              <UndercutCalculator />
             </div>
           </div>
         )}
