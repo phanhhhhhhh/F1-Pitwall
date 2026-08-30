@@ -165,7 +165,7 @@ export default function UndercutCalculator({ className = "" }: { className?: str
             onChange={(e) => setWornTyreDeg(parseFloat(e.target.value))}
             className="w-full accent-red-500 bg-zinc-800 rounded-lg cursor-pointer"
           />
-          <span className="text-[9px] f-mono text-zinc-600 block mt-1">Drop-off on leader's worn rubber</span>
+          <span className="text-[9px] f-mono text-zinc-600 block mt-1">Drop-off on leader&apos;s worn rubber</span>
         </div>
 
         {/* Leader Response Laps */}
