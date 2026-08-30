@@ -41,6 +41,18 @@ public class CircuitGeometry {
 
     private int pointCount;
 
+    /**
+     * Car telemetry sampled at the same points as {@link #points}: a JSON array of
+     * {@code [speedKmh, gear, throttlePct, brakePct, drs]} quintuples, one per point.
+     *
+     * <p>Only the OpenF1 source carries this — it is read from the same driver and lap the racing
+     * line was traced from, so the two are consistent measurements of one lap. {@code null} when
+     * the geometry came from map data or the synthetic fallback.
+     */
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String samples;
+
     /** Real-world bounding box of the plan view, in metres. */
     private Float spanXM;
     private Float spanZM;
