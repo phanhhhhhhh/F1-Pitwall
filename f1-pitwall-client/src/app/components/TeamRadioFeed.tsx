@@ -304,7 +304,7 @@ export default function TeamRadioFeed({ className = "" }: { className?: string }
                       <span className="text-[9px] f-mono text-zinc-600">{msg.timestamp}</span>
                     </div>
                     <p className="text-xs sm:text-sm font-medium text-zinc-100 italic leading-relaxed">
-                      "{msg.transcript}"
+                      &ldquo;{msg.transcript}&rdquo;
                     </p>
                   </div>
                 </div>
