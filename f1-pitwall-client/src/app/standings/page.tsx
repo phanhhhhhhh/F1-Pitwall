@@ -17,6 +17,8 @@ import PodiumSpotlight from "../components/PodiumSpotlight";
 import dynamic from "next/dynamic";
 import { useCountUp } from "../lib/f1-theme";
 import type { DriverStanding, ConstructorStanding } from "../types/f1";
+import StandingsBumpChart from "../components/StandingsBumpChart";
+import ChampionshipCalculator from "../components/ChampionshipCalculator";
 
 const GapToLeaderChart = dynamic(() => import("../components/GapToLeaderChart"), { ssr: false });
 
@@ -32,7 +34,7 @@ export default function StandingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
-  const [showChart, setShowChart] = useState(false);
+  const [viewFeature, setViewFeature] = useState<"table" | "bump" | "calculator" | "gap">("table");
 
   useEffect(() => {
     (async () => {
@@ -103,7 +105,7 @@ export default function StandingsPage() {
           <PodiumSpotlight standings={drivers} />
         )}
 
-        {/* Tabs + Chart Toggle */}
+        {/* Tabs + Feature View Selector */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div className="flex items-center gap-2 bg-black/60 p-1.5 rounded-2xl border border-zinc-800">
             {(["drivers", "constructors"] as const).map((t) => (
@@ -122,16 +124,26 @@ export default function StandingsPage() {
           </div>
 
           {!loading && (
-            <button
-              onClick={() => setShowChart((v) => !v)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl f-mono text-xs font-bold tracking-wider border transition-all ${
-                showChart
-                  ? "border-red-500 text-red-400 bg-red-950/40 shadow-sm"
-                  : "border-zinc-800 text-zinc-400 hover:text-zinc-200 bg-black/40"
-              }`}
-            >
-              📊 GAP TRAJECTORY CHART
-            </button>
+            <div className="flex items-center gap-1.5 bg-black/60 p-1.5 rounded-2xl border border-zinc-800 flex-wrap">
+              {[
+                { id: "table", label: "📋 TABLE" },
+                { id: "bump", label: "📈 BUMP CHART" },
+                { id: "calculator", label: "🔮 TITLE SIMULATOR" },
+                { id: "gap", label: "📊 GAP TRAJECTORY" },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setViewFeature(f.id as typeof viewFeature)}
+                  className={`px-3 py-1.5 rounded-xl f-mono text-xs font-bold tracking-wider transition-all ${
+                    viewFeature === f.id
+                      ? "bg-red-600 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -145,7 +157,23 @@ export default function StandingsPage() {
           <SkeletonTable rows={10} cols={6} />
         ) : (
           <>
-            {showChart && (drivers.length > 0 || constructors.length > 0) && (
+            {viewFeature === "bump" && (
+              <div className="mb-6">
+                <StandingsBumpChart
+                  drivers={drivers}
+                  constructors={constructors}
+                  type={tab}
+                />
+              </div>
+            )}
+
+            {viewFeature === "calculator" && (
+              <div className="mb-6">
+                <ChampionshipCalculator initialStandings={drivers} season={season} />
+              </div>
+            )}
+
+            {viewFeature === "gap" && (drivers.length > 0 || constructors.length > 0) && (
               <div className="mb-6">
                 <GapToLeaderChart drivers={drivers} constructors={constructors} tab={tab} />
               </div>
