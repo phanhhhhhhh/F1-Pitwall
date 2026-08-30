@@ -12,6 +12,8 @@ import Navbar from "../components/Navbar";
 import SteeringWheelHUD from "../components/SteeringWheelHUD";
 import LiveTrackMap from "../components/LiveTrackMap";
 import TelemetryComparator from "../components/TelemetryComparator";
+import TyreThermalDisplay from "../components/TyreThermalDisplay";
+import GForceCircle from "../components/GForceCircle";
 import { BASE_URL as API } from "../lib/api-client";
 import type { TelemetryData, LiveTyreData, LiveStatus } from "../types/f1";
 
@@ -493,6 +495,27 @@ export default function TelemetryPage() {
                         height={180}
                         domain={[100, 360]}
                       />
+                    </div>
+
+                    {/* 4-Wheel Tyre Thermal Matrix & G-Force Kamm's Diagram */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                      <div className="md:col-span-7">
+                        <TyreThermalDisplay
+                          compound={selectedDriver.tyreType}
+                          baseTemp={selectedDriver.tyreTemp || 101}
+                          tyreAge={selectedDriver.lap || 12}
+                          driverName={selectedDriver.driverName}
+                        />
+                      </div>
+                      <div className="md:col-span-5">
+                        <GForceCircle
+                          speed={selectedDriver.speed}
+                          throttle={selectedDriver.throttle}
+                          brake={selectedDriver.brake}
+                          gear={selectedDriver.gear}
+                          size={280}
+                        />
+                      </div>
                     </div>
                   </>
                 )}
