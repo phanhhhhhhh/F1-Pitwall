@@ -200,6 +200,14 @@ export interface CircuitGeometry {
   hasRealElevation: boolean;
   points: [number, number, number][];
   pointCount: number;
+  /** True when the line is backed by car telemetry, so the three fields below carry readings. */
+  hasLapTelemetry: boolean;
+  /** What the car was doing at each entry of `points`. Empty without lap telemetry. */
+  samples: TrackSample[];
+  /** Corners read off the traced lap, numbered in track order from the finish line. */
+  corners: TrackCorner[];
+  /** Where the traced driver actually had DRS open. Empty is a real answer, not missing data. */
+  drsRanges: DrsRange[];
   spanXM: number | null;
   spanZM: number | null;
   elevationMinM: number | null;
@@ -218,6 +226,41 @@ export interface CircuitGeometry {
   openf1DriverNumber: number | null;
   openf1LapNumber: number | null;
   fetchedAt: string | null;
+}
+
+/**
+ * One point of a traced lap.
+ *
+ * The G figures are derived rather than measured — lateral from the curvature of the racing line,
+ * longitudinal from how the speed changes along it. Points sit tens of metres apart at racing
+ * speed, so lateral load reads low through the tightest corners.
+ */
+export interface TrackSample {
+  speedKmh: number;
+  gear: number;
+  throttlePct: number;
+  brakePct: number;
+  drsOpen: boolean;
+  lateralG: number;
+  longitudinalG: number;
+}
+
+/** A corner as driven on the traced lap. `brakingM` is measured back to the braking point. */
+export interface TrackCorner {
+  number: number;
+  pointIndex: number;
+  apexSpeedKmH: number;
+  gear: number;
+  entrySpeedKmH: number;
+  brakingM: number;
+  lateralG: number;
+}
+
+/** A DRS stretch. Wraps past the finish line when `endIndex` is below `startIndex`. */
+export interface DrsRange {
+  startIndex: number;
+  endIndex: number;
+  lengthM: number;
 }
 
 /* ── Circuit (lightweight — used by strategy simulator) ─────────────────── */
