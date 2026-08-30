@@ -6,6 +6,7 @@ import { authFetch } from "../lib/pitwall-auth";
 import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
 import PitwallBackground from "../components/PitwallBackground";
+import TeamRadioFeed from "../components/TeamRadioFeed";
 import { BASE_URL as API } from "../lib/api-client";
 import type { TelemetryData, LiveStatus } from "../types/f1";
 
@@ -133,6 +134,8 @@ export default function LiveTimingPage() {
   const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
   const [rows, setRows] = useState<TimingRow[]>([]);
   const [liveTimingData, setLiveTimingData] = useState<LiveTimingEntry[]>([]);
+  const [viewMode, setViewMode] = useState<"tower" | "radio" | "split">("tower");
+  const [tvMode, setTvMode] = useState(false);
   const stompRef = useRef<StompClient | null>(null);
 
   // Stateful tracking across updates
@@ -412,27 +415,76 @@ export default function LiveTimingPage() {
             )}
           </div>
 
-          {/* Connection badge */}
-          <div
-            className="flex items-center gap-2 rounded-xl border px-3.5 py-2"
-            style={{
-              borderColor: connected ? "rgba(0,230,118,.3)" : "rgba(225,6,0,.3)",
-              background: connected ? "rgba(0,230,118,.06)" : "rgba(225,6,0,.06)",
-            }}
-          >
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{
-                background: connected ? F1.green : F1.red,
-                animation: connected ? "live-pulse 1.6s infinite" : "none",
-              }}
-            />
-            <span
-              className="f-mono text-[11px] font-bold tracking-wider"
-              style={{ color: connected ? F1.green : "#ff6a52" }}
+          {/* Controls: View Tabs + TV Mode + Connection Badge */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* View Mode Tabs */}
+            <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-zinc-800">
+              <button
+                onClick={() => setViewMode("tower")}
+                className={`px-3 py-1.5 rounded-lg f-cond font-bold text-xs uppercase transition-all ${
+                  viewMode === "tower"
+                    ? "bg-red-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                ⏱️ TIMING TOWER
+              </button>
+              <button
+                onClick={() => setViewMode("split")}
+                className={`px-3 py-1.5 rounded-lg f-cond font-bold text-xs uppercase transition-all ${
+                  viewMode === "split"
+                    ? "bg-red-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                📺 SPLIT COMMAND
+              </button>
+              <button
+                onClick={() => setViewMode("radio")}
+                className={`px-3 py-1.5 rounded-lg f-cond font-bold text-xs uppercase transition-all ${
+                  viewMode === "radio"
+                    ? "bg-red-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                📻 TEAM RADIO
+              </button>
+            </div>
+
+            {/* TV Broadcast HUD Toggle */}
+            <button
+              onClick={() => setTvMode((v) => !v)}
+              className={`px-3.5 py-1.5 rounded-xl f-mono text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                tvMode
+                  ? "bg-amber-500/20 text-amber-400 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+                  : "bg-black/40 text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700"
+              }`}
             >
-              {connected ? "LIVE" : "CONNECTING"}
-            </span>
+              <span>{tvMode ? "🔴 TV OVERLAY ACTIVE" : "📺 BROADCAST HUD"}</span>
+            </button>
+
+            {/* Connection badge */}
+            <div
+              className="flex items-center gap-2 rounded-xl border px-3.5 py-2"
+              style={{
+                borderColor: connected ? "rgba(0,230,118,.3)" : "rgba(225,6,0,.3)",
+                background: connected ? "rgba(0,230,118,.06)" : "rgba(225,6,0,.06)",
+              }}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{
+                  background: connected ? F1.green : F1.red,
+                  animation: connected ? "live-pulse 1.6s infinite" : "none",
+                }}
+              />
+              <span
+                className="f-mono text-[11px] font-bold tracking-wider"
+                style={{ color: connected ? F1.green : "#ff6a52" }}
+              >
+                {connected ? "LIVE" : "CONNECTING"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -479,8 +531,63 @@ export default function LiveTimingPage() {
           </div>
         )}
 
-        {/* ══════════════════ TIMING TOWER ══════════════════════════════ */}
-        {connected && rows.length > 0 && (
+        {/* ══════════════════ VIEW MODE RENDERER ══════════════════════════════ */}
+        {viewMode === "radio" ? (
+          <div className="max-w-4xl mx-auto">
+            <TeamRadioFeed />
+          </div>
+        ) : viewMode === "split" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8">
+              {/* TIMING TOWER in split */}
+              {connected && rows.length > 0 && (
+                <div
+                  className="relative rounded-2xl border overflow-hidden"
+                  style={{ background: "rgba(18,18,21,.85)", borderColor: "rgba(255,255,255,.08)" }}
+                >
+                  <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
+                  <div
+                    className="flex items-center gap-0 px-4 py-2.5 border-b text-[10px] f-mono tracking-widest uppercase select-none sticky top-0 z-10"
+                    style={{ borderColor: "rgba(255,255,255,.06)", background: "rgba(16,16,20,.95)" }}
+                  >
+                    <span className={`${COL.POS} text-zinc-500`}>POS</span>
+                    <span className={`${COL.DRIVER} text-zinc-500`}>DRIVER</span>
+                    <span className={`${COL.GAP} text-right text-zinc-500`}>GAP</span>
+                    <span className={`${COL.LAST} text-right text-zinc-500`}>LAST</span>
+                    <span className={`${COL.TYRE} text-center text-zinc-500`}>TYRE</span>
+                    <span className={`${COL.DRS} text-center text-zinc-500`}>DRS</span>
+                  </div>
+                  <div className="max-h-[500px] overflow-y-auto">
+                    {rows.map((row) => {
+                      const isP1 = row.position === 1;
+                      const tSpec = tyreSpec(row.tyreCompound);
+                      return (
+                        <div
+                          key={row.driverName}
+                          className="flex items-center gap-0 px-4 py-2 border-b text-xs f-mono hover:bg-white/[0.04] transition-colors"
+                          style={{ borderColor: "rgba(255,255,255,.04)" }}
+                        >
+                          <span className={`${COL.POS} font-black ${isP1 ? "text-amber-400" : "text-white"}`}>P{row.position}</span>
+                          <div className={`${COL.DRIVER} flex items-center gap-2 min-w-0`}>
+                            <span className="w-1.5 h-3.5 rounded-full" style={{ background: row.teamColor }} />
+                            <span className="font-bold text-white truncate">{row.driverName}</span>
+                          </div>
+                          <span className={`${COL.GAP} text-right font-bold ${isP1 ? "text-amber-400" : "text-zinc-300"}`}>{isP1 ? "LEADER" : `+${row.gapToLeader.toFixed(3)}`}</span>
+                          <span className={`${COL.LAST} text-right text-zinc-400`}>{row.lastLap > 0 ? `${Math.floor(row.lastLap/60)}:${(row.lastLap%60).toFixed(3)}` : "—"}</span>
+                          <span className={`${COL.TYRE} text-center font-bold`} style={{ color: tSpec.color }}>{tSpec.letter} ({row.tyreAge}L)</span>
+                          <span className={`${COL.DRS} text-center ${row.drsActive ? "text-emerald-400 font-bold" : "text-zinc-700"}`}>{row.drsActive ? "DRS" : "—"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="lg:col-span-4">
+              <TeamRadioFeed />
+            </div>
+          </div>
+        ) : connected && rows.length > 0 ? (
           <div
             className="relative rounded-2xl border overflow-hidden"
             style={{ background: "rgba(18,18,21,.85)", borderColor: "rgba(255,255,255,.08)" }}
@@ -721,7 +828,7 @@ export default function LiveTimingPage() {
               </span>
             </div>
           </div>
-        )}
+        ) : null}
 
         <p className="text-center f-mono text-[10px] text-zinc-700 mt-6 tracking-widest">
           F1 PITWALL · LIVE TIMING
