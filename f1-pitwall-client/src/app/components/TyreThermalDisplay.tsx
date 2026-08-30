@@ -1,24 +1,48 @@
 "use client";
 
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { tyre as tyreSpec } from "../lib/f1-theme";
+import type { TrackSample } from "../types/f1";
 
+/**
+ * A modelled reading for one corner of the car.
+ *
+ * No public feed publishes per-wheel tyre data — OpenF1 and the timing feeds carry a single bulk
+ * temperature per car and nothing else — so the four corners here are a model, not measurements.
+ * What the model is fed is real: the measured bulk temperature, the stint age, and the circuit's
+ * own corner balance read off a traced lap. The panel says so on its face.
+ */
 interface WheelThermalData {
   inner: number;
   middle: number;
   outer: number;
-  carcass: number;
-  pressurePsi: number;
+  /** Share of the lap's load this corner of the car carries, 0–1. */
+  loadShare: number;
   wearPct: number;
 }
 
 interface TyreThermalDisplayProps {
   compound?: string;
-  baseTemp?: number;
+  /** Bulk tyre temperature from the live feed — the one temperature that is actually measured. */
+  measuredTempC?: number;
   tyreAge?: number;
   driverName?: string;
+  /**
+   * The circuit's traced lap. Its corner balance decides which side of the car works hardest, and
+   * its braking-to-traction split decides how the load falls between front and rear.
+   */
+  trace?: TrackSample[];
   className?: string;
 }
+
+/** Representative stint lengths per compound, used to turn stint age into remaining tread. */
+const COMPOUND_LIFE_LAPS: Record<string, number> = {
+  SOFT: 20, MEDIUM: 30, HARD: 40, INTERMEDIATE: 25, INTER: 25, WET: 30,
+};
+
+/** How far the hardest-worked corner runs from the measured bulk temperature, in °C. */
+const TEMP_SPREAD = 6;
 
 function getThermalColor(temp: number): { color: string; status: string } {
   if (temp < 88) return { color: "#3B82F6", status: "COLD" };
@@ -26,6 +50,42 @@ function getThermalColor(temp: number): { color: string; status: string } {
   if (temp <= 112) return { color: "#FACC15", status: "WARM" };
   if (temp <= 120) return { color: "#FB923C", status: "HOT" };
   return { color: "#EF4444", status: "OVERHEAT" };
+}
+
+/**
+ * How the lap divides its work between the two sides and the two ends of the car.
+ *
+ * Right-hand corners load the left-hand tyres and braking loads the front, so the shares below are
+ * read straight off the traced lap: the cornering load in each direction, and the split between
+ * time spent slowing down and time spent accelerating.
+ */
+function loadBalance(trace: TrackSample[]) {
+  let leftCorners = 0;
+  let rightCorners = 0;
+  let braking = 0;
+  let traction = 0;
+
+  for (const s of trace) {
+    if (s.lateralG >= 0) rightCorners += s.lateralG;
+    else leftCorners += -s.lateralG;
+    if (s.longitudinalG < 0) braking += -s.longitudinalG;
+    else traction += s.longitudinalG;
+  }
+
+  const cornering = leftCorners + rightCorners;
+  const longitudinal = braking + traction;
+  if (cornering <= 0 || longitudinal <= 0) {
+    return { left: 0.5, right: 0.5, front: 0.5, rear: 0.5, measured: false };
+  }
+
+  return {
+    // A right-hander leans the car onto its left-hand tyres, hence the crossover.
+    left: rightCorners / cornering,
+    right: leftCorners / cornering,
+    front: braking / longitudinal,
+    rear: traction / longitudinal,
+    measured: true,
+  };
 }
 
 function SingleWheel({
@@ -57,7 +117,6 @@ function SingleWheel({
         </span>
       </div>
 
-      {/* 3D-styled Tyre Cross-section with 3 thermal bands */}
       <div className="relative w-28 h-20 bg-zinc-950 rounded-xl border border-zinc-800 p-1.5 flex flex-col justify-between shadow-inner">
         {/* Compound Ring accent */}
         <div
@@ -95,17 +154,17 @@ function SingleWheel({
           </div>
         </div>
 
-        {/* Pressure & Carcass */}
+        {/* Share of the lap's load this corner carries */}
         <div className="flex items-center justify-between text-[9px] f-mono text-zinc-400 px-1 pt-1">
-          <span>{data.pressurePsi} PSI</span>
-          <span className="text-zinc-500">CARC: {data.carcass}°C</span>
+          <span className="text-zinc-500">LOAD SHARE</span>
+          <span className="font-bold text-white">{Math.round(data.loadShare * 100)}%</span>
         </div>
       </div>
 
       {/* Wear Bar */}
       <div className="w-full mt-2 space-y-1">
         <div className="flex items-center justify-between text-[9px] f-mono text-zinc-500">
-          <span>TREAD WEAR</span>
+          <span>TREAD LEFT</span>
           <span className="font-bold text-white">{data.wearPct}%</span>
         </div>
         <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
@@ -126,51 +185,44 @@ function SingleWheel({
 
 export default function TyreThermalDisplay({
   compound = "SOFT",
-  baseTemp = 101,
-  tyreAge = 12,
+  measuredTempC = 100,
+  tyreAge = 0,
   driverName,
+  trace = [],
   className = "",
 }: TyreThermalDisplayProps) {
   const spec = tyreSpec(compound);
+  const balance = useMemo(() => loadBalance(trace), [trace]);
 
-  // Simulated 4-corner tyre physics based on baseTemp and tyre age
-  const wear = Math.max(15, 100 - tyreAge * 3.8);
+  const wheels = useMemo(() => {
+    const life = COMPOUND_LIFE_LAPS[(compound || "").toUpperCase()] ?? 30;
 
-  const fl: WheelThermalData = {
-    inner: baseTemp + 4,
-    middle: baseTemp + 1,
-    outer: baseTemp - 2,
-    carcass: baseTemp + 2,
-    pressurePsi: 23.2,
-    wearPct: Math.round(wear - 3),
-  };
+    const build = (side: number, end: number): WheelThermalData => {
+      // Both shares sit either side of a half; averaging them keeps the neutral case neutral.
+      const loadShare = (side + end) / 2;
+      const middle = Math.round(measuredTempC + TEMP_SPREAD * (loadShare - 0.5) * 2);
+      // The inside shoulder does the cornering work, so it runs hottest on the busiest corners.
+      const shoulder = Math.round(1 + 5 * loadShare);
 
-  const fr: WheelThermalData = {
-    inner: baseTemp + 5,
-    middle: baseTemp + 3,
-    outer: baseTemp,
-    carcass: baseTemp + 3,
-    pressurePsi: 23.4,
-    wearPct: Math.round(wear - 5),
-  };
+      // A harder-worked corner wears through its stint faster than a lightly loaded one.
+      const used = (tyreAge / life) * (0.8 + 0.4 * loadShare * 2);
 
-  const rl: WheelThermalData = {
-    inner: baseTemp + 2,
-    middle: baseTemp - 1,
-    outer: baseTemp - 3,
-    carcass: baseTemp,
-    pressurePsi: 21.8,
-    wearPct: Math.round(wear + 2),
-  };
+      return {
+        inner: middle + shoulder,
+        middle,
+        outer: middle - shoulder,
+        loadShare,
+        wearPct: Math.max(0, Math.min(100, Math.round(100 * (1 - used)))),
+      };
+    };
 
-  const rr: WheelThermalData = {
-    inner: baseTemp + 3,
-    middle: baseTemp,
-    outer: baseTemp - 2,
-    carcass: baseTemp + 1,
-    pressurePsi: 22.0,
-    wearPct: Math.round(wear),
-  };
+    return {
+      fl: build(balance.left, balance.front),
+      fr: build(balance.right, balance.front),
+      rl: build(balance.left, balance.rear),
+      rr: build(balance.right, balance.rear),
+    };
+  }, [balance, compound, measuredTempC, tyreAge]);
 
   return (
     <div className={`p-5 rounded-3xl bg-zinc-950/90 border border-zinc-800 shadow-2xl backdrop-blur-xl ${className}`}>
@@ -188,19 +240,25 @@ export default function TyreThermalDisplay({
             {spec.letter}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="f-cond font-black text-sm uppercase text-white tracking-wider">
-                4-WHEEL TYRE THERMAL MATRIX
+                4-WHEEL TYRE THERMAL MODEL
               </h3>
+              <span className="px-2 py-0.5 rounded-full bg-amber-950/60 border border-amber-700/60 text-[10px] f-mono font-bold text-amber-400">
+                MODELLED
+              </span>
               <span className="px-2 py-0.5 rounded-full bg-zinc-900 text-[10px] f-mono font-bold text-zinc-400">
                 {compound} · {tyreAge} LAPS
               </span>
             </div>
-            {driverName && <p className="text-[10px] f-mono text-zinc-500">Live telemetry: {driverName}</p>}
+            {driverName && (
+              <p className="text-[10px] f-mono text-zinc-500">
+                Bulk temperature {Math.round(measuredTempC)}°C · {driverName}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Operating Window Badge */}
         <div className="text-right">
           <span className="text-[9px] f-mono text-zinc-500 uppercase block">OPTIMAL WINDOW</span>
           <span className="text-xs f-mono font-bold text-emerald-400">95°C – 105°C</span>
@@ -218,18 +276,20 @@ export default function TyreThermalDisplay({
           </div>
         </div>
 
-        {/* Front Left */}
-        <SingleWheel label="Front Left" position="FL" data={fl} specColor={spec.color} />
-
-        {/* Front Right */}
-        <SingleWheel label="Front Right" position="FR" data={fr} specColor={spec.color} />
-
-        {/* Rear Left */}
-        <SingleWheel label="Rear Left" position="RL" data={rl} specColor={spec.color} />
-
-        {/* Rear Right */}
-        <SingleWheel label="Rear Right" position="RR" data={rr} specColor={spec.color} />
+        <SingleWheel label="Front Left" position="FL" data={wheels.fl} specColor={spec.color} />
+        <SingleWheel label="Front Right" position="FR" data={wheels.fr} specColor={spec.color} />
+        <SingleWheel label="Rear Left" position="RL" data={wheels.rl} specColor={spec.color} />
+        <SingleWheel label="Rear Right" position="RR" data={wheels.rr} specColor={spec.color} />
       </div>
+
+      <p className="mt-4 pt-3 border-t border-zinc-800/60 f-mono text-[9px] text-zinc-500 leading-relaxed">
+        No public feed publishes per-wheel tyre data. These four corners are modelled from the
+        measured bulk temperature, the stint age, and{" "}
+        {balance.measured
+          ? "this circuit's own corner balance, read off a traced lap."
+          : "an even load split — no traced lap is available for this circuit."}{" "}
+        Treat them as an estimate, not a reading.
+      </p>
     </div>
   );
 }
