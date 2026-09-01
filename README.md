@@ -138,12 +138,12 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 | `JWT_SECRET` | Yes (prod) | `f1-pitwall-super-secret-key-...` | HS256 signing key — min 32 characters |
 | `ADMIN_PASSWORD` | No | `REDACTED` | Password seeded for the `admin` user on first startup |
 | `ENGINEER_PASSWORD` | No | `REDACTED` | Password seeded for the `engineer` user on first startup |
-| `ALLOWED_ORIGINS` | No | `http://localhost:3000` | Comma-separated CORS origins |
+| `ALLOWED_ORIGINS` | No | `http://localhost:3000` | Comma-separated CORS origins — local/self-hosted override only |
+| `FRONTEND_URL` | Yes (prod) | `https://f1-pitwall.vercel.app` | The CORS origin `application-prod.properties` actually reads in production (Render sets this, not `ALLOWED_ORIGINS`) |
 | `GOOGLE_CLIENT_ID` | No (dev) | `dummy-local` | Google OAuth 2.0 client ID |
 | `GOOGLE_CLIENT_SECRET` | No (dev) | `dummy-local` | Google OAuth 2.0 client secret |
 | `RESEND_API_KEY` | No (dev) | (empty — OTP disabled) | Resend API key for OTP email delivery |
 | `RESEND_FROM` | No | `onboarding@resend.dev` | Sender address for OTP emails |
-| `BACKEND_URL` | Yes (prod) | — | Full backend URL for OAuth2 redirect URI |
 | `SPRING_PROFILES_ACTIVE` | No | (defaults) | Set to `prod` in production |
 
 **Production-only database env vars** (read by `application-prod.properties`):
@@ -172,13 +172,13 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 ├── backend/                        # Spring Boot API
 │   ├── src/main/java/backend/
 │   │   ├── config/                 # SecurityConfig, GlobalExceptionHandler, DataSeeder
-│   │   ├── controller/             # 18 REST controllers
+│   │   ├── controller/             # 22 REST controllers
 │   │   ├── dto/                    # Request/response DTOs
-│   │   ├── model/                  # 21 JPA entities + enums
-│   │   ├── repository/             # 21 Spring Data repositories
+│   │   ├── model/                  # 24 JPA entities + enums
+│   │   ├── repository/             # 24 Spring Data repositories
 │   │   ├── scheduler/              # TelemetrySimulator (1 s tick)
 │   │   ├── security/               # JwtService, JwtAuthenticationFilter, OAuth2SuccessHandler
-│   │   ├── service/                # 18 service classes (business logic + external APIs)
+│   │   ├── service/                # 28 service classes (business logic + external APIs)
 │   │   └── websocket/              # WebSocketConfig, TelemetryPayload
 │   ├── src/main/resources/
 │   │   ├── application.properties       # Default (dev) config
@@ -226,13 +226,14 @@ The following entities exist in the database schema but are **not wired to any A
 
 | Entity | Repository | Notes |
 |---|---|---|
-| `StrategyPlan` | `StrategyPlanRepository` | Pit strategy simulator planned but not built |
+| `StrategyPlan` | `StrategyPlanRepository` | Pit strategy simulator planned but not built (the `/strategy` frontend page computes client-side, with no backend endpoint) |
 | `CarSetup` | `CarSetupRepository` | Setup data model ready, no management UI |
 | `DriverContract` | `DriverContractRepository` | Contract tracking, no UI yet |
 | `Sponsorship` | `SponsorshipRepository` | Sponsor management, no UI yet |
-| `Penalty` | `PenaltyRepository` | Penalty tracking, no UI yet |
 | `Engineer` | `EngineerRepository` | Engineer profiles, no UI yet |
 | `Championship` | `ChampionshipRepository` | Has controller but minimal functionality |
+
+`Penalty` was previously listed here too but now has a full `PenaltyController` (5 endpoints) and `PenaltyService` — no longer orphaned.
 
 These are safe to leave in place (they only add schema weight via `ddl-auto=update`) but are candidates for either building out or removing to keep the codebase lean.
 
