@@ -61,6 +61,18 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Flyway: versioned schema migrations, baselined against the existing
+		     ddl-auto=update schema (see V1__baseline.sql). Spring Boot 4 split Flyway's
+		     autoconfiguration out of spring-boot-autoconfigure into this dedicated starter —
+		     flyway-core alone is not enough to activate FlywayAutoConfiguration. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
