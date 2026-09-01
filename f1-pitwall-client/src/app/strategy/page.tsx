@@ -29,6 +29,16 @@ const STRATEGY_NAMES = ["Strategy A", "Strategy B", "Strategy C", "Strategy D", 
 interface Stint    { id: string; tyre: TyreType; laps: number; }
 interface Strategy { id: string; name: string; color: string; stints: Stint[]; }
 
+/** A strategy plan saved on the backend for a circuit's most recent race — see StrategyPlanController. */
+interface SavedPlan {
+  id: number;
+  planName: string;
+  plannedStops: number;
+  plannedCompounds: string;
+  stints: { tyre: string; laps: number }[];
+  raceName: string;
+}
+
 // ─── pure helpers ─────────────────────────────────────────────────────────────
 function calcRaceTime(stints: Stint[], base: number): number {
   let total = 0;
@@ -192,6 +202,8 @@ export default function StrategyPage() {
   ]);
   const [loading, setLoading] = useState(true);
   const [hoveredStrat, setHoveredStrat] = useState<string | null>(null);
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   // ── auth + data fetch ───────────────────────────────────────────────────────
   // loading starts true, so the mount effect fetches directly without the
@@ -206,6 +218,18 @@ export default function StrategyPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Plans are saved against a circuit's most recent race (StrategyPlanController resolves
+  // that server-side) — reload whenever the viewer switches circuits.
+  useEffect(() => {
+    if (!selectedCircuit) { setSavedPlans([]); return; }
+    let cancelled = false;
+    authFetch(`${API}/api/strategy/circuit/${selectedCircuit.id}`)
+      .then(r => r.json())
+      .then((data: SavedPlan[]) => { if (!cancelled) setSavedPlans(data); })
+      .catch(() => { if (!cancelled) setSavedPlans([]); });
+    return () => { cancelled = true; };
+  }, [selectedCircuit]);
 
   // ── derived values ─────────────────────────────────────────────────────────
   const totalLaps = selectedCircuit?.totalLaps || 57;
@@ -260,6 +284,52 @@ export default function StrategyPage() {
   const updateStint = (stratId: string, stintId: string, field: keyof Stint, value: Stint[keyof Stint]) => {
     setStrategies(prev => prev.map(s => s.id !== stratId ? s :
       { ...s, stints: s.stints.map(st => st.id === stintId ? { ...st, [field]: value } : st) }));
+  };
+
+  // ── save / load persisted plans ─────────────────────────────────────────────
+  const saveStrategy = async (strategy: Strategy) => {
+    if (!selectedCircuit) return;
+    setSavingId(strategy.id);
+    try {
+      const synced = syncStrategyLaps(strategy);
+      await authFetch(`${API}/api/strategy/circuit/${selectedCircuit.id}`, {
+        method: "POST",
+        body: JSON.stringify({
+          planName: strategy.name,
+          stints: synced.stints.map(st => ({ tyre: st.tyre, laps: st.laps })),
+        }),
+      });
+      const res = await authFetch(`${API}/api/strategy/circuit/${selectedCircuit.id}`);
+      setSavedPlans(await res.json());
+    } catch (e) {
+      console.error("Failed to save strategy:", e);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const loadPlan = (plan: SavedPlan) => {
+    if (strategies.length >= 5) return;
+    const idx = strategies.length;
+    setStrategies(prev => [...prev, {
+      id: `s${Date.now()}`,
+      name: plan.planName,
+      color: STRATEGY_COLORS[idx],
+      stints: plan.stints.map((st, i) => ({
+        id: `st${Date.now()}${i}`,
+        tyre: (st.tyre in TYRE_PERF ? st.tyre : "HARD") as TyreType,
+        laps: st.laps,
+      })),
+    }]);
+  };
+
+  const deletePlan = async (id: number) => {
+    try {
+      await authFetch(`${API}/api/strategy/${id}`, { method: "DELETE" });
+      setSavedPlans(prev => prev.filter(p => p.id !== id));
+    } catch (e) {
+      console.error("Failed to delete saved strategy:", e);
+    }
   };
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -369,6 +439,60 @@ export default function StrategyPage() {
                 </div>
               </motion.div>
 
+              {/* Saved strategies for this circuit's latest race */}
+              {selectedCircuit && (
+                <motion.div
+                  className="relative rounded-2xl overflow-hidden border"
+                  style={{ background: F1.card, borderColor: F1.hairline }}
+                  initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.08 }}
+                >
+                  <div className="h-[3px] w-full" style={{ background: `linear-gradient(90deg,${F1.green},transparent)` }} />
+                  <div className="p-5">
+                    <p className="f-mono text-[10px] tracking-[0.3em] text-zinc-500 mb-3 uppercase">Saved Strategies</p>
+                    {savedPlans.length === 0 ? (
+                      <p className="f-mono text-[11px] text-zinc-600">
+                        None yet — 💾 a strategy card to save it here.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {savedPlans.map(plan => (
+                          <div
+                            key={plan.id}
+                            className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 border"
+                            style={{ background: "rgba(255,255,255,0.03)", borderColor: F1.hairline }}
+                          >
+                            <div className="min-w-0">
+                              <p className="f-cond font-bold text-sm text-white truncate">{plan.planName}</p>
+                              <p className="f-mono text-[9px] text-zinc-600 tracking-wide">
+                                {plan.plannedStops} stop{plan.plannedStops === 1 ? "" : "s"} · {plan.plannedCompounds}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                onClick={() => loadPlan(plan)}
+                                disabled={strategies.length >= 5}
+                                title="Load into simulator"
+                                className="f-mono text-[10px] px-2 py-1 rounded text-emerald-400 hover:bg-emerald-400/10 transition-colors disabled:opacity-30"
+                              >
+                                LOAD
+                              </button>
+                              <button
+                                onClick={() => deletePlan(plan.id)}
+                                title="Delete"
+                                className="text-zinc-700 hover:text-red-400 transition-colors text-sm w-5 h-5 flex items-center justify-center rounded hover:bg-red-400/10"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
               {/* Tyre compound reference */}
               <motion.div
                 className="relative rounded-2xl overflow-hidden border"
@@ -437,12 +561,22 @@ export default function StrategyPage() {
                               </span>
                             )}
                           </div>
-                          <button
-                            onClick={() => removeStrategy(strategy.id)}
-                            className="text-zinc-700 hover:text-red-400 transition-colors text-lg leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-red-400/10"
-                          >
-                            ×
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => saveStrategy(strategy)}
+                              disabled={!selectedCircuit || savingId === strategy.id}
+                              title="Save this strategy to the circuit's latest race"
+                              className="text-zinc-700 hover:text-emerald-400 transition-colors text-sm leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-emerald-400/10 disabled:opacity-30"
+                            >
+                              {savingId === strategy.id ? "…" : "💾"}
+                            </button>
+                            <button
+                              onClick={() => removeStrategy(strategy.id)}
+                              className="text-zinc-700 hover:text-red-400 transition-colors text-lg leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-red-400/10"
+                            >
+                              ×
+                            </button>
+                          </div>
                         </div>
 
                         {/* Stint editors */}
