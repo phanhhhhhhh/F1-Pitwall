@@ -65,7 +65,7 @@ Render (backend Docker + PostgreSQL) · Vercel (frontend edge) · Supabase Stora
 ## Prerequisites
 
 - Java 21+
-- Node.js 18+
+- Node.js 22.22+ (jsdom 30, used by `npm test`, doesn't run on Node 20 or earlier)
 - PostgreSQL 15 (or Docker Desktop)
 - Maven 3.9+
 
