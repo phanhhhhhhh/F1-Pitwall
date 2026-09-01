@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { playRadioChirp, isSoundEnabled } from "../lib/f1-sound";
+import { playRadioChirp } from "../lib/f1-sound";
 import { getTeamColor } from "../lib/f1-theme";
 
 export interface RadioTransmission {
@@ -20,7 +20,12 @@ export interface RadioTransmission {
   urgency?: "HIGH" | "MEDIUM" | "NORMAL";
 }
 
-const MOCK_RADIO_FEED: RadioTransmission[] = [
+/**
+ * No public API publishes team radio transcripts (OpenF1's team_radio endpoint is audio-only,
+ * with no transcript). This feed is invented sample dialogue, not sourced from any race — the
+ * "SIMULATED" badge below says so on its face.
+ */
+const SAMPLE_RADIO_FEED: RadioTransmission[] = [
   {
     id: "r-1",
     driverName: "Max Verstappen",
@@ -151,9 +156,9 @@ function AudioWaveform({ isPlaying, color }: { isPlaying: boolean; color: string
 }
 
 export default function TeamRadioFeed({ className = "" }: { className?: string }) {
-  const [transmissions, setTransmissions] = useState<RadioTransmission[]>(MOCK_RADIO_FEED);
+  const transmissions = SAMPLE_RADIO_FEED;
   const [activeTransmission, setActiveTransmission] = useState<RadioTransmission | null>(
-    MOCK_RADIO_FEED[0]
+    SAMPLE_RADIO_FEED[0]
   );
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("ALL");
@@ -198,12 +203,12 @@ export default function TeamRadioFeed({ className = "" }: { className?: string }
               <span className="f-cond font-black text-sm uppercase tracking-wider text-white">
                 TEAM RADIO COMM FREQUENCY
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-[10px] f-mono font-bold text-emerald-400">
-                LIVE INTERCEPT
+              <span className="px-2 py-0.5 rounded-full bg-amber-950 border border-amber-800 text-[10px] f-mono font-bold text-amber-400">
+                SIMULATED
               </span>
             </div>
             <p className="f-mono text-[10px] text-zinc-400">
-              Encrypted 868MHz Team-to-Pitwall Radio Transmissions
+              Sample dialogue — no public feed publishes real radio transcripts
             </p>
           </div>
         </div>
