@@ -137,33 +137,6 @@ function DetailChart({
   );
 }
 
-function GaugeBar({ value, max, color, label, unit = "%", optimal }: {
-  value: number; max: number; color: string; label: string; unit?: string;
-  optimal?: [number, number];
-}) {
-  const pct = Math.min((value / max) * 100, 100);
-  const inWindow = optimal ? value >= optimal[0] && value <= optimal[1] : true;
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-1.5">
-        <span className="f-mono text-[10px] tracking-widest text-zinc-500">{label}</span>
-        <span className="f-cond font-black text-lg tabular-nums" style={{ color }}>
-          {value.toFixed(0)}<span className="text-[10px] text-zinc-600 ml-0.5 f-mono">{unit}</span>
-        </span>
-      </div>
-      <div className="h-2 rounded-full overflow-hidden relative" style={{ background: "rgba(255,255,255,.06)" }}>
-        <motion.div className="h-full rounded-full"
-          initial={false} animate={{ width: `${pct}%` }}
-          transition={{ type: "spring", stiffness: 140, damping: 22 }}
-          style={{ background: `linear-gradient(90deg,${color}99,${color})`, boxShadow: `0 0 10px ${color}70` }} />
-        {optimal && !inWindow && (
-          <span className="absolute top-1/2 -translate-y-1/2 right-1 w-1.5 h-1.5 rounded-full bg-[#FFD200]" />
-        )}
-      </div>
-    </div>
-  );
-}
-
 function TyreChip({ type, size = "sm" }: { type: string; size?: "sm" | "lg" }) {
   const t = tyreSpec(type);
   const dim = size === "lg" ? "w-7 h-7 text-sm" : "w-5 h-5 text-[10px]";
@@ -225,8 +198,6 @@ export default function TelemetryPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<"single" | "compare" | "radar" | "tyres">("single");
   const [speedHistory, setSpeedHistory] = useState<Record<string, number[]>>({});
-  const [rpmHistory, setRpmHistory] = useState<Record<string, number[]>>({});
-  const [throttleHistory, setThrottleHistory] = useState<Record<string, number[]>>({});
   const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
   const [liveTyreData, setLiveTyreData] = useState<LiveTyreData[]>([]);
   const [circuits, setCircuits] = useState<CircuitInfo[]>([]);
@@ -246,8 +217,6 @@ export default function TelemetryPage() {
           const data: TelemetryData[] = JSON.parse(msg.body);
           setDrivers(data);
           setSpeedHistory(prev => { const n = { ...prev }; data.forEach(d => { n[d.driverName] = [...(n[d.driverName] || []).slice(-(MAX_HISTORY - 1)), d.speed]; }); return n; });
-          setRpmHistory(prev => { const n = { ...prev }; data.forEach(d => { n[d.driverName] = [...(n[d.driverName] || []).slice(-(MAX_HISTORY - 1)), d.rpm]; }); return n; });
-          setThrottleHistory(prev => { const n = { ...prev }; data.forEach(d => { n[d.driverName] = [...(n[d.driverName] || []).slice(-(MAX_HISTORY - 1)), d.throttle]; }); return n; });
         });
       }, () => setConnected(false));
       stompRef.current = stompClient;
@@ -323,6 +292,24 @@ export default function TelemetryPage() {
 
   const singleSpeedSeries: SeriesPoint[] =
     ((selectedDriver && speedHistory[selectedDriver.driverName]) || []).map((v, i) => ({ i, a: v }));
+
+  /**
+   * Tyres tab data source: real compound/age/stint from OpenF1 during a live session,
+   * falling back to the telemetry simulator otherwise (per the README's documented behaviour).
+   * `lap` here doubles as tyre age — real for live data, race-lap-as-proxy for the simulator.
+   */
+  const tyreCards: { carNumber: number; position: number; driverName: string; teamName: string; teamColor: string; tyreType: string; lap: number }[] =
+    liveStatus?.isLive && liveTyreData.length > 0
+      ? liveTyreData.map(t => ({
+          carNumber: t.driverNumber,
+          position: t.position,
+          driverName: t.driverName,
+          teamName: t.teamName,
+          teamColor: t.teamColor,
+          tyreType: t.tyreCompound,
+          lap: t.tyreAge,
+        }))
+      : drivers;
 
   const MODES: { key: "single" | "compare" | "radar" | "tyres"; label: string }[] = [
     { key: "single", label: "STEERING & CAR" },
@@ -434,7 +421,7 @@ export default function TelemetryPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 {["SOFT", "MEDIUM", "HARD", "INTERMEDIATE"].map((compound, i) => {
                   const spec = tyreSpec(compound);
-                  const count = drivers.filter(d => (d.tyreType || "").toUpperCase() === compound).length;
+                  const count = tyreCards.filter(d => (d.tyreType || "").toUpperCase() === compound).length;
                   return (
                     <motion.div key={compound} variants={STAGGER} custom={i} initial="hidden" animate="show"
                       className="relative rounded-2xl border border-zinc-800 bg-black/60 overflow-hidden px-4 py-3.5 shadow-xl">
@@ -452,7 +439,7 @@ export default function TelemetryPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {[...drivers].sort((a, b) => a.position - b.position).map((d, idx) => {
+                {[...tyreCards].sort((a, b) => a.position - b.position).map((d, idx) => {
                   const col = getTeamColor(d.teamName, d.teamColor);
                   const spec = tyreSpec(d.tyreType);
                   const maxLaps = maxLapsFor(d.tyreType);
