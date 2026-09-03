@@ -69,7 +69,7 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
     return (
       <Link href={item.href}
         className={`f-mono px-3.5 py-4 text-[11px] font-bold tracking-[0.15em] border-b-2 transition-all flex items-center gap-1.5 ${active
-          ? "border-[#E10600] text-white"
+          ? "border-[#E10600] text-white shadow-[0_2px_10px_rgba(225,6,0,0.4)]"
           : "border-transparent text-zinc-400 hover:text-zinc-100 hover:border-zinc-700"
           }`}>
         {item.live && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />}
@@ -81,25 +81,25 @@ function NavDropdown({ group, pathname }: { group: typeof navGroups[0]; pathname
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(p => !p)}
-        className={`f-mono px-3.5 py-4 text-[11px] font-bold tracking-[0.15em] border-b-2 transition-all flex items-center gap-1.5 ${isActive ? "border-[#E10600] text-white" : "border-transparent text-zinc-400 hover:text-zinc-100 hover:border-zinc-700"
+        className={`f-mono px-3.5 py-4 text-[11px] font-bold tracking-[0.15em] border-b-2 transition-all flex items-center gap-1.5 ${isActive ? "border-[#E10600] text-white shadow-[0_2px_10px_rgba(225,6,0,0.3)]" : "border-transparent text-zinc-400 hover:text-zinc-100 hover:border-zinc-700"
           }`}>
         {group.label}
-        <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-180 text-[#E10600]" : "text-zinc-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/70 rounded-xl shadow-2xl z-50 overflow-hidden min-w-48">
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-[#E10600] to-transparent" />
+        <div className="absolute top-full left-0 mt-1 bg-zinc-950/95 backdrop-blur-2xl border border-zinc-800 hover:border-zinc-700 rounded-2xl shadow-2xl z-50 overflow-hidden min-w-52 p-1.5 dropdown-in">
+          <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#E10600] to-transparent shadow-[0_0_8px_#E10600] mb-1" />
           {group.items.map(item => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-                className={`f-cond flex items-center gap-2 px-4 py-3 text-sm font-bold transition-colors border-l-2 ${active
-                  ? "border-[#E10600] text-white bg-white/[0.04]"
-                  : "border-transparent text-zinc-400 hover:text-white hover:bg-white/[0.03] hover:border-zinc-600"
+                className={`f-cond flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all ${active
+                  ? "border border-[#E10600]/40 text-white bg-[#E10600]/10 shadow-[inset_0_0_12px_rgba(225,6,0,0.15)]"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.05]"
                   }`}>
-                {item.live && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />}
+                {item.live && <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] live-pulse flex-shrink-0" />}
                 {item.label}
               </Link>
             );
@@ -208,11 +208,11 @@ export default function Navbar() {
           {/* Quick Command Palette Search Button */}
           <button
             onClick={() => setPaletteOpen(true)}
-            className="flex items-center gap-2 bg-black/50 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-600 rounded-xl px-2.5 py-1.5 transition-all text-zinc-400 hover:text-white group"
+            className="flex items-center gap-2 bg-black/60 hover:bg-zinc-900 border border-zinc-800 hover:border-[#E10600]/40 rounded-xl px-2.5 py-1.5 transition-all text-zinc-400 hover:text-white group shadow-sm hover:shadow-[0_0_12px_rgba(225,6,0,0.2)]"
             title="Open Command Palette (Ctrl+K)"
           >
             <span className="text-xs">🔍</span>
-            <span className="f-mono text-[10px] hidden sm:block font-bold">SEARCH</span>
+            <span className="f-mono text-[10px] hidden sm:block font-bold tracking-wider">SEARCH</span>
             <kbd className="hidden lg:inline-block px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[9px] f-mono text-zinc-400 group-hover:text-zinc-200">
               Ctrl+K
             </kbd>
@@ -222,10 +222,10 @@ export default function Navbar() {
           <button
             onClick={toggleSound}
             title={soundOn ? "Mute F1 Audio FX" : "Unmute F1 Audio FX"}
-            className={`p-1.5 rounded-lg border transition-all flex items-center justify-center ${
+            className={`p-1.5 rounded-xl border transition-all flex items-center justify-center ${
               soundOn
-                ? "bg-zinc-800/80 text-emerald-400 border-emerald-500/30 hover:bg-zinc-700"
-                : "bg-zinc-900/60 text-zinc-600 border-zinc-800 hover:text-zinc-400"
+                ? "bg-zinc-900/90 text-emerald-400 border-emerald-500/40 hover:bg-zinc-800 shadow-[0_0_10px_rgba(0,230,118,0.2)]"
+                : "bg-zinc-950 text-zinc-600 border-zinc-800 hover:text-zinc-400"
             }`}
           >
             {soundOn ? (
@@ -244,8 +244,8 @@ export default function Navbar() {
           <SeasonSelector />
 
           {/* Live STOMP Indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse" />
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/40 border border-emerald-500/30 shadow-[0_0_12px_rgba(0,230,118,0.15)]">
+            <span className="w-2 h-2 rounded-full bg-[#00E676] live-pulse" />
             <span className="f-mono text-emerald-400 font-bold text-[10px] tracking-widest">LIVE</span>
           </div>
 

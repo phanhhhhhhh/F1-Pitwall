@@ -41,20 +41,20 @@ function TeamCard({ team, drivers, idx }: { team: TeamInfo; drivers: DriverCard[
     >
       <div
         className="absolute inset-0 rounded-3xl transition-opacity duration-500 pointer-events-none"
-        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 44px ${col}30` }}
+        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 44px ${col}35` }}
       />
       <div
-        className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/90 to-black/95 p-6 shadow-xl"
+        className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/95 via-zinc-950/98 to-black p-6 sm:p-7 shadow-xl"
         style={{
-          borderColor: hov ? `${col}80` : "rgba(255,255,255,.08)",
-          transform: hov ? "translateY(-5px)" : "none",
+          borderColor: hov ? `${col}90` : "rgba(255,255,255,.08)",
+          transform: hov ? "translateY(-6px)" : "none",
         }}
       >
-        <div className="h-1 w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
+        <div className="h-1 w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 14px ${col}` }} />
         
         {/* Championship watermark */}
         <div
-          className="absolute right-3 top-4 f-cond font-black select-none pointer-events-none transition-all duration-500 text-8xl"
+          className="absolute right-4 top-4 f-orbitron font-black select-none pointer-events-none transition-all duration-500 text-8xl"
           style={{
             lineHeight: 0.8,
             color: col,
@@ -69,46 +69,46 @@ function TeamCard({ team, drivers, idx }: { team: TeamInfo; drivers: DriverCard[
           <div className="flex items-start justify-between mb-5">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="f-orbitron text-[10px] text-zinc-400 border border-zinc-700/80 px-2 py-0.5 rounded-lg bg-black/40">
+                <span className="f-orbitron text-[10px] text-zinc-300 border border-white/10 px-2 py-0.5 rounded-lg bg-black/60 font-bold">
                   RANK #{idx + 1}
                 </span>
-                <span className="text-base">{COUNTRY_FLAGS[team.country] || "🏁"}</span>
+                <span className="text-base drop-shadow">{COUNTRY_FLAGS[team.country] || "🏁"}</span>
                 <span className="f-mono text-[11px] text-zinc-400 font-bold">{team.country}</span>
               </div>
-              <h2 className="f-cond font-black text-3xl uppercase tracking-tight text-white transition-colors" style={{ color: hov ? col : "#fff" }}>
+              <h2 className="f-cond font-black text-3xl sm:text-4xl uppercase tracking-tight text-white transition-colors" style={{ color: hov ? col : "#fff" }}>
                 {team.name}
               </h2>
-              <p className="f-mono text-[11px] text-zinc-400 mt-1 font-semibold">
+              <p className="f-mono text-xs text-zinc-400 mt-1 font-semibold">
                 EST. {team.foundedYear} · {team.base}
               </p>
             </div>
             <div className="text-right">
-              <p className="f-orbitron font-black text-4xl tabular-nums leading-none" style={{ color: col }}>
+              <p className="f-orbitron font-black text-4xl sm:text-5xl tabular-nums leading-none" style={{ color: col }}>
                 {titles}
               </p>
-              <p className="f-mono text-[9px] text-zinc-500 tracking-widest mt-1 uppercase font-bold">WCC TITLES</p>
+              <p className="f-mono text-[9px] text-zinc-500 tracking-widest mt-1 uppercase font-black">WCC TITLES</p>
             </div>
           </div>
 
           {/* Power Unit Spec Pill */}
-          <div className="mb-4 p-2 rounded-xl bg-black/40 border border-zinc-800 flex items-center justify-between text-[11px] f-mono">
-            <span className="text-zinc-500">POWER UNIT</span>
-            <span className="font-bold text-zinc-200">{engine}</span>
+          <div className="mb-4 p-2.5 rounded-2xl bg-black/50 border border-white/5 flex items-center justify-between text-xs f-mono shadow-inner">
+            <span className="text-zinc-500 font-bold">POWER UNIT</span>
+            <span className="font-bold text-zinc-200">⚡ {engine}</span>
           </div>
 
           {/* Driver Lineup */}
           {td.length > 0 && (
-            <div className="flex gap-2 mb-5">
+            <div className="flex gap-2.5 mb-5">
               {td.map((d) => (
                 <div
                   key={d.id}
-                  className="flex items-center gap-2.5 flex-1 rounded-2xl px-3 py-2.5 border transition-all bg-black/40"
+                  className="flex items-center gap-3 flex-1 rounded-2xl px-3.5 py-3 border transition-all bg-black/60 shadow-inner"
                   style={{ borderColor: hov ? `${col}40` : "rgba(255,255,255,.08)" }}
                 >
-                  <span className="text-base flex-shrink-0">{NATIONALITY_FLAGS[d.nationality] || "🏁"}</span>
+                  <span className="text-xl flex-shrink-0 drop-shadow">{NATIONALITY_FLAGS[d.nationality] || "🏁"}</span>
                   <div className="min-w-0">
-                    <p className="f-cond font-bold text-sm text-white truncate uppercase">{d.name.split(" ").pop()}</p>
-                    <p className="f-mono text-[10px] font-bold" style={{ color: col }}>#{d.carNumber}</p>
+                    <p className="f-cond font-bold text-base text-white truncate uppercase">{d.name.split(" ").pop()}</p>
+                    <p className="f-mono text-[10px] font-black" style={{ color: col }}>#{d.carNumber}</p>
                   </div>
                 </div>
               ))}

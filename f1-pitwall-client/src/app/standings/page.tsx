@@ -180,137 +180,167 @@ export default function StandingsPage() {
             )}
 
             {tab === "drivers" ? (
-              <div className="rounded-3xl border border-zinc-800 bg-black/70 overflow-hidden shadow-2xl">
-                <div className="grid grid-cols-12 gap-2 px-6 py-3.5 border-b border-zinc-800 f-mono text-[10px] text-zinc-500 font-bold tracking-widest uppercase">
-                  <div className="col-span-1">POS</div>
-                  <div className="col-span-5 sm:col-span-4">DRIVER</div>
-                  <div className="col-span-3 hidden sm:block">TEAM</div>
-                  <div className="col-span-1 text-center">WINS</div>
-                  <div className="col-span-2 sm:col-span-1 text-right">GAP</div>
-                  <div className="col-span-3 sm:col-span-2 text-right">TOTAL PTS</div>
-                </div>
-
-                {drivers.map((d, i) => {
-                  const col = d.teamColor || "#E10600";
-                  return (
-                    <div
-                      key={d.driverId}
-                      className={`relative grid grid-cols-12 gap-2 px-6 py-4 border-b border-zinc-800/60 transition-colors hover:bg-zinc-900/60 ${
-                        i === 0 ? "bg-red-950/20" : ""
-                      }`}
-                      onMouseEnter={() => setHovered(d.driverId)}
-                      onMouseLeave={() => setHovered(null)}
-                    >
-                      {hovered === d.driverId && (
-                        <div
-                          className="absolute left-0 top-0 bottom-0 w-1"
-                          style={{ background: col, boxShadow: `0 0 10px ${col}` }}
-                        />
-                      )}
-                      <div className="col-span-1 flex items-center">
-                        <span
-                          className="f-orbitron font-black text-xl tabular-nums"
-                          style={{ color: i < 3 ? MEDAL[i] : "#71717a" }}
-                        >
-                          {d.position}
-                        </span>
-                      </div>
-                      <div className="col-span-5 sm:col-span-4 flex items-center gap-3 min-w-0">
-                        <span
-                          className="w-1.5 h-8 rounded-full flex-shrink-0"
-                          style={{ background: col, boxShadow: `0 0 8px ${col}80` }}
-                        />
-                        <div className="min-w-0">
-                          <p className="f-cond font-bold text-base text-white truncate uppercase tracking-wide">
-                            {d.driverName}
-                          </p>
-                          <p className="f-mono text-[10px] font-bold" style={{ color: col }}>
-                            #{d.carNumber}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="col-span-3 hidden sm:flex items-center">
-                        <span
-                          className="f-mono text-xs px-2.5 py-1 rounded-lg font-bold"
-                          style={{ color: col, background: `${col}18` }}
-                        >
-                          {d.teamName}
-                        </span>
-                      </div>
-                      <div className="col-span-1 flex items-center justify-center">
-                        <span className={`f-cond font-bold text-base ${d.wins > 0 ? "text-amber-400" : "text-zinc-600"}`}>
-                          {d.wins}
-                        </span>
-                      </div>
-                      <div className="col-span-2 sm:col-span-1 flex items-center justify-end">
-                        <span className="f-mono text-xs text-zinc-400">
-                          {d.gapToLeader > 0 ? `-${Math.round(d.gapToLeader)}` : "—"}
-                        </span>
-                      </div>
-                      <div className="col-span-3 sm:col-span-2 flex items-center justify-end">
-                        <span
-                          className="f-orbitron font-black text-lg tabular-nums"
-                          style={{ color: i === 0 ? "#E10600" : "#fff" }}
-                        >
-                          <Pts points={d.totalPoints} delay={i * 30} />
-                        </span>
-                      </div>
+              <div className="rounded-3xl border border-white/10 bg-black/80 backdrop-blur-xl overflow-hidden shadow-2xl">
+                <div className="overflow-x-auto">
+                  <div className="min-w-[720px]">
+                    <div className="grid grid-cols-12 gap-2 px-6 py-4 border-b border-white/[0.08] bg-white/[0.02] f-mono text-[10px] text-zinc-400 font-black tracking-widest uppercase select-none">
+                      <div className="col-span-1">POS</div>
+                      <div className="col-span-5 sm:col-span-4">DRIVER & CAR</div>
+                      <div className="col-span-3 hidden sm:block">CONSTRUCTOR</div>
+                      <div className="col-span-1 text-center">WINS</div>
+                      <div className="col-span-2 sm:col-span-1 text-right">GAP</div>
+                      <div className="col-span-3 sm:col-span-2 text-right">TOTAL PTS</div>
                     </div>
-                  );
-                })}
+
+                    {drivers.map((d, i) => {
+                      const col = d.teamColor || "#E10600";
+                      const isTop3 = i < 3;
+                      const medalCol = isTop3 ? MEDAL[i] : "#71717a";
+
+                      return (
+                        <div
+                          key={d.driverId}
+                          className={`relative grid grid-cols-12 gap-2 px-6 py-4 border-b border-white/[0.04] transition-all duration-200 hover:bg-white/[0.04] group ${
+                            i === 0 ? "bg-red-950/20" : ""
+                          }`}
+                          onMouseEnter={() => setHovered(d.driverId)}
+                          onMouseLeave={() => setHovered(null)}
+                        >
+                          {hovered === d.driverId && (
+                            <div
+                              className="absolute left-0 top-0 bottom-0 w-1 shadow-lg"
+                              style={{ background: col, boxShadow: `0 0 12px ${col}` }}
+                            />
+                          )}
+
+                          {/* Position */}
+                          <div className="col-span-1 flex items-center">
+                            <span
+                              className="f-orbitron font-black text-xl tabular-nums leading-none"
+                              style={{ color: medalCol }}
+                            >
+                              {d.position}
+                            </span>
+                          </div>
+
+                          {/* Driver Name & Number */}
+                          <div className="col-span-5 sm:col-span-4 flex items-center gap-3 min-w-0">
+                            <span
+                              className="w-1.5 h-9 rounded-full flex-shrink-0 transition-transform group-hover:scale-y-110"
+                              style={{ background: col, boxShadow: `0 0 10px ${col}80` }}
+                            />
+                            <div className="min-w-0">
+                              <p className="f-cond font-bold text-base text-white truncate uppercase tracking-wide group-hover:text-white">
+                                {d.driverName}
+                              </p>
+                              <p className="f-mono text-[10px] font-black tracking-wider" style={{ color: col }}>
+                                #{d.carNumber}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Constructor */}
+                          <div className="col-span-3 hidden sm:flex items-center">
+                            <span
+                              className="f-mono text-xs px-3 py-1 rounded-xl font-bold border transition-all"
+                              style={{ color: col, borderColor: `${col}30`, background: `${col}15` }}
+                            >
+                              {d.teamName}
+                            </span>
+                          </div>
+
+                          {/* Wins */}
+                          <div className="col-span-1 flex items-center justify-center">
+                            {d.wins > 0 ? (
+                              <span className="f-cond font-black text-base text-amber-400 px-2 py-0.5 rounded-lg bg-amber-950/40 border border-amber-500/30">
+                                🏆 {d.wins}
+                              </span>
+                            ) : (
+                              <span className="f-cond text-zinc-600 font-bold">—</span>
+                            )}
+                          </div>
+
+                          {/* Gap to Leader */}
+                          <div className="col-span-2 sm:col-span-1 flex items-center justify-end">
+                            <span className="f-mono text-xs font-bold text-zinc-400">
+                              {d.gapToLeader > 0 ? `-${Math.round(d.gapToLeader)}` : "LEADER"}
+                            </span>
+                          </div>
+
+                          {/* Total Points */}
+                          <div className="col-span-3 sm:col-span-2 flex items-center justify-end">
+                            <span
+                              className="f-orbitron font-black text-lg sm:text-xl tabular-nums"
+                              style={{ color: i === 0 ? "#E10600" : "#ffffff" }}
+                            >
+                              <Pts points={d.totalPoints} delay={i * 30} />
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
                 {constructors.map((c, i) => {
                   const col = c.teamColor || "#E10600";
+                  const isTop3 = i < 3;
+                  const medalCol = isTop3 ? MEDAL[i] : "#71717a";
+
                   return (
                     <div
                       key={c.teamId}
-                      className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-black/70 p-5 sm:p-6 shadow-xl transition-transform hover:-translate-y-1"
+                      className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-zinc-950/95 via-black to-zinc-950/90 p-5 sm:p-7 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:border-white/20"
                     >
-                      <div className="h-[3px] w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
+                      <div className="h-[3px] w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 14px ${col}` }} />
+                      
                       <div className="flex items-center gap-4 sm:gap-6">
                         <span
-                          className="f-orbitron font-black text-3xl sm:text-4xl tabular-nums w-12 text-center"
-                          style={{ color: i < 3 ? MEDAL[i] : "#71717a" }}
+                          className="f-orbitron font-black text-3xl sm:text-5xl tabular-nums w-12 text-center"
+                          style={{ color: medalCol }}
                         >
                           {c.position}
                         </span>
+
                         <div className="flex-1 min-w-0">
-                          <h2 className="f-cond font-black text-2xl text-white uppercase tracking-wide truncate">
+                          <h2 className="f-cond font-black text-2xl sm:text-3xl text-white uppercase tracking-wide truncate">
                             {c.teamName}
                           </h2>
-                          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                          <div className="flex items-center gap-2.5 mt-2 flex-wrap">
                             {[{ n: c.driver1Name, p: c.driver1Points }, { n: c.driver2Name, p: c.driver2Points }]
                               .filter((x) => x.n)
                               .map((x, di) => (
-                                <span key={di} className="f-mono text-xs text-zinc-400 font-bold">
+                                <span key={di} className="f-mono text-xs text-zinc-400 font-bold px-2.5 py-1 rounded-lg bg-black/60 border border-white/5">
                                   {x.n.split(" ").pop()} <span className="text-white font-black">{Math.round(x.p)}</span> PTS
                                 </span>
                               ))}
                           </div>
                         </div>
-                        <div className="hidden sm:flex items-center gap-6 text-center">
-                          <div>
+
+                        <div className="hidden md:flex items-center gap-6 text-center">
+                          <div className="px-3 py-1.5 rounded-xl bg-black/40 border border-white/5">
                             <div className="f-orbitron font-black text-xl text-amber-400">{c.wins}</div>
-                            <div className="f-mono text-[9px] text-zinc-500 font-bold uppercase">WINS</div>
+                            <div className="f-mono text-[9px] text-zinc-500 font-bold uppercase tracking-wider">WINS</div>
                           </div>
-                          <div>
+                          <div className="px-3 py-1.5 rounded-xl bg-black/40 border border-white/5">
                             <div className="f-orbitron font-black text-xl text-white">{c.podiums}</div>
-                            <div className="f-mono text-[9px] text-zinc-500 font-bold uppercase">PODIUMS</div>
+                            <div className="f-mono text-[9px] text-zinc-500 font-bold uppercase tracking-wider">PODIUMS</div>
                           </div>
                         </div>
-                        <div className="text-right min-w-[80px]">
+
+                        <div className="text-right min-w-[90px]">
                           {c.gapToLeader > 0 && (
                             <p className="f-mono text-[10px] text-zinc-500 font-bold mb-0.5">-{Math.round(c.gapToLeader)}</p>
                           )}
                           <p
-                            className="f-orbitron font-black text-3xl leading-none"
+                            className="f-orbitron font-black text-3xl sm:text-4xl leading-none"
                             style={{ color: i === 0 ? "#E10600" : "#fff" }}
                           >
                             <Pts points={c.totalPoints} delay={i * 50} />
                           </p>
-                          <p className="f-mono text-[9px] text-zinc-500 font-bold tracking-widest mt-1 uppercase">PTS</p>
+                          <p className="f-mono text-[9px] text-zinc-500 font-bold tracking-widest mt-1 uppercase">POINTS</p>
                         </div>
                       </div>
                     </div>
