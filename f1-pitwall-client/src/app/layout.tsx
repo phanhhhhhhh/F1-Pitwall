@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import { SeasonProvider } from "./context/SeasonContext";
 import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
+import PitwallFooter from "./components/PitwallFooter";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,12 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-zinc-950 text-white">
         <ErrorBoundaryWrapper>
           <SeasonProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <div className="flex-1 flex flex-col">
+                {children}
+              </div>
+              <PitwallFooter />
+            </AuthProvider>
           </SeasonProvider>
         </ErrorBoundaryWrapper>
       </body>

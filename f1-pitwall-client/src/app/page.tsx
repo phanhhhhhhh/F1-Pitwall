@@ -161,20 +161,23 @@ export default function Home() {
       )}
 
       {/* Broadcast ticker */}
-      <div className="relative z-10 border-b border-white/5 bg-black/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-9 flex items-center justify-between text-[11px] f-mono tracking-widest">
+      <div className="relative z-10 border-b border-white/[0.08] bg-black/60 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-10 flex items-center justify-between text-[11px] f-mono tracking-widest">
           <div className="flex items-center gap-2.5">
             <span className="inline-block w-2 h-2 rounded-full bg-[#E10600] live-pulse" />
-            <span className="text-[#E10600] font-black">PIT WALL OS 2.0</span>
+            <span className="text-[#E10600] font-black tracking-widest">PIT WALL OS 2.0</span>
             <span className="text-zinc-700">{"//"}</span>
-            <span className="text-zinc-400">FORMULA 1 WORLD CHAMPIONSHIP · {season}</span>
+            <span className="text-zinc-300 font-bold">FIA FORMULA 1 WORLD CHAMPIONSHIP · {season}</span>
           </div>
-          <div className="hidden sm:flex items-center gap-4 text-zinc-500">
-            <span>RND <span className="text-zinc-200">{nextRace?.roundNumber || gpDone}</span>/{totalGP}</span>
+          <div className="hidden sm:flex items-center gap-4 text-zinc-400 font-bold">
+            <span>RND <span className="text-white">{nextRace?.roundNumber || gpDone}</span>/{totalGP}</span>
             <span className="text-zinc-800">|</span>
-            <span>{gpDone} <span className="text-zinc-600">COMPLETED</span></span>
+            <span>{gpDone} <span className="text-zinc-500">COMPLETED</span></span>
             <span className="text-zinc-800">|</span>
-            <span className="text-[#00E676] font-bold">● SYSTEMS ONLINE</span>
+            <span className="text-[#00E676] font-bold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse" />
+              SYSTEMS ONLINE
+            </span>
           </div>
         </div>
       </div>
@@ -184,34 +187,35 @@ export default function Home() {
         <RaceControlBanner />
 
         {/* HERO SECTION */}
-        <section className="grid lg:grid-cols-[1.5fr_1fr] gap-6 mb-6">
+        <section className="grid lg:grid-cols-[1.5fr_1fr] gap-6 mb-8">
           {/* Title Card */}
-          <div className="rise relative overflow-hidden rounded-3xl border border-white/10 chamfer bg-gradient-to-br from-zinc-900/90 via-zinc-950/95 to-black p-6 sm:p-8 shadow-2xl">
-            <div className="absolute top-0 right-0 f-cond font-black leading-none select-none text-[160px] sm:text-[220px] text-white/[0.02] pointer-events-none">
-              26
+          <div className="rise relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-zinc-900/95 via-zinc-950/98 to-black p-6 sm:p-8 shadow-2xl">
+            {/* Background racing watermark */}
+            <div className="absolute top-0 right-2 f-orbitron font-black leading-none select-none text-[130px] sm:text-[180px] text-white/[0.02] pointer-events-none">
+              {season.toString().slice(-2)}
             </div>
-            <div className="relative">
+            <div className="relative z-10">
               <div className="flex items-center gap-2 mb-3">
-                <span className="inline-block w-8 h-[3px] bg-[#E10600] rounded-full shadow-[0_0_8px_#E10600]" />
-                <span className="f-mono text-[11px] tracking-[0.35em] text-red-500 font-bold">RACE ENGINEERING SUITE</span>
+                <span className="inline-block w-8 h-[3px] bg-[#E10600] rounded-full shadow-[0_0_10px_#E10600]" />
+                <span className="f-mono text-[11px] tracking-[0.35em] text-red-500 font-black uppercase">RACE ENGINEERING SUITE</span>
               </div>
-              <h1 className="f-cond font-black leading-[0.85] tracking-tight text-5xl sm:text-7xl lg:text-8xl">
+              <h1 className="f-cond font-black leading-[0.85] tracking-tight text-5xl sm:text-7xl lg:text-8xl uppercase">
                 <span className="block text-white">PIT<span className="text-[#E10600]">WALL</span></span>
                 <span className="block text-zinc-600 text-3xl sm:text-4xl tracking-normal mt-1">OPERATIONS HUB</span>
               </h1>
               <div className="mt-5 h-[3px] w-full max-w-md overflow-hidden rounded-full bg-white/10">
                 <div className="h-full w-3/4 bg-gradient-to-r from-[#E10600] via-[#FF8000] to-[#FFD200]" />
               </div>
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-6 flex flex-wrap gap-2.5">
                 {[
                   { k: "S", c: "#ff2a2a", l: "SOFT" },
                   { k: "M", c: "#FFD200", l: "MEDIUM" },
                   { k: "H", c: "#EDEDED", l: "HARD" },
-                  { k: "I", c: "#43b047", l: "INTER" },
-                  { k: "W", c: "#1e6fff", l: "WET" },
+                  { k: "I", c: "#00E676", l: "INTER" },
+                  { k: "W", c: "#00E5FF", l: "WET" },
                 ].map(t => (
-                  <div key={t.k} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-black/40">
-                    <span className="w-3 h-3 rounded-full border-2" style={{ borderColor: t.c, background: `${t.c}33` }} />
+                  <div key={t.k} className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-white/10 bg-black/60 shadow-inner hover:border-white/20 transition-all">
+                    <span className="w-3 h-3 rounded-full border-2" style={{ borderColor: t.c, background: `${t.c}40`, boxShadow: `0 0 6px ${t.c}80` }} />
                     <span className="f-mono text-[10px] tracking-wider text-zinc-300 font-bold">{t.l}</span>
                   </div>
                 ))}
@@ -224,7 +228,7 @@ export default function Home() {
         </section>
 
         {/* ── 3D F1 CAR & AERO WIND TUNNEL INSPECTOR ── */}
-        <section className="mb-6">
+        <section className="mb-8">
           <F1CarInspector3D />
         </section>
 
@@ -234,7 +238,7 @@ export default function Home() {
         )}
 
         {/* BENTO GRID */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid lg:grid-cols-3 gap-6 mb-8">
           <TimingTower standings={standings.slice(0, 6)} loading={loading} />
           <StatTilesGrid tiles={statTiles} />
           <SeasonProgress
@@ -248,7 +252,7 @@ export default function Home() {
         </div>
 
         {/* LIVE TRACK RADAR & INTERACTIVE PIT STOP CHALLENGE */}
-        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6 mb-6">
+        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6 mb-8">
           {/* Opens on the circuit the championship is actually heading to next */}
           <LiveTrackMap
             circuitId={nextRace?.circuit?.id}
@@ -259,22 +263,18 @@ export default function Home() {
         </div>
 
         {/* STARTING GANTRY REACTION TESTER */}
-        <div className="mb-6">
+        <div className="mb-8">
           <LightsOutGantry />
         </div>
 
         {/* RACE WEEKEND & CALENDAR */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <RaceWeekendWidget />
           <RaceCalendarSection calendar={calendar} winners={winners} loading={loading} />
         </div>
 
         {/* ROUND NEWS */}
         <RoundNewsSection />
-
-        <p className="text-center f-mono text-[11px] text-zinc-600 mt-10 tracking-widest uppercase">
-          F1 PITWALL OS · ADVANCED TELEMETRY & STRATEGY PLATFORM · SEASON {season}
-        </p>
       </main>
     </div>
   );

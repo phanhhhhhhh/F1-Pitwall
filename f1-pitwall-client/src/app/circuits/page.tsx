@@ -99,24 +99,24 @@ function CircuitCard({
     >
       <div
         className="absolute inset-0 rounded-3xl transition-opacity duration-500 pointer-events-none"
-        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 36px ${col}30` }}
+        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 36px ${col}35` }}
       />
       <div
-        className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/90 to-black/95 p-5 shadow-xl"
+        className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/95 via-zinc-950/98 to-black p-6 shadow-xl"
         style={{
-          borderColor: hov ? `${col}80` : "rgba(255,255,255,.08)",
-          transform: hov ? "translateY(-5px)" : "none",
+          borderColor: hov ? `${col}90` : "rgba(255,255,255,.08)",
+          transform: hov ? "translateY(-6px)" : "none",
         }}
       >
-        <div className="h-[3px] w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
+        <div className="h-[3px] w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 14px ${col}` }} />
 
         <div className="relative z-10">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl leading-none">{flag}</span>
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="text-3xl leading-none drop-shadow">{flag}</span>
               <span
-                className="f-orbitron text-[10px] font-black px-2.5 py-0.5 rounded-lg border shadow-sm"
-                style={{ color: col, borderColor: `${col}40`, background: `${col}15` }}
+                className="f-orbitron text-[10px] font-black px-2.5 py-1 rounded-xl border shadow-sm"
+                style={{ color: col, borderColor: `${col}50`, background: `${col}15` }}
               >
                 {cfg.label}
               </span>
@@ -124,38 +124,38 @@ function CircuitCard({
             <TrackMotif type={circuit.type} color={col} />
           </div>
 
-          <div className="mb-4">
+          <div className="mb-5">
             <h2
-              className="f-cond font-black text-2xl uppercase tracking-tight text-white transition-colors"
+              className="f-cond font-black text-2xl sm:text-3xl uppercase tracking-tight text-white transition-colors"
               style={{ color: hov ? col : "#fff" }}
             >
               {circuit.name}
             </h2>
-            <p className="f-mono text-[11px] text-zinc-400 mt-1 font-semibold">
-              {circuit.city}, {circuit.country}
+            <p className="f-mono text-xs text-zinc-400 mt-1 font-semibold">
+              📍 {circuit.city}, {circuit.country}
             </p>
           </div>
 
           {/* Key Stats Grid */}
-          <div className="grid grid-cols-4 gap-2 mb-4">
+          <div className="grid grid-cols-4 gap-2 mb-5">
             {[
               { label: "LAPS", val: circuit.totalLaps },
               { label: "LENGTH", val: `${circuit.lengthKm} KM` },
-              { label: "CORNERS", val: circuit.turnCount },
-              { label: "DISTANCE", val: `${raceDistanceKm} KM` },
+              { label: "TURNS", val: circuit.turnCount },
+              { label: "DIST", val: `${raceDistanceKm} KM` },
             ].map((s) => (
-              <div key={s.label} className="text-center p-2 rounded-xl bg-black/40 border border-zinc-800">
-                <p className="f-orbitron font-bold text-xs text-white tabular-nums">{s.val}</p>
-                <p className="f-mono text-[8px] text-zinc-500 tracking-wider mt-0.5">{s.label}</p>
+              <div key={s.label} className="text-center p-2.5 rounded-2xl bg-black/60 border border-white/5 shadow-inner">
+                <p className="f-orbitron font-bold text-xs sm:text-sm text-white tabular-nums">{s.val}</p>
+                <p className="f-mono text-[8px] text-zinc-500 font-bold tracking-wider mt-1">{s.label}</p>
               </div>
             ))}
           </div>
 
           {/* Lap Record Footer */}
-          <div className="pt-3 border-t border-zinc-800 flex items-center justify-between">
-            <span className="f-mono text-[10px] text-zinc-500 tracking-widest uppercase">LAP RECORD</span>
+          <div className="pt-3.5 border-t border-white/[0.08] flex items-center justify-between">
+            <span className="f-mono text-[10px] text-zinc-500 font-bold tracking-widest uppercase">LAP RECORD</span>
             <span className="f-orbitron font-black text-xs text-amber-400">
-              {formatTime(circuit.lapRecordSec)}
+              ⏱ {formatTime(circuit.lapRecordSec)}
             </span>
           </div>
         </div>

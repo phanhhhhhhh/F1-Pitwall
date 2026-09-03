@@ -46,69 +46,67 @@ function DriverCard({
     >
       <div
         className="absolute inset-0 rounded-3xl transition-opacity duration-500 pointer-events-none"
-        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 36px ${col}30` }}
+        style={{ opacity: hov ? 1 : 0, boxShadow: `0 0 40px ${col}35` }}
       />
       <div
-        className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/90 to-black/95 p-5 shadow-xl"
+        className="relative border rounded-3xl overflow-hidden transition-all duration-300 bg-gradient-to-b from-zinc-900/95 via-zinc-950/98 to-black p-6 shadow-xl"
         style={{
-          borderColor: hov ? `${col}80` : "rgba(255,255,255,.08)",
-          transform: hov ? "translateY(-5px)" : "none",
+          borderColor: hov ? `${col}90` : "rgba(255,255,255,.08)",
+          transform: hov ? "translateY(-6px)" : "none",
         }}
       >
-        <div className="h-[3px] w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
+        <div className="h-[3px] w-full absolute top-0 left-0 right-0" style={{ background: col, boxShadow: `0 0 14px ${col}` }} />
 
         <div className="relative z-10">
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-4">
             <span
-              className="f-orbitron font-black text-3xl tabular-nums leading-none"
-              style={{ color: col, textShadow: `0 0 16px ${col}40` }}
+              className="f-orbitron font-black text-3xl sm:text-4xl tabular-nums leading-none drop-shadow"
+              style={{ color: col, textShadow: `0 0 16px ${col}50` }}
             >
               #{driver.carNumber}
             </span>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/40 border border-zinc-800">
-              <span className="text-sm leading-none">{flag}</span>
-              <span className="f-mono text-[10px] text-zinc-400 font-bold uppercase">{driver.nationality}</span>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-black/60 border border-white/10 shadow-inner">
+              <span className="text-base leading-none drop-shadow">{flag}</span>
+              <span className="f-mono text-[10px] text-zinc-300 font-black uppercase tracking-wider">{driver.nationality}</span>
             </div>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-5">
             <h2
-              className="f-cond font-black text-2xl uppercase tracking-tight text-white transition-colors"
+              className="f-cond font-black text-2xl sm:text-3xl uppercase tracking-tight text-white transition-colors"
               style={{ color: hov ? col : "#fff" }}
             >
               {driver.name}
             </h2>
-            <p className="f-mono text-[11px] font-bold mt-1" style={{ color: col }}>
-              {driver.team?.name || "Independent"}
+            <p className="f-mono text-xs font-bold mt-1" style={{ color: col }}>
+              🏎 {driver.team?.name || "Independent"}
             </p>
           </div>
 
-          {/* Ratings derived from this season's races, not a hand-written table */}
-          <div className="space-y-1 mb-4 p-2.5 rounded-2xl bg-black/50 border border-zinc-800/80">
+          {/* Ratings derived from this season's races */}
+          <div className="space-y-1.5 mb-5 p-3 rounded-2xl bg-black/60 border border-white/5 shadow-inner">
             {skill ? (
               <>
-                <div className="flex items-center justify-between text-[10px] f-mono text-zinc-400">
+                <div className="flex items-center justify-between text-[11px] f-mono text-zinc-300 font-bold">
                   <span>PACE RATING</span>
-                  <span className="font-bold text-white">{skill.pace}/100</span>
+                  <span className="font-black text-white px-2 py-0.5 rounded bg-white/10">{skill.pace}/100</span>
                 </div>
-                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden p-0.5 border border-white/5">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
+                    className="h-full rounded-full transition-all duration-700 shadow-[0_0_8px_rgba(0,230,118,0.5)]"
                     style={{ width: `${skill.pace}%`, background: `linear-gradient(90deg, ${col}, #00E676)` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[9px] f-mono text-zinc-500 pt-0.5">
-                  <span>RACECRAFT: {skill.racecraft}</span>
-                  <span>TYRE: {skill.tyreMgmt}</span>
-                  <span>WET: {skill.wetSkill}</span>
+                <div className="flex items-center justify-between text-[10px] f-mono text-zinc-400 font-semibold pt-1">
+                  <span>RACECRAFT: <strong className="text-white">{skill.racecraft}</strong></span>
+                  <span>TYRE: <strong className="text-white">{skill.tyreMgmt}</strong></span>
+                  <span>WET: <strong className="text-white">{skill.wetSkill}</strong></span>
                 </div>
               </>
             ) : (
-              <div className="text-[10px] f-mono text-zinc-600 py-2 text-center">RATING PENDING</div>
+              <div className="text-[10px] f-mono text-zinc-500 py-2 text-center font-bold tracking-wider uppercase">RATING PENDING</div>
             )}
           </div>
-
-          <div className="h-px mb-4 bg-gradient-to-r from-zinc-700 to-transparent" />
 
           {/* Stats Grid */}
           <div className="grid grid-cols-3 gap-2">
@@ -117,11 +115,11 @@ function DriverCard({
               { l: "POLES", v: poles, hl: false },
               { l: "POINTS", v: pts, hl: false },
             ].map((s) => (
-              <div key={s.l} className="text-center p-1.5 rounded-xl bg-zinc-900/60 border border-zinc-800/60">
-                <p className={`f-cond font-black text-xl tabular-nums ${s.hl ? "text-amber-400" : "text-white"}`}>
+              <div key={s.l} className="text-center p-2 rounded-2xl bg-black/50 border border-white/5 shadow-inner">
+                <p className={`f-orbitron font-black text-lg sm:text-xl tabular-nums ${s.hl ? "text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.4)]" : "text-white"}`}>
                   {s.v.toLocaleString()}
                 </p>
-                <p className="f-mono text-[8px] text-zinc-500 tracking-wider mt-0.5">{s.l}</p>
+                <p className="f-mono text-[8px] text-zinc-500 font-bold tracking-wider mt-1">{s.l}</p>
               </div>
             ))}
           </div>
