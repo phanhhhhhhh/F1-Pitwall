@@ -4,7 +4,6 @@ import backend.repository.QualifyingResultRepository;
 import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
 import backend.service.OpenF1SyncService;
-import backend.service.RaceStoryService;
 import backend.service.QualifyingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,22 +23,12 @@ public class SyncController {
     private final RaceResultRepository raceResultRepo;
     private final QualifyingResultRepository qualifyingRepo;
     private final RaceRepository raceRepo;
-    private final RaceStoryService raceStoryService;
 
     @PostMapping("/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER')")
     public ResponseEntity<Map<String, Object>> syncAll() {
         Map<String, Object> result = syncService.syncRecentSessions();
-        invalidateDerivedCaches();
         return ResponseEntity.ok(result);
-    }
-
-    /**
-     * The pit stop benchmark is computed from race data and cached, so any sync that writes
-     * results has to drop it or the site keeps serving pre-sync numbers.
-     */
-    private void invalidateDerivedCaches() {
-        raceStoryService.invalidateBenchmark();
     }
 
     @Transactional
@@ -59,7 +48,6 @@ public class SyncController {
                 String countryName = race.getCircuit() != null
                         ? race.getCircuit().getCountry() : "";
                 boolean success = syncService.syncSession(sessionKey, countryName, sprint);
-                invalidateDerivedCaches();
                 return ResponseEntity.ok(Map.of(
                         "success", success,
                         "raceId", raceId,
@@ -67,7 +55,6 @@ public class SyncController {
                 ));
             } else {
                 Map<String, Object> result = syncService.syncRecentSessions();
-                invalidateDerivedCaches();
                 return ResponseEntity.ok(Map.of(
                         "success", true,
                         "raceId", raceId,
@@ -87,7 +74,6 @@ public class SyncController {
         try {
             qualifyingRepo.deleteByRaceId(raceId);
             Map<String, Object> result = qualifyingService.syncQualifying(raceId);
-            invalidateDerivedCaches();
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
@@ -102,7 +88,6 @@ public class SyncController {
             @RequestParam(defaultValue = "false") boolean sprint,
             @RequestParam(defaultValue = "") String countryName) {
         boolean success = syncService.syncSession(sessionKey, countryName, sprint);
-        invalidateDerivedCaches();
         return ResponseEntity.ok(Map.of(
                 "success", success,
                 "sessionKey", sessionKey,

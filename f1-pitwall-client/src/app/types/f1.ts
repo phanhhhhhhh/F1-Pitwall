@@ -36,54 +36,6 @@ export interface DriverRef {
   team: { name: string; colorHex: string };
 }
 
-/* ── Team livery (GET /api/teams/livery) ────────────────────────────────── */
-export interface TeamLivery {
-  id: number;
-  name: string;
-  country: string;
-  colorHex: string | null;
-  accentHex: string | null;
-  engineSupplier: string | null;
-  carName: string | null;
-  teamPrincipal: string | null;
-  base: string | null;
-  championships: number;
-  foundedYear: number;
-  annualBudgetM: number;
-  drivers: { id: number; name: string; carNumber: number; nationality: string }[];
-}
-
-/* ── Pit stop benchmark (GET /api/races/pit-stops/benchmark/{season}) ───── */
-export interface PitStopBenchmark {
-  season: number;
-  totalStops: number;
-  greenFlagStops: number;
-  fastestSec: number | null;
-  medianSec: number | null;
-  meanSec: number | null;
-  topQuartileSec: number | null;
-  fastest: {
-    id: number;
-    durationSec: number;
-    lapNumber: number;
-    driverName: string;
-    driverNumber: number;
-    teamName: string;
-    teamColor: string;
-    raceName: string;
-    round: number;
-    tyreOut: string | null;
-    underSafetyCar: boolean;
-  }[];
-  crews: {
-    teamName: string;
-    teamColor: string;
-    stops: number;
-    medianSec: number | null;
-    bestSec: number | null;
-  }[];
-}
-
 /* ── Team (constructor) ─────────────────────────────────────────────────── */
 export interface TeamInfo {
   id: number;
