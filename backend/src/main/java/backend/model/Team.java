@@ -43,14 +43,4 @@ public class Team {
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL)
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private List<Driver> drivers;
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL)
-    @ToString.Exclude @EqualsAndHashCode.Exclude
-    private List<Engineer> engineers;
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL)
-    @ToString.Exclude @EqualsAndHashCode.Exclude
-    private List<Sponsorship> sponsorships;
 }

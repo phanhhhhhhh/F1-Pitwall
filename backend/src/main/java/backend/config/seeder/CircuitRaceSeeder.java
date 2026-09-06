@@ -1,12 +1,9 @@
 package backend.config.seeder;
 
-import backend.model.Championship;
 import backend.model.Circuit;
 import backend.model.Race;
-import backend.model.enums.ChampionshipType;
 import backend.model.enums.CircuitType;
 import backend.model.enums.RaceStatus;
-import backend.repository.ChampionshipRepository;
 import backend.repository.CircuitRepository;
 import backend.repository.RaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,16 +22,14 @@ public class CircuitRaceSeeder {
 
     private final CircuitRepository circuitRepo;
     private final RaceRepository raceRepo;
-    private final ChampionshipRepository champRepo;
 
     /**
-     * Seeds circuits, races and championships.
+     * Seeds circuits and races.
      * Returns the list of saved circuits.
      */
     public List<Circuit> seed() {
         List<Circuit> circuits = seedCircuits();
         seedRaces(circuits);
-        seedChampionships();
         return circuits;
     }
 
@@ -186,15 +181,5 @@ public class CircuitRaceSeeder {
                         .season(2026).roundNumber(18).status(RaceStatus.SCHEDULED).circuit(circuitMap.get("Marina Bay Street Circuit")).build()
         ));
         log.info("[Pitwall] 30 races seeded (24 GP + 6 Sprint)");
-    }
-
-    private void seedChampionships() {
-        champRepo.saveAll(List.of(
-                Championship.builder().season(2026).type(ChampionshipType.DRIVERS)
-                        .leaderName("Lando Norris").leaderPoints(0f).p2Gap(0f).p3Gap(0f).build(),
-                Championship.builder().season(2026).type(ChampionshipType.CONSTRUCTORS)
-                        .leaderName("McLaren").leaderPoints(0f).p2Gap(0f).p3Gap(0f).build()
-        ));
-        log.info("[Pitwall] Championships seeded (2026)");
     }
 }

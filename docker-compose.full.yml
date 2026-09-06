@@ -19,18 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─── Redis ───────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: f1_redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # ─── Backend (Spring Boot) ───────────────────────────────────────────────
   backend:
     build:
@@ -41,16 +29,12 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/f1_pitwall_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
       JWT_SECRET: f1pitwall2026supersecretkey_changethisinproduction
       FRONTEND_URL: http://localhost:3000
     ports:
       - "8080:8080"
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     restart: unless-stopped
 

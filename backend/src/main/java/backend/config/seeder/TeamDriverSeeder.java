@@ -1,12 +1,10 @@
 package backend.config.seeder;
 
 import backend.model.Driver;
-import backend.model.Engineer;
 import backend.model.Team;
 import backend.model.TyreCompound;
 import backend.model.enums.TyreType;
 import backend.repository.DriverRepository;
-import backend.repository.EngineerRepository;
 import backend.repository.TeamRepository;
 import backend.repository.TyreCompoundRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,18 +24,16 @@ public class TeamDriverSeeder {
 
     private final TeamRepository teamRepo;
     private final DriverRepository driverRepo;
-    private final EngineerRepository engineerRepo;
     private final TyreCompoundRepository tyreRepo;
 
     /**
-     * Seeds tyre compounds, teams, drivers and engineers.
+     * Seeds tyre compounds, teams and drivers.
      * Returns the list of saved teams so downstream seeders can reference them.
      */
     public List<Team> seed() {
         seedTyres();
         List<Team> teams = seedTeams();
         seedDrivers(teams);
-        seedEngineers(teams);
         return teams;
     }
 
@@ -262,21 +258,4 @@ public class TeamDriverSeeder {
         }
     }
 
-    private void seedEngineers(List<Team> teams) {
-        if (engineerRepo.count() > 0) {
-            log.info("[Pitwall] Engineers already exist — skipping engineer seeding");
-            return;
-        }
-        Map<String, Team> teamMap = teams.stream()
-                .collect(Collectors.toMap(Team::getName, t -> t));
-
-        engineerRepo.saveAll(List.of(
-                Engineer.builder().name("Andrea Stella").specialization("Team Principal").nationality("Italian").team(teamMap.get("McLaren")).build(),
-                Engineer.builder().name("Frederic Vasseur").specialization("Team Principal").nationality("French").team(teamMap.get("Ferrari")).build(),
-                Engineer.builder().name("Christian Horner").specialization("Team Principal").nationality("British").team(teamMap.get("Red Bull Racing")).build(),
-                Engineer.builder().name("Toto Wolff").specialization("Team Principal").nationality("Austrian").team(teamMap.get("Mercedes-AMG Petronas")).build(),
-                Engineer.builder().name("Adrian Newey").specialization("Chief Technical Officer").nationality("British").team(teamMap.get("Aston Martin")).build()
-        ));
-        log.info("[Pitwall] Engineers seeded");
-    }
 }

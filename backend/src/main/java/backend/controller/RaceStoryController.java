@@ -1,6 +1,5 @@
 package backend.controller;
 
-import backend.dto.PitStopBenchmarkResponse;
 import backend.service.RaceStoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,16 +19,6 @@ import java.util.Map;
 public class RaceStoryController {
 
     private final RaceStoryService raceStoryService;
-
-    /**
-     * Season pit stop timings used to grade the pit stop challenge against real crews.
-     * GET /api/races/pit-stops/benchmark/{season}
-     */
-    @GetMapping("/pit-stops/benchmark/{season}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER', 'VIEWER')")
-    public ResponseEntity<PitStopBenchmarkResponse> getPitStopBenchmark(@PathVariable int season) {
-        return ResponseEntity.ok(raceStoryService.getPitStopBenchmark(season));
-    }
 
     @GetMapping("/{raceId}/pit-stops")
     @PreAuthorize("hasAnyRole('ADMIN', 'ENGINEER', 'VIEWER')")
