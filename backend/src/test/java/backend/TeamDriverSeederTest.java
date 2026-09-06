@@ -4,7 +4,6 @@ import backend.config.seeder.TeamDriverSeeder;
 import backend.model.Driver;
 import backend.model.Team;
 import backend.repository.DriverRepository;
-import backend.repository.EngineerRepository;
 import backend.repository.TeamRepository;
 import backend.repository.TyreCompoundRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +30,6 @@ class TeamDriverSeederTest {
 
     private final TeamRepository teamRepo = mock(TeamRepository.class);
     private final DriverRepository driverRepo = mock(DriverRepository.class);
-    private final EngineerRepository engineerRepo = mock(EngineerRepository.class);
     private final TyreCompoundRepository tyreRepo = mock(TyreCompoundRepository.class);
 
     private Team team(String name) {
@@ -47,10 +45,9 @@ class TeamDriverSeederTest {
         // Other grid teams don't exist yet
         when(teamRepo.findByName(any(String.class))).thenReturn(Optional.empty());
         when(tyreRepo.count()).thenReturn(5L);   // tyres already seeded
-        when(engineerRepo.count()).thenReturn(1L); // engineers already seeded
         when(driverRepo.findAll()).thenReturn(List.of());
 
-        new TeamDriverSeeder(teamRepo, driverRepo, engineerRepo, tyreRepo).seed();
+        new TeamDriverSeeder(teamRepo, driverRepo, tyreRepo).seed();
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Team>> captor = ArgumentCaptor.forClass(List.class);
@@ -61,9 +58,8 @@ class TeamDriverSeederTest {
                 .contains("Racing Bulls", "Cadillac", "Audi", "Mercedes-AMG Petronas")
                 .doesNotContain("McLaren");
 
-        // Idempotency guards: already-seeded tyres and engineers are not re-saved
+        // Idempotency guard: already-seeded tyres are not re-saved
         verify(tyreRepo, never()).saveAll(any());
-        verify(engineerRepo, never()).saveAll(any());
     }
 
     @Test
@@ -78,13 +74,12 @@ class TeamDriverSeederTest {
         when(teamRepo.findByName("Racing Bulls")).thenReturn(Optional.of(racingBulls));
         when(teamRepo.findByName("Cadillac")).thenReturn(Optional.of(cadillac));
         when(tyreRepo.count()).thenReturn(5L);
-        when(engineerRepo.count()).thenReturn(1L);
 
         Driver lindblad = Driver.builder().name("Arvid Lindblad").carNumber(41).team(null).build();
         when(driverRepo.findAll()).thenReturn(List.of(lindblad));
         when(driverRepo.findByCarNumber(41)).thenReturn(Optional.of(lindblad));
 
-        new TeamDriverSeeder(teamRepo, driverRepo, engineerRepo, tyreRepo).seed();
+        new TeamDriverSeeder(teamRepo, driverRepo, tyreRepo).seed();
 
         assertThat(lindblad.getTeam()).isEqualTo(racingBulls);
         verify(driverRepo).save(lindblad);
@@ -98,13 +93,12 @@ class TeamDriverSeederTest {
         when(teamRepo.findByName("McLaren")).thenReturn(Optional.of(mclaren));
         when(teamRepo.findByName(any(String.class))).thenReturn(Optional.empty());
         when(tyreRepo.count()).thenReturn(5L);
-        when(engineerRepo.count()).thenReturn(1L);
 
         Driver lawson = Driver.builder().name("Liam Lawson").carNumber(30).team(team("Red Bull Racing")).build();
         when(driverRepo.findAll()).thenReturn(List.of(lawson));
         when(driverRepo.findByCarNumber(30)).thenReturn(Optional.of(lawson));
 
-        new TeamDriverSeeder(teamRepo, driverRepo, engineerRepo, tyreRepo).seed();
+        new TeamDriverSeeder(teamRepo, driverRepo, tyreRepo).seed();
 
         assertThat(lawson.getTeam().getName()).isEqualTo("Red Bull Racing");
         verify(driverRepo, never()).save(lawson);

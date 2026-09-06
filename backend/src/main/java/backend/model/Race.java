@@ -54,9 +54,4 @@ public class Race {
     @OneToMany(mappedBy = "race", cascade = CascadeType.ALL)
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private List<StrategyPlan> strategyPlans;
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "race", cascade = CascadeType.ALL)
-    @ToString.Exclude @EqualsAndHashCode.Exclude
-    private List<CarSetup> carSetups;
 }
