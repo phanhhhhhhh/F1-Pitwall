@@ -542,17 +542,3 @@ export type TimelineEvent =
   | { kind: "incident"; lap: number; data: RaceIncident }
   | { kind: "weather"; lap: number; data: WeatherChange }
   | { kind: "fastest-lap"; lap: number; driverName: string; teamColor: string; time: number };
-
-/* ── Race news ──────────────────────────────────────────────────────────── */
-export interface RaceNewsItem {
-  id: number;
-  title: string;
-  content: string;
-  tag: string | null;
-  createdAt: string | null;
-  raceId: number;
-  raceName: string;
-  roundNumber: number;
-  season: number;
-  raceDate: string | null;
-}

@@ -17,26 +17,23 @@ interface CommandItem {
 
 const COMMANDS: CommandItem[] = [
   // Pages
-  { id: "p-home", title: "Season Overview & 3D Car", category: "PAGES", href: "/", subtitle: "Main dashboard, 3D WebGL car inspector, calendar" },
+  { id: "p-home", title: "Season Overview", category: "PAGES", href: "/", subtitle: "Main dashboard, standings, calendar" },
   { id: "p-standings", title: "Championship Standings", category: "PAGES", href: "/standings", subtitle: "WDC / WCC standings, bump chart, title simulator" },
-  { id: "p-compare", title: "1v1 Driver Head-to-Head Battle", category: "PAGES", href: "/drivers/compare", subtitle: "5-axis radar chart, telemetry & career battle", badge: "NEW" },
-  { id: "p-drivers", title: "Drivers Lineup & 3D Helmets", category: "PAGES", href: "/drivers", subtitle: "All 20 drivers, ratings, career records" },
+  { id: "p-drivers", title: "Drivers Lineup", category: "PAGES", href: "/drivers", subtitle: "All drivers, career records" },
   { id: "p-teams", title: "Constructors & Liveries", category: "PAGES", href: "/teams", subtitle: "Team profiles, car specs, budgets" },
-  { id: "p-live", title: "Live Pitwall Timing & Team Radio", category: "PAGES", href: "/live", subtitle: "Real-time sector delta, speed, team radio comms", badge: "LIVE" },
-  { id: "p-telemetry", title: "Live Telemetry & 4-Wheel Thermals", category: "PAGES", href: "/telemetry", subtitle: "Steering wheel HUD, Kamm's G-circle, speed trace", badge: "LIVE" },
+  { id: "p-telemetry", title: "Live Telemetry & Timing", category: "PAGES", href: "/telemetry", subtitle: "Timing tower, speed trace, tyre data", badge: "LIVE" },
   { id: "p-strategy", title: "Pit Strategy & Undercut Tool", category: "PAGES", href: "/strategy", subtitle: "Degradation simulator, stint optimizer, undercut matrix" },
   { id: "p-races", title: "Race Calendar & Grand Prix Weekends", category: "PAGES", href: "/races", subtitle: "FP1, FP2, FP3, Qualifying, Sprint, Race results" },
   { id: "p-circuits", title: "Circuits & 3D Track Elevation", category: "PAGES", href: "/circuits", subtitle: "3D racing lines, DRS zones, lap records" },
-  { id: "p-news", title: "Race Weekend News & Bulletins", category: "PAGES", href: "/news", subtitle: "Latest official FIA & pitwall bulletins" },
 
   // Drivers
-  { id: "d-ver", title: "Max Verstappen #1", category: "DRIVERS", href: "/drivers/compare?d1=1&d2=4", subtitle: "Red Bull Racing · 4x World Champion" },
-  { id: "d-nor", title: "Lando Norris #4", category: "DRIVERS", href: "/drivers/compare?d1=4&d2=1", subtitle: "McLaren Formula 1 Team" },
-  { id: "d-lec", title: "Charles Leclerc #16", category: "DRIVERS", href: "/drivers/compare?d1=16&d2=44", subtitle: "Scuderia Ferrari" },
-  { id: "d-ham", title: "Lewis Hamilton #44", category: "DRIVERS", href: "/drivers/compare?d1=44&d2=16", subtitle: "Scuderia Ferrari · 7x World Champion" },
-  { id: "d-pia", title: "Oscar Piastri #81", category: "DRIVERS", href: "/drivers/compare?d1=81&d2=4", subtitle: "McLaren Formula 1 Team" },
-  { id: "d-rus", title: "George Russell #63", category: "DRIVERS", href: "/drivers/compare?d1=63&d2=12", subtitle: "Mercedes-AMG Petronas" },
-  { id: "d-alo", title: "Fernando Alonso #14", category: "DRIVERS", href: "/drivers/compare?d1=14&d2=18", subtitle: "Aston Martin Aramco · 2x World Champion" },
+  { id: "d-ver", title: "Max Verstappen #1", category: "DRIVERS", href: "/drivers", subtitle: "Red Bull Racing · 4x World Champion" },
+  { id: "d-nor", title: "Lando Norris #4", category: "DRIVERS", href: "/drivers", subtitle: "McLaren Formula 1 Team" },
+  { id: "d-lec", title: "Charles Leclerc #16", category: "DRIVERS", href: "/drivers", subtitle: "Scuderia Ferrari" },
+  { id: "d-ham", title: "Lewis Hamilton #44", category: "DRIVERS", href: "/drivers", subtitle: "Scuderia Ferrari · 7x World Champion" },
+  { id: "d-pia", title: "Oscar Piastri #81", category: "DRIVERS", href: "/drivers", subtitle: "McLaren Formula 1 Team" },
+  { id: "d-rus", title: "George Russell #63", category: "DRIVERS", href: "/drivers", subtitle: "Mercedes-AMG Petronas" },
+  { id: "d-alo", title: "Fernando Alonso #14", category: "DRIVERS", href: "/drivers", subtitle: "Aston Martin Aramco · 2x World Champion" },
 
   // Circuits
   { id: "c-monaco", title: "Circuit de Monaco (Monte Carlo)", category: "CIRCUITS", href: "/circuits", subtitle: "3.337 km Street Circuit · 19 Turns" },

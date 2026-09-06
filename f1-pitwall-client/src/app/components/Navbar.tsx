@@ -20,7 +20,6 @@ const navGroups: { label: string; items: NavItem[]; roles: string[] }[] = [
       { href: "/", label: "Overview" },
       { href: "/standings", label: "Standings" },
       { href: "/races", label: "Race Calendar" },
-      { href: "/news", label: "News" },
       { href: "/circuits", label: "Circuits" },
     ],
     roles: ["ADMIN", "ENGINEER", "VIEWER"],

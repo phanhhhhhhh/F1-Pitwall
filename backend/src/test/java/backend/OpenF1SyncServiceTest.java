@@ -11,7 +11,6 @@ import backend.repository.TeamRepository;
 import backend.repository.WeatherConditionRepository;
 import backend.service.NotificationService;
 import backend.service.OpenF1SyncService;
-import backend.service.RaceNewsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -139,7 +138,6 @@ class OpenF1SyncServiceTest {
                     mock(DriverRepository.class),
                     mock(TeamRepository.class),
                     mock(NotificationService.class),
-                    mock(RaceNewsService.class),
                     mock(PitStopRepository.class),
                     mock(LapTelemetryRepository.class),
                     mock(WeatherConditionRepository.class),
@@ -220,7 +218,6 @@ class OpenF1SyncServiceTest {
                     mock(DriverRepository.class),
                     teamRepo,
                     mock(NotificationService.class),
-                    mock(RaceNewsService.class),
                     mock(PitStopRepository.class),
                     mock(LapTelemetryRepository.class),
                     mock(WeatherConditionRepository.class),
