@@ -12,7 +12,6 @@ import StatTilesGrid from "./components/StatTilesGrid";
 import SeasonProgress from "./components/SeasonProgress";
 import RaceCalendarSection from "./components/RaceCalendarSection";
 import RaceWeekendWidget from "./components/RaceWeekendWidget";
-import RoundNewsSection from "./components/RoundNewsSection";
 import RaceControlBanner from "./components/RaceControlBanner";
 import PodiumSpotlight from "./components/PodiumSpotlight";
 import LiveTrackMap from "./components/LiveTrackMap";
@@ -272,9 +271,6 @@ export default function Home() {
           <RaceWeekendWidget />
           <RaceCalendarSection calendar={calendar} winners={winners} loading={loading} />
         </div>
-
-        {/* ROUND NEWS */}
-        <RoundNewsSection />
       </main>
     </div>
   );
