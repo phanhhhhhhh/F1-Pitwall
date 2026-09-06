@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { getTeamColor } from "../lib/f1-theme";
-import { playShiftBeep, playDrsBeep } from "../lib/f1-sound";
 import type { TelemetryData } from "../types/f1";
 
 interface SteeringWheelHUDProps {
@@ -21,8 +20,6 @@ export default function SteeringWheelHUD({
   teamName = "Red Bull Racing",
   teamColor,
 }: SteeringWheelHUDProps) {
-  const [prevGear, setPrevGear] = useState<number>(telemetry?.gear ?? 1);
-  const [prevDrs, setPrevDrs] = useState<boolean>(telemetry?.drsActive ?? false);
   const [now, setNow] = useState<number>(0);
 
   const speed = telemetry?.speed ?? 284;
@@ -34,25 +31,6 @@ export default function SteeringWheelHUD({
   const tyreTemp = telemetry?.tyreTemp ?? 102;
 
   const resolvedColor = getTeamColor(teamName, teamColor);
-
-  // Trigger audio on shift and DRS
-  useEffect(() => {
-    if (telemetry?.gear && telemetry.gear !== prevGear) {
-      if (telemetry.rpm && telemetry.rpm > 11500) {
-        playShiftBeep();
-      }
-      setPrevGear(telemetry.gear);
-    }
-  }, [telemetry?.gear, telemetry?.rpm, prevGear]);
-
-  useEffect(() => {
-    if (telemetry?.drsActive !== undefined && telemetry.drsActive !== prevDrs) {
-      if (telemetry.drsActive) {
-        playDrsBeep();
-      }
-      setPrevDrs(telemetry.drsActive);
-    }
-  }, [telemetry?.drsActive, prevDrs]);
 
   // Drive the animated G-force readout without reading a clock during render
   useEffect(() => {

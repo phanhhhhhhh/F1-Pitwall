@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { playUiClick } from "../lib/f1-sound";
 import { fetchCircuitGeometry, fetchCircuits, formatLapTime } from "../lib/f1-data";
 import type { CircuitGeometry, CircuitInfo } from "../types/f1";
 
@@ -273,7 +272,6 @@ export default function Track3DViewer({ circuits: circuitsProp, initialCircuitId
   }, [curvePoints]);
 
   const selectCircuit = useCallback((id: number) => {
-    playUiClick();
     setError(null);
     setPickedId(id);
   }, []);
@@ -319,10 +317,7 @@ export default function Track3DViewer({ circuits: circuitsProp, initialCircuitId
           {EXAGGERATION_STEPS.map((step) => (
             <button
               key={step}
-              onClick={() => {
-                playUiClick();
-                setExaggeration(step);
-              }}
+              onClick={() => setExaggeration(step)}
               className={`px-2.5 py-1 text-xs font-bold f-cond rounded-lg transition-all ${
                 exaggeration === step
                   ? "bg-red-600 text-white shadow-sm"

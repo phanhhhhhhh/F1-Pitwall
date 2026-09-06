@@ -9,7 +9,6 @@ import { useSeason } from "../context/SeasonContext";
 import NotificationBell from "./NotificationBell";
 import SeasonSelector from "./SeasonSelector";
 import CommandPalette from "./CommandPalette";
-import { isSoundEnabled, setSoundEnabled, playUiClick } from "../lib/f1-sound";
 
 interface NavItem { href: string; label: string; live?: boolean; }
 
@@ -113,7 +112,6 @@ export default function Navbar() {
   const { season } = useSeason();
   const [imgError, setImgError] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [soundOn, setSoundOn] = useState(true);
   const [utcTime, setUtcTime] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const mobileRef = useRef<HTMLDivElement>(null);
@@ -131,7 +129,6 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    setSoundOn(isSoundEnabled());
     const tickClock = () => {
       const now = new Date();
       setUtcTime(
@@ -142,13 +139,6 @@ export default function Navbar() {
     const interval = setInterval(tickClock, 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const toggleSound = () => {
-    const next = !soundOn;
-    setSoundOn(next);
-    setSoundEnabled(next);
-    if (next) playUiClick();
-  };
 
   const handleLogout = () => { clearTokens(); window.location.href = "/login"; };
 
@@ -213,28 +203,6 @@ export default function Navbar() {
             <kbd className="hidden lg:inline-block px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[9px] f-mono text-zinc-400 group-hover:text-zinc-200">
               Ctrl+K
             </kbd>
-          </button>
-
-          {/* Sound FX Toggle Button */}
-          <button
-            onClick={toggleSound}
-            title={soundOn ? "Mute F1 Audio FX" : "Unmute F1 Audio FX"}
-            className={`p-1.5 rounded-xl border transition-all flex items-center justify-center ${
-              soundOn
-                ? "bg-zinc-900/90 text-emerald-400 border-emerald-500/40 hover:bg-zinc-800 shadow-[0_0_10px_rgba(0,230,118,0.2)]"
-                : "bg-zinc-950 text-zinc-600 border-zinc-800 hover:text-zinc-400"
-            }`}
-          >
-            {soundOn ? (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-              </svg>
-            )}
           </button>
 
           {/* Season selector */}

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { isSoundEnabled, setSoundEnabled, playUiClick } from "../lib/f1-sound";
 
 interface CommandItem {
   id: string;
@@ -77,7 +76,6 @@ export default function CommandPalette({
   // version whenever it changes rather than holding on to the one from its first render.
   const executeCommand = useCallback(
     (cmd: CommandItem) => {
-      playUiClick();
       onClose();
       if (cmd.href) {
         router.push(cmd.href);
