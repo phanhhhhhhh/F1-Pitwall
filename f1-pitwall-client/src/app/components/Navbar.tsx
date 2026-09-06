@@ -35,7 +35,6 @@ const navGroups: { label: string; items: NavItem[]; roles: string[] }[] = [
   {
     label: "TOOLS",
     items: [
-      { href: "/live", label: "Live Timing", live: true },
       { href: "/strategy", label: "Pit Strategy" },
       { href: "/telemetry", label: "Live Telemetry", live: true },
     ],
