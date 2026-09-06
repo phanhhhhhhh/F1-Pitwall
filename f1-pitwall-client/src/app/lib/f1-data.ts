@@ -3,7 +3,6 @@ import { BASE_URL as API } from "./api-client";
 import type {
   CircuitGeometry,
   CircuitInfo,
-  DriverProfile,
   PitStopBenchmark,
   TeamLivery,
 } from "../types/f1";
@@ -34,10 +33,6 @@ export function fetchCircuits(): Promise<CircuitInfo[]> {
  */
 export function fetchCircuitGeometry(circuitId: number): Promise<CircuitGeometry> {
   return getJson<CircuitGeometry>(`/api/circuits/${circuitId}/geometry`);
-}
-
-export function fetchDriverProfiles(season: number): Promise<DriverProfile[]> {
-  return getJson<DriverProfile[]>(`/api/drivers/profiles?season=${season}`);
 }
 
 export function fetchTeamLiveries(): Promise<TeamLivery[]> {

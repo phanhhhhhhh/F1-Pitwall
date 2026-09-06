@@ -28,7 +28,6 @@ const navGroups: { label: string; items: NavItem[]; roles: string[] }[] = [
     label: "GRID",
     items: [
       { href: "/drivers", label: "Drivers" },
-      { href: "/drivers/compare", label: "Driver 1v1 Battle" },
       { href: "/teams", label: "Teams" },
     ],
     roles: ["ADMIN", "ENGINEER", "VIEWER"],

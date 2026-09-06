@@ -3,7 +3,6 @@ package backend.controller;
 import backend.repository.QualifyingResultRepository;
 import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
-import backend.service.DriverRatingService;
 import backend.service.OpenF1SyncService;
 import backend.service.RaceStoryService;
 import backend.service.QualifyingService;
@@ -25,7 +24,6 @@ public class SyncController {
     private final RaceResultRepository raceResultRepo;
     private final QualifyingResultRepository qualifyingRepo;
     private final RaceRepository raceRepo;
-    private final DriverRatingService driverRatingService;
     private final RaceStoryService raceStoryService;
 
     @PostMapping("/all")
@@ -37,11 +35,10 @@ public class SyncController {
     }
 
     /**
-     * Driver ratings and pit stop benchmarks are computed from race data and cached, so any sync
-     * that writes results has to drop them or the site keeps serving pre-sync numbers.
+     * The pit stop benchmark is computed from race data and cached, so any sync that writes
+     * results has to drop it or the site keeps serving pre-sync numbers.
      */
     private void invalidateDerivedCaches() {
-        driverRatingService.invalidate();
         raceStoryService.invalidateBenchmark();
     }
 
