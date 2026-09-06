@@ -39,9 +39,4 @@ public class StrategyPlan {
     @JoinColumn(name = "race_id")
     @ToString.Exclude @EqualsAndHashCode.Exclude
     private Race race;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "engineer_id")
-    @ToString.Exclude @EqualsAndHashCode.Exclude
-    private Engineer engineer;
 }
