@@ -81,8 +81,6 @@ docker compose -f docker-compose.full.yml up -d postgres
 
 This creates a PostgreSQL 15 container named `f1_postgres` with database `f1_pitwall_db`, user `postgres`, password `postgres` on port 5432 — matching the defaults in `application.properties`.
 
-(Optional: `docker compose -f docker-compose.full.yml up -d` starts Redis as well, but Redis is not yet integrated by the backend.)
-
 ### 2. Backend
 
 ```bash
@@ -174,8 +172,8 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 │   │   ├── config/                 # SecurityConfig, GlobalExceptionHandler, DataSeeder
 │   │   ├── controller/             # 22 REST controllers
 │   │   ├── dto/                    # Request/response DTOs
-│   │   ├── model/                  # 24 JPA entities + enums
-│   │   ├── repository/             # 24 Spring Data repositories
+│   │   ├── model/                  # 19 JPA entities + enums
+│   │   ├── repository/             # 19 Spring Data repositories
 │   │   ├── scheduler/              # TelemetrySimulator (1 s tick)
 │   │   ├── security/               # JwtService, JwtAuthenticationFilter, OAuth2SuccessHandler
 │   │   ├── service/                # 28 service classes (business logic + external APIs)
@@ -190,7 +188,7 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 │   ├── next.config.ts              # output: "standalone"
 │   ├── vercel.json
 │   └── package.json
-├── docker-compose.full.yml         # Full-stack local dev (PostgreSQL + Redis + backend + frontend)
+├── docker-compose.full.yml         # Full-stack local dev (PostgreSQL + backend + frontend)
 ├── render.yaml                     # Render IAC (backend + DB)
 └── README.md
 ```
@@ -218,28 +216,13 @@ All of the following are stored in `ConcurrentHashMap` and are **lost on applica
 | `RateLimitFilter` | Bucket4j token buckets per IP | Rate-limit counters reset — a flooder gets a fresh 5 req/min allowance |
 | `TelemetrySimulator` | Simulated speed/RPM/gear per driver | Simulation state resets from lap-start values |
 
-**Mitigation (future):** Redis via Upstash free tier would persist these across restarts.
-
-### Orphan Entities (model + repository, no feature code)
-
-The following entities exist in the database schema but are **not wired to any API endpoint or service**:
-
-| Entity | Repository | Notes |
-|---|---|---|
-| `StrategyPlan` | `StrategyPlanRepository` | Pit strategy simulator planned but not built (the `/strategy` frontend page computes client-side, with no backend endpoint) |
-| `CarSetup` | `CarSetupRepository` | Setup data model ready, no management UI |
-| `DriverContract` | `DriverContractRepository` | Contract tracking, no UI yet |
-| `Sponsorship` | `SponsorshipRepository` | Sponsor management, no UI yet |
-| `Engineer` | `EngineerRepository` | Engineer profiles, no UI yet |
-| `Championship` | `ChampionshipRepository` | Has controller but minimal functionality |
-
-`Penalty` was previously listed here too but now has a full `PenaltyController` (5 endpoints) and `PenaltyService` — no longer orphaned.
-
-These are safe to leave in place (they only add schema weight via `ddl-auto=update`) but are candidates for either building out or removing to keep the codebase lean.
+**Mitigation (future):** a durable store (e.g. Redis via Upstash free tier) would persist these across restarts. Nothing in the backend uses Redis today.
 
 ### Database Migration
 
-The project currently uses `spring.jpa.hibernate.ddl-auto=update` even in production. This is convenient for development but risky for schema changes — there's no rollback capability. A migration to **Flyway** is planned for versioned, auditable schema changes.
+**Flyway owns the schema.** `spring.jpa.hibernate.ddl-auto=validate` in every profile — Hibernate only checks the entities against what the migrations built and never issues DDL itself. Schema changes go in a new `backend/src/main/resources/db/migration/V<n>__*.sql`. `V1__baseline.sql` is a `pg_dump` of the pre-Flyway schema; `baseline-on-migrate` lets an already-populated database adopt it. Tests build their schema from the entities (`ddl-auto=create-drop`, Flyway disabled) and are unaffected.
+
+Model-only entities that were never wired to a feature (`CarSetup`, `DriverContract`, `Sponsorship`, `Engineer`, `Championship`) were removed in `V2__drop_unused_entities.sql`. `StrategyPlan` is now backed by a real API (`StrategyPlanController` / `StrategyPlanService`).
 
 ---
 
