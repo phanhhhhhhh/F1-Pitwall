@@ -1,17 +1,9 @@
 import { authFetch } from "./pitwall-auth";
 import { BASE_URL as API } from "./api-client";
-import type {
-  CircuitGeometry,
-  CircuitInfo,
-  PitStopBenchmark,
-  TeamLivery,
-} from "../types/f1";
+import type { CircuitGeometry, CircuitInfo } from "../types/f1";
 
 /**
- * Typed fetchers for the data the 3D widgets run on.
- *
- * <p>The widgets are rendered on several pages and each of them needs the same few endpoints, so
- * the request shape lives here rather than being re-implemented per component.
+ * Typed fetchers for the circuit data the track map and 3D circuit viewer run on.
  */
 
 async function getJson<T>(path: string): Promise<T> {
@@ -33,14 +25,6 @@ export function fetchCircuits(): Promise<CircuitInfo[]> {
  */
 export function fetchCircuitGeometry(circuitId: number): Promise<CircuitGeometry> {
   return getJson<CircuitGeometry>(`/api/circuits/${circuitId}/geometry`);
-}
-
-export function fetchTeamLiveries(): Promise<TeamLivery[]> {
-  return getJson<TeamLivery[]>("/api/teams/livery");
-}
-
-export function fetchPitStopBenchmark(season: number): Promise<PitStopBenchmark> {
-  return getJson<PitStopBenchmark>(`/api/races/pit-stops/benchmark/${season}`);
 }
 
 /** Formats a lap time in seconds as `m:ss.mmm`. */
