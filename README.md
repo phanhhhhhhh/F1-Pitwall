@@ -170,13 +170,13 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 ├── backend/                        # Spring Boot API
 │   ├── src/main/java/backend/
 │   │   ├── config/                 # SecurityConfig, GlobalExceptionHandler, DataSeeder
-│   │   ├── controller/             # 22 REST controllers
+│   │   ├── controller/             # 21 REST controllers
 │   │   ├── dto/                    # Request/response DTOs
-│   │   ├── model/                  # 19 JPA entities + enums
-│   │   ├── repository/             # 19 Spring Data repositories
+│   │   ├── model/                  # 18 JPA entities + enums
+│   │   ├── repository/             # 18 Spring Data repositories
 │   │   ├── scheduler/              # TelemetrySimulator (1 s tick)
 │   │   ├── security/               # JwtService, JwtAuthenticationFilter, OAuth2SuccessHandler
-│   │   ├── service/                # 28 service classes (business logic + external APIs)
+│   │   ├── service/                # 25 service classes (business logic + external APIs)
 │   │   └── websocket/              # WebSocketConfig, TelemetryPayload
 │   ├── src/main/resources/
 │   │   ├── application.properties       # Default (dev) config
