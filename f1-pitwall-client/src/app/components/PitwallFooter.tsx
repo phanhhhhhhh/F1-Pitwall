@@ -71,11 +71,6 @@ export default function PitwallFooter() {
                   Circuit Directory
                 </Link>
               </li>
-              <li>
-                <Link href="/news" className="hover:text-white hover:translate-x-1 inline-block transition-all">
-                  Paddock News
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -89,11 +84,6 @@ export default function PitwallFooter() {
               <li>
                 <Link href="/drivers" className="hover:text-white hover:translate-x-1 inline-block transition-all">
                   Driver Profiles
-                </Link>
-              </li>
-              <li>
-                <Link href="/drivers/compare" className="hover:text-white hover:translate-x-1 inline-block transition-all">
-                  Driver 1v1 Battle
                 </Link>
               </li>
               <li>
@@ -117,15 +107,9 @@ export default function PitwallFooter() {
             </h4>
             <ul className="space-y-2.5 text-xs f-cond font-bold uppercase tracking-wider">
               <li>
-                <Link href="/live" className="hover:text-[#E10600] flex items-center gap-1.5 hover:translate-x-1 transition-all">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#E10600] animate-pulse" />
-                  Live Timing Tower
-                </Link>
-              </li>
-              <li>
                 <Link href="/telemetry" className="hover:text-[#00E5FF] flex items-center gap-1.5 hover:translate-x-1 transition-all">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse" />
-                  Telemetry Suite
+                  Telemetry & Timing
                 </Link>
               </li>
               <li>

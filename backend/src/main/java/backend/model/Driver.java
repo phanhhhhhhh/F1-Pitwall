@@ -39,11 +39,6 @@ public class Driver {
     @JsonIgnore
     @OneToMany(mappedBy = "driver", cascade = CascadeType.ALL)
     @ToString.Exclude @EqualsAndHashCode.Exclude
-    private List<DriverContract> contracts;
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "driver", cascade = CascadeType.ALL)
-    @ToString.Exclude @EqualsAndHashCode.Exclude
     private List<RaceResult> raceResults;
 
     @JsonIgnore

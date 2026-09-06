@@ -1,14 +1,11 @@
 package backend.config.seeder;
 
-import backend.model.Championship;
 import backend.model.Circuit;
 import backend.model.Driver;
 import backend.model.Race;
 import backend.model.Team;
-import backend.model.enums.ChampionshipType;
 import backend.model.enums.CircuitType;
 import backend.model.enums.RaceStatus;
-import backend.repository.ChampionshipRepository;
 import backend.repository.CircuitRepository;
 import backend.repository.DriverRepository;
 import backend.repository.RaceRepository;
@@ -32,7 +29,6 @@ public class Seeder2025 {
     private final DriverRepository driverRepo;
     private final CircuitRepository circuitRepo;
     private final RaceRepository raceRepo;
-    private final ChampionshipRepository champRepo;
 
     public void seed() {
         boolean hasGpRaces = raceRepo.findBySeason(2025).stream()
@@ -46,7 +42,6 @@ public class Seeder2025 {
             seedDrivers(teams);
             List<Circuit> circuits = seedCircuits();
             seedRaces(circuits);
-            seedChampionships();
 
             log.info("[Pitwall] 2025 season data seeded");
         }
@@ -401,15 +396,5 @@ public class Seeder2025 {
                         .circuit(circuitMap.get("Yas Marina Circuit")).build()
         ));
         log.info("[Pitwall] 24 races seeded (2025 season)");
-    }
-
-    private void seedChampionships() {
-        champRepo.saveAll(List.of(
-                Championship.builder().season(2025).type(ChampionshipType.DRIVERS)
-                        .leaderName("TBD").leaderPoints(0f).p2Gap(0f).p3Gap(0f).build(),
-                Championship.builder().season(2025).type(ChampionshipType.CONSTRUCTORS)
-                        .leaderName("TBD").leaderPoints(0f).p2Gap(0f).p3Gap(0f).build()
-        ));
-        log.info("[Pitwall] Championships seeded (2025)");
     }
 }

@@ -37,7 +37,6 @@ public class OpenF1SyncService {
     private final DriverRepository driverRepo;
     private final TeamRepository teamRepo;
     private final NotificationService notificationService;
-    private final RaceNewsService raceNewsService;
     private final PitStopRepository pitStopRepo;
     private final LapTelemetryRepository lapTelemetryRepo;
     private final WeatherConditionRepository weatherConditionRepo;
@@ -286,7 +285,6 @@ public class OpenF1SyncService {
 
         raceResultRepo.deleteByRaceId(race.getId());
         raceResultRepo.saveAll(results);
-        raceNewsService.generateRaceReport(race);
 
         results.stream()
                 .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)
@@ -405,7 +403,6 @@ public class OpenF1SyncService {
             raceResultRepo.saveAll(results);
             race.setStatus(RaceStatus.COMPLETED);
             raceRepo.save(race);
-            raceNewsService.generateRaceReport(race);
 
             results.stream()
                     .filter(r -> r.getFinishPosition() == 1 && r.getDnfReason() == null)

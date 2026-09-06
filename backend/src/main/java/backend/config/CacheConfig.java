@@ -15,9 +15,7 @@ public class CacheConfig {
             "sessionResults",
             "sessionList",
             "liveSessionStatus",
-            "liveTyreData",
-            "driverProfiles",
-            "pitStopBenchmark"
+            "liveTyreData"
         );
     }
 }
