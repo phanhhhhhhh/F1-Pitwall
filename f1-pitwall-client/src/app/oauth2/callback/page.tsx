@@ -86,7 +86,15 @@ function CallbackHandler() {
         const refreshToken = searchParams.get("refreshToken");
         const username = searchParams.get("username");
         const role = searchParams.get("role");
+        const state = searchParams.get("state");
         const err = searchParams.get("error");
+
+        // Scrub the token-bearing query string from history immediately —
+        // it must not linger in browser history / Referer headers even if
+        // we bail out below.
+        if (typeof window !== "undefined" && window.location.search) {
+            window.history.replaceState({}, "", window.location.pathname);
+        }
 
         if (err) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -99,6 +107,31 @@ function CallbackHandler() {
             setError("Invalid callback — missing tokens.");
             setTimeout(() => router.push("/login"), 3000);
             return;
+        }
+
+        // Login-CSRF guard: reject a callback that doesn't carry back the state
+        // this browser generated when it started the flow. OAuth2SuccessHandler
+        // echoes the nonce it read from the oauth_state cookie, so a legitimate
+        // login always has both sides present — missing or mismatched now fails
+        // closed instead of silently allowing the login through.
+        if (typeof window !== "undefined") {
+            let expectedState: string | null = null;
+            try {
+                expectedState = sessionStorage.getItem("oauth_state");
+                sessionStorage.removeItem("oauth_state");
+            } catch {
+                // sessionStorage unavailable — nothing to compare against, fails closed below.
+            }
+            try {
+                document.cookie = "oauth_state=; path=/; max-age=0";
+            } catch {
+                // ignore — best-effort cleanup
+            }
+            if (!expectedState || !state || state !== expectedState) {
+                setError("Invalid callback — login could not be verified.");
+                setTimeout(() => router.push("/login"), 3000);
+                return;
+            }
         }
 
         // Store tokens

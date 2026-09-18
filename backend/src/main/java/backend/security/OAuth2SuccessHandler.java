@@ -4,6 +4,7 @@ import backend.model.OtpToken;
 import backend.model.User;
 import backend.repository.UserRepository;
 import backend.service.OtpService;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -85,13 +86,34 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         String accessToken  = jwtService.generateAccessToken(userDetails, user.getRole().name());
         String refreshToken = jwtService.generateRefreshToken(userDetails);
 
+        // Echo back the nonce the SPA planted in a same-site cookie before it
+        // navigated into this flow, so /oauth2/callback can verify this browser
+        // actually initiated the login (login-CSRF / session-fixation guard).
+        String state = readCookie(request, "oauth_state");
+        if (state != null) {
+            Cookie expired = new Cookie("oauth_state", "");
+            expired.setPath("/");
+            expired.setMaxAge(0);
+            response.addCookie(expired);
+        }
+
         String redirectUrl = getFrontendUrl() + "/oauth2/callback"
                 + "?accessToken="  + URLEncoder.encode(accessToken,  StandardCharsets.UTF_8)
                 + "&refreshToken=" + URLEncoder.encode(refreshToken, StandardCharsets.UTF_8)
                 + "&username="     + URLEncoder.encode(user.getUsername(), StandardCharsets.UTF_8)
-                + "&role="         + URLEncoder.encode(user.getRole().name(), StandardCharsets.UTF_8);
+                + "&role="         + URLEncoder.encode(user.getRole().name(), StandardCharsets.UTF_8)
+                + (state != null ? "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8) : "");
 
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
+    }
+
+    private String readCookie(HttpServletRequest request, String name) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (Cookie cookie : cookies) {
+            if (name.equals(cookie.getName())) return cookie.getValue();
+        }
+        return null;
     }
 
     private String getFrontendUrl() {
