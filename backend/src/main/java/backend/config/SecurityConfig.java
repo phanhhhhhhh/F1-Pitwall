@@ -70,7 +70,7 @@ public class SecurityConfig {
                         // OAuth2 endpoints phải public
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").hasRole("ADMIN")
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/ws/**", "/ws/info/**").permitAll()
 

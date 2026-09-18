@@ -42,7 +42,7 @@ class OpenInViewRegressionTest {
             @SuppressWarnings("rawtypes")
             ResponseEntity<Map> resp = rest.postForEntity(
                     url("/api/auth/login"),
-                    Map.of("username", "admin", "password", "REDACTED"),
+                    Map.of("username", "admin", "password", "test-only-admin-password"),
                     Map.class);
             jwtToken = (String) resp.getBody().get("accessToken");
         }

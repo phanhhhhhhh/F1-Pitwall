@@ -30,7 +30,12 @@ public class DataSeeder implements CommandLineRunner {
         try {
             userSeeder.seed();
             log.info("[Pitwall] Users seeded");
-
+        } catch (IllegalStateException e) {
+            // Missing ADMIN_PASSWORD/ENGINEER_PASSWORD must not silently seed a known
+            // default, but it also shouldn't block the season data below from seeding.
+            log.error("[Pitwall] User seeding skipped: {}", e.getMessage());
+        }
+        try {
             // Seed 2025 data first (idempotent — skips if already present)
             seeder2025.seed();
 

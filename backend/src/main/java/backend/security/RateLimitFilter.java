@@ -59,20 +59,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Parse the first IP from X-Forwarded-For to prevent spoofing
-        // (a client can set an arbitrary X-Forwarded-For; taking only the first
-        // entry and falling back to the direct socket address is the pragmatic fix)
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank()) {
-            // X-Forwarded-For format: "client, proxy1, proxy2"
-            int comma = ip.indexOf(',');
-            ip = (comma > 0) ? ip.substring(0, comma).trim() : ip.trim();
-            if (ip.isBlank()) {
-                ip = request.getRemoteAddr();
-            }
-        } else {
-            ip = request.getRemoteAddr();
-        }
+        // X-Forwarded-For is fully client-controlled unless server.forward-headers-strategy
+        // is configured to trust a specific reverse proxy (it isn't here) — keying the
+        // bucket on it lets an attacker mint a fresh rate-limit bucket per request by
+        // sending a new header value each time. request.getRemoteAddr() is the actual
+        // TCP peer and can't be spoofed by the client.
+        String ip = request.getRemoteAddr();
 
         Bucket bucket = buckets.get(ip, k -> createBucket());
 

@@ -36,7 +36,7 @@ class AuthIntegrationTest {
     void loginWithValidCredentialsReturns200AndJwtTokens() {
         Map<String, String> body = Map.of(
                 "username", "admin",
-                "password", "REDACTED"
+                "password", "test-only-admin-password"
         );
 
         ResponseEntity<Map> response = rest.postForEntity(
