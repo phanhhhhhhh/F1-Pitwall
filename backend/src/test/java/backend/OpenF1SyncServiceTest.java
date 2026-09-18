@@ -132,7 +132,7 @@ class OpenF1SyncServiceTest {
         private final RaceRepository raceRepo = mock(RaceRepository.class);
 
         private OpenF1SyncService newSpy() {
-            return spy(new OpenF1SyncService(
+            OpenF1SyncService spy = spy(new OpenF1SyncService(
                     raceRepo,
                     mock(RaceResultRepository.class),
                     mock(DriverRepository.class),
@@ -142,6 +142,12 @@ class OpenF1SyncServiceTest {
                     mock(LapTelemetryRepository.class),
                     mock(WeatherConditionRepository.class),
                     mock(RestTemplate.class)));
+            // Production wiring routes internal calls through the `self` proxy field
+            // (see OpenF1SyncService) so @Transactional applies on self-invocation.
+            // spy() shallow-copies fields from the pre-spy instance, so `self` still
+            // points at the un-spied original unless we repoint it at the spy here.
+            org.springframework.test.util.ReflectionTestUtils.setField(spy, "self", spy);
+            return spy;
         }
 
         private Race raceOn(LocalDate date) {

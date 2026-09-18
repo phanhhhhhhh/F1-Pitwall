@@ -19,6 +19,8 @@ import backend.repository.TeamRepository;
 import backend.repository.WeatherConditionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,21 @@ public class OpenF1SyncService {
     private static final String OPENF1_BASE = "https://api.openf1.org/v1";
 
     private final RestTemplate restTemplate;
+
+    // Self-injected proxy reference: internal calls to @Transactional methods below
+    // (e.g. from syncRecentSessions, which is not itself @Transactional) must go
+    // through the Spring proxy via `self`, not `this`, or the @Transactional
+    // annotation is silently ignored (self-invocation bypasses the proxy). Without
+    // this, deleteByRaceId()+saveAll() in syncRaceResultsFromOpenF1/
+    // syncRaceByRoundViaJolpica each get their own auto-committed mini-transaction
+    // instead of one atomic transaction, so a failure between the two permanently
+    // loses that race's results.
+    // Defaults to `this` so unit tests that construct this service directly with
+    // `new OpenF1SyncService(...)` still work; Spring overwrites it with the lazy
+    // proxy via field injection when the bean is wired normally.
+    @Lazy
+    @Autowired
+    private OpenF1SyncService self = this;
 
     private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
     private static final int[] RACE_POINTS = {25, 18, 15, 12, 10, 8, 6, 4, 2, 1};
@@ -118,7 +135,7 @@ public class OpenF1SyncService {
             try {
                 sleep(800);
                 boolean isSprint = race.getName().toLowerCase().contains("sprint");
-                boolean result = syncRaceByRound(race, isSprint);
+                boolean result = self.syncRaceByRound(race, isSprint);
                 if (result) synced.add(label);
                 else skipped.add(label + " (no data available)");
             } catch (Exception e) {
@@ -144,7 +161,7 @@ public class OpenF1SyncService {
         // includes penalties, DSQs and DNF classification that OpenF1's
         // on-track position feed cannot reflect.
         if (historical) {
-            return syncRaceByRoundViaJolpica(race, isSprint);
+            return self.syncRaceByRoundViaJolpica(race, isSprint);
         }
 
         // Live races: try OpenF1 first (fast, near-real-time)…
@@ -160,7 +177,7 @@ public class OpenF1SyncService {
         }
 
         // …then fall back to Jolpica (slower, curated)
-        return syncRaceByRoundViaJolpica(race, isSprint);
+        return self.syncRaceByRoundViaJolpica(race, isSprint);
     }
 
     /**
@@ -446,7 +463,7 @@ public class OpenF1SyncService {
             log.warn("[Sync] No race found for country={} sprint={}", countryName, isSprint);
             return false;
         }
-        return syncRaceByRound(raceOpt.get(), isSprint);
+        return self.syncRaceByRound(raceOpt.get(), isSprint);
     }
 
     /**

@@ -15,6 +15,7 @@ import java.util.Optional;
 public interface DriverRepository extends JpaRepository<Driver, Long> {
     List<Driver> findByTeamId(Long teamId);
     Optional<Driver> findByCarNumber(int carNumber);
+    Optional<Driver> findByNameAndCarNumber(String name, int carNumber);
     List<Driver> findByNationality(String nationality);
 
     @Query("SELECT d FROM Driver d ORDER BY d.careerPoints DESC")
