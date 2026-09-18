@@ -111,10 +111,11 @@ describe("authFetch", () => {
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 })); // refresh fails
     vi.stubGlobal("fetch", fetchMock);
-    // authFetch navigates to /login on a failed refresh — stub it out so jsdom doesn't warn.
-    // @ts-expect-error jsdom's location is not fully navigable in tests
-    delete window.location;
-    window.location = { href: "" } as Location;
+    // authFetch navigates to /login on a failed refresh. jsdom's real `window.location` throws on
+    // navigation, so stub it for this test only — `vi.unstubAllGlobals()` in `afterEach` restores
+    // the real one, unlike `delete window.location`, which permanently breaks jsdom's shared window
+    // (and therefore `localStorage`) for every test that runs after this one in the file.
+    vi.stubGlobal("location", { ...window.location, href: "" });
 
     await authFetch("http://api.test/thing");
 
