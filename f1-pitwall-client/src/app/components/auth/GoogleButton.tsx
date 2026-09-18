@@ -9,9 +9,31 @@ interface GoogleButtonProps {
 }
 
 export function GoogleButton({ label = "Continue with Google", className = "" }: GoogleButtonProps) {
+  // Bind this browser to the OAuth round-trip so the callback can reject a
+  // crafted /oauth2/callback?accessToken=... link that didn't originate from
+  // a login this tab actually started (login CSRF / session fixation).
+  //
+  // The nonce goes in sessionStorage (read back by the callback page) AND in
+  // a SameSite=Lax cookie — the cookie is what actually survives the redirect
+  // through Google and back, since OAuth2SuccessHandler reads it server-side
+  // and echoes it back as `state` on the final /oauth2/callback redirect.
+  const handleClick = () => {
+    try {
+      const state = crypto.randomUUID();
+      sessionStorage.setItem("oauth_state", state);
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `oauth_state=${state}; path=/; max-age=300; samesite=lax${secure}`;
+    } catch {
+      // sessionStorage/cookies unavailable (private mode / disabled) — the
+      // callback page fails closed in that case, so login is blocked rather
+      // than silently skipping the check.
+    }
+  };
+
   return (
     <a
       href={`${API}/oauth2/authorize/google`}
+      onClick={handleClick}
       className={`flex items-center justify-center gap-3 w-full py-3 rounded-lg border transition-all duration-200 f-mono text-xs font-bold uppercase tracking-wider text-white group ${className}`}
       style={{
         borderColor: F1.hairline,
