@@ -15,6 +15,7 @@ A full-stack Formula 1 race engineering SaaS platform for the 2026 season — li
 - **OpenF1 Live Race Integration** — auto-detects currently-live sessions and switches the Tyres tab to real compound/age/stint data polled every 30 seconds; falls back to the telemetry simulator when no race is active
 - **Driver & Constructor Championship Standings** — real 2026 points system; wins, podiums, fastest laps, gap to leader/previous; top-6 surfaced on the Overview dashboard; CSV and PDF export
 - **Race Management** — submit P1–P22 results with automatic F1 points (including fastest-lap bonus); 2026 sprint points; race status lifecycle (SCHEDULED → ONGOING → COMPLETED / CANCELLED / RED_FLAGGED)
+- **Pit Strategy Simulator** — model up to 5 multi-stop strategies per circuit with a per-lap tyre degradation model (backed by real Pirelli compound data via `/api/tyrecompounds`), pit-stop loss, and race-time deltas; save/load plans per circuit; includes an undercut/overcut pit-window calculator
 - **Qualifying Results** — Q1/Q2/Q3 times and grid positions synced from the Jolpica API; per-race and bulk sync
 - **Pre-seeded 2026 Season** — 22 drivers, 11 teams, 24 circuits, 24 Grands Prix + 6 Sprint races auto-loaded on first startup
 - **Notifications** — RACE_RESULT, DNF, and STATUS_CHANGE notifications broadcast via STOMP WebSocket; unread count badge, mark-read, bulk dismiss
@@ -22,10 +23,6 @@ A full-stack Formula 1 race engineering SaaS platform for the 2026 season — li
 - **Admin Panel** — dashboard stats, user CRUD + role management, data migration tools (seed sprints, fix duplicates, clear/recalculate results)
 - **Auto-Sync** — scheduled OpenF1 live-data polling (30 s), weekend cache refresh (30 min), and Jolpica race-result sync (hourly)
 - **Swagger UI** — interactive API docs at `/swagger-ui/index.html`
-
-### Coming Soon
-
-- **Pit Strategy Simulator** — compare multi-stop strategies with tyre degradation and pit-stop loss (data model ready, API in progress)
 
 ---
 

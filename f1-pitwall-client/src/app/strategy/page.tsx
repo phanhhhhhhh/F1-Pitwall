@@ -13,14 +13,24 @@ import { BASE_URL as API } from "../lib/api-client";
 import type { CircuitRef } from "../types/f1";
 
 // ─── local tyre data (lap-time penalty + degradation model) ──────────────────
-const TYRE_PERF: Record<string, { lapTime: number; degradation: number }> = {
-  SOFT:         { lapTime: 0,   degradation: 0.08 },
-  MEDIUM:       { lapTime: 0.5, degradation: 0.05 },
-  HARD:         { lapTime: 1.2, degradation: 0.03 },
-  INTERMEDIATE: { lapTime: 3.0, degradation: 0.04 },
-  WET:          { lapTime: 6.0, degradation: 0.03 },
+// `lapTime` (fresh-tyre pace offset) has no backend equivalent, so it stays a
+// static estimate. `degradation` is overridden from /api/tyrecompounds once it
+// loads (see the tyrePerf effect in StrategyPage) — these values are only the
+// pre-fetch/fallback defaults, kept close to real Pirelli compound behaviour.
+const TYRE_PERF_DEFAULTS: Record<string, { lapTime: number; degradation: number }> = {
+  SOFT:         { lapTime: 0,   degradation: 0.8 },
+  MEDIUM:       { lapTime: 0.5, degradation: 0.5 },
+  HARD:         { lapTime: 1.2, degradation: 0.3 },
+  INTERMEDIATE: { lapTime: 3.0, degradation: 0.6 },
+  WET:          { lapTime: 6.0, degradation: 0.4 },
 };
-type TyreType = keyof typeof TYRE_PERF;
+type TyreType = keyof typeof TYRE_PERF_DEFAULTS;
+type TyrePerfTable = typeof TYRE_PERF_DEFAULTS;
+
+interface TyreCompoundApi {
+  type: string;
+  degradationRate: number;
+}
 
 const PIT_LOSS = 22;
 const STRATEGY_COLORS = [F1.red, "#3b82f6", F1.green, F1.gold, "#a855f7"];
@@ -40,17 +50,17 @@ interface SavedPlan {
 }
 
 // ─── pure helpers ─────────────────────────────────────────────────────────────
-function calcRaceTime(stints: Stint[], base: number): number {
+function calcRaceTime(stints: Stint[], base: number, perf: TyrePerfTable): number {
   let total = 0;
   stints.forEach(stint => {
-    const p = TYRE_PERF[stint.tyre] ?? TYRE_PERF.HARD;
+    const p = perf[stint.tyre] ?? perf.HARD;
     for (let lap = 1; lap <= stint.laps; lap++) total += base + p.lapTime + p.degradation * lap;
   });
   return total + (stints.length - 1) * PIT_LOSS;
 }
 
-function calcStintTime(stint: Stint, base: number): number {
-  const p = TYRE_PERF[stint.tyre] ?? TYRE_PERF.HARD;
+function calcStintTime(stint: Stint, base: number, perf: TyrePerfTable): number {
+  const p = perf[stint.tyre] ?? perf.HARD;
   let total = 0;
   for (let lap = 1; lap <= stint.laps; lap++) total += base + p.lapTime + p.degradation * lap;
   return total;
@@ -158,9 +168,9 @@ function LapAxis({ totalLaps }: { totalLaps: number }) {
 }
 
 /** Tyre compound legend chip */
-function CompoundChip({ tyreKey }: { tyreKey: string }) {
+function CompoundChip({ tyreKey, perfTable }: { tyreKey: string; perfTable: TyrePerfTable }) {
   const spec = tyre(tyreKey);
-  const perf = TYRE_PERF[tyreKey as TyreType];
+  const perf = perfTable[tyreKey as TyreType];
   return (
     <div className="flex items-center gap-2 py-1.5 group">
       <div
@@ -204,6 +214,7 @@ export default function StrategyPage() {
   const [hoveredStrat, setHoveredStrat] = useState<string | null>(null);
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [tyrePerf, setTyrePerf] = useState<TyrePerfTable>(TYRE_PERF_DEFAULTS);
 
   // ── auth + data fetch ───────────────────────────────────────────────────────
   // loading starts true, so the mount effect fetches directly without the
@@ -217,6 +228,29 @@ export default function StrategyPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+
+  // Degradation numbers come from the real Pirelli compound data an admin can
+  // tune via /api/tyrecompounds, so the simulator can't silently drift out of
+  // sync with it. Fresh-tyre pace offset (`lapTime`) has no backend field, so
+  // it stays the static default from TYRE_PERF_DEFAULTS.
+  useEffect(() => {
+    authFetch(`${API}/api/tyrecompounds`)
+      .then(r => r.json())
+      .then((data: TyreCompoundApi[]) => {
+        setTyrePerf(prev => {
+          const next = { ...prev };
+          data.forEach(c => {
+            if (c.type in next) {
+              next[c.type as TyreType] = { ...next[c.type as TyreType], degradation: c.degradationRate };
+            }
+          });
+          return next;
+        });
+      })
+      .catch(() => {
+        // keep TYRE_PERF_DEFAULTS — the simulator still works, just with the estimate.
+      });
   }, []);
 
   // Plans are saved against a circuit's most recent race (StrategyPlanController resolves
@@ -241,7 +275,7 @@ export default function StrategyPage() {
     return { ...s, stints: [...s.stints.slice(0, -1), last] };
   };
 
-  const raceTimes  = strategies.map(s => calcRaceTime(syncStrategyLaps(s).stints, baseLapTime));
+  const raceTimes  = strategies.map(s => calcRaceTime(syncStrategyLaps(s).stints, baseLapTime, tyrePerf));
   const minTime    = Math.min(...raceTimes);
   const bestStratIdx = raceTimes.indexOf(minTime);
 
@@ -317,7 +351,7 @@ export default function StrategyPage() {
       color: STRATEGY_COLORS[idx],
       stints: plan.stints.map((st, i) => ({
         id: `st${Date.now()}${i}`,
-        tyre: (st.tyre in TYRE_PERF ? st.tyre : "HARD") as TyreType,
+        tyre: (st.tyre in TYRE_PERF_DEFAULTS ? st.tyre : "HARD") as TyreType,
         laps: st.laps,
       })),
     }]);
@@ -505,7 +539,7 @@ export default function StrategyPage() {
                   <p className="f-mono text-[10px] tracking-[0.3em] text-zinc-500 mb-3 uppercase">Tyre Compounds</p>
                   <div className="space-y-1 divide-y divide-white/[0.04]">
                     {(["SOFT","MEDIUM","HARD","INTERMEDIATE","WET"] as TyreType[]).map(k => (
-                      <CompoundChip key={k} tyreKey={k} />
+                      <CompoundChip key={k} tyreKey={k} perfTable={tyrePerf} />
                     ))}
                   </div>
                   <div className="mt-3 pt-3 border-t flex items-center justify-between" style={{ borderColor: F1.hairline }}>
@@ -519,7 +553,7 @@ export default function StrategyPage() {
               <AnimatePresence>
                 {strategies.map((strategy, sIdx) => {
                   const synced    = syncStrategyLaps(strategy);
-                  const raceTime  = calcRaceTime(synced.stints, baseLapTime);
+                  const raceTime  = calcRaceTime(synced.stints, baseLapTime, tyrePerf);
                   const isBest    = sIdx === bestStratIdx;
                   const col       = strategy.color;
 
@@ -758,7 +792,7 @@ export default function StrategyPage() {
                   <div className="space-y-4">
                     {strategies.map((strategy, sIdx) => {
                       const synced    = syncStrategyLaps(strategy);
-                      const raceTime  = calcRaceTime(synced.stints, baseLapTime);
+                      const raceTime  = calcRaceTime(synced.stints, baseLapTime, tyrePerf);
                       const isBest    = sIdx === bestStratIdx;
                       const isHov     = hoveredStrat === strategy.id;
                       const gap       = raceTime - minTime;
@@ -832,7 +866,7 @@ export default function StrategyPage() {
                                     {spec.label}
                                   </span>
                                   <span className="f-mono text-zinc-500">{stint.laps}L</span>
-                                  <span className="f-mono text-zinc-700">{formatTime(calcStintTime(stint, baseLapTime))}</span>
+                                  <span className="f-mono text-zinc-700">{formatTime(calcStintTime(stint, baseLapTime, tyrePerf))}</span>
                                   {i < synced.stints.length - 1 && (
                                     <span className="text-zinc-700 text-[10px]">⬝ PIT</span>
                                   )}
@@ -879,7 +913,7 @@ export default function StrategyPage() {
                     <tbody>
                       {strategies.map((strategy, sIdx) => {
                         const synced   = syncStrategyLaps(strategy);
-                        const raceTime = calcRaceTime(synced.stints, baseLapTime);
+                        const raceTime = calcRaceTime(synced.stints, baseLapTime, tyrePerf);
                         const gap      = raceTime - minTime;
                         const isBest   = sIdx === bestStratIdx;
                         const col      = strategy.color;
