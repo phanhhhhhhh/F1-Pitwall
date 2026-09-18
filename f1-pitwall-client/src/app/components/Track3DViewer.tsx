@@ -268,6 +268,7 @@ export default function Track3DViewer({ circuits: circuitsProp, initialCircuitId
         }
       });
       renderer.dispose();
+      if (container.contains(dom)) container.removeChild(dom);
     };
   }, [curvePoints]);
 
