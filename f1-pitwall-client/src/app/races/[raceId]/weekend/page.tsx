@@ -150,6 +150,7 @@ export default function RaceWeekendPage() {
   const [results, setResults] = useState<SessionResult[]>([]);
   const [loadingPage, setLoadingPage] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPageData();
@@ -157,11 +158,15 @@ export default function RaceWeekendPage() {
   }, [raceId]);
 
   const fetchPageData = async () => {
+    setPageError(null);
     try {
       const [raceRes, sessionsRes] = await Promise.all([
         authFetch(`${API}/api/races/${raceId}`),
         authFetch(`${API}/api/openf1/race/${raceId}/sessions`),
       ]);
+      for (const res of [raceRes, sessionsRes]) {
+        if (!res.ok) throw new Error(`Failed to load race weekend data (${res.status}).`);
+      }
       const [raceData, sessionsData]: [RaceInfo, SessionInfo[]] = await Promise.all([raceRes.json(), sessionsRes.json()]);
       setRace(raceData);
       setSessions(sessionsData);
@@ -169,7 +174,10 @@ export default function RaceWeekendPage() {
       if (sessionsData.length > 0) {
         setActiveSession(sessionsData[0]);
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      setPageError(err instanceof Error ? err.message : "Failed to load race weekend data.");
+    }
     finally { setLoadingPage(false); }
   };
 
@@ -191,6 +199,7 @@ export default function RaceWeekendPage() {
     setLoadingResults(true);
     try {
       const res = await authFetch(`${API}/api/openf1/session/${session.sessionKey}/results`);
+      if (!res.ok) throw new Error(`Failed to load session results (${res.status}).`);
       const data: SessionResult[] = await res.json();
       sessionCacheRef.current[session.sessionKey] = data;
       setResults(data);
@@ -218,6 +227,27 @@ export default function RaceWeekendPage() {
           {[0, 1, 2, 3, 4].map(i => <div key={i} className="h-9 w-28 bg-zinc-800 rounded-xl animate-pulse" />)}
         </div>
         <SkeletonTable rows={10} cols={5} />
+      </main>
+    </div>
+  );
+
+  // ── Error state
+  if (pageError) return (
+    <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: F1.bg }}>
+      <PitwallBackground glow="top-left" />
+      <Navbar />
+      <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+        <RaceSubNav
+          raceId={raceId}
+          raceName={race?.name}
+          roundNumber={race?.roundNumber}
+          country={race?.circuit?.country}
+          date={race?.date}
+          activeTab="weekend"
+        />
+        <div className="p-8 rounded-2xl bg-red-950/40 border border-red-500/30 text-center">
+          <p className="f-mono text-sm text-red-400">{pageError}</p>
+        </div>
       </main>
     </div>
   );

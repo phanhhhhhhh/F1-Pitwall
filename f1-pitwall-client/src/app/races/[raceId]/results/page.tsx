@@ -109,6 +109,7 @@ export default function RaceResultsPage() {
   const [rows, setRows] = useState<ResultRow[]>([]);
   const [existingResults, setExistingResults] = useState<RaceResultResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [resyncing, setResyncing] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -121,17 +122,24 @@ export default function RaceResultsPage() {
   }, [raceId]);
 
   const fetchData = async () => {
+    setError(null);
     try {
       const [raceRes, driversRes, resultsRes] = await Promise.all([
         authFetch(`${API}/api/races/${raceId}`),
         authFetch(`${API}/api/drivers`),
         authFetch(`${API}/api/race-results/race/${raceId}`),
       ]);
+      for (const res of [raceRes, driversRes, resultsRes]) {
+        if (!res.ok) throw new Error(`Failed to load race data (${res.status}).`);
+      }
       const [raceData, driversData, resultsData] = await Promise.all([raceRes.json(), driversRes.json(), resultsRes.json()]);
       setRace(raceData); setDrivers(driversData); setExistingResults(resultsData);
       if (resultsData.length > 0) setMode("view");
       else { initRows(driversData); setMode("edit"); }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to load race data.");
+    }
     finally { setLoading(false); }
   };
 
@@ -204,6 +212,27 @@ export default function RaceResultsPage() {
           {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
         </div>
         <SkeletonTable rows={10} cols={5} />
+      </main>
+    </div>
+  );
+
+  // ── Error state
+  if (error) return (
+    <div className="min-h-screen text-white relative overflow-x-hidden" style={{ background: F1.bg }}>
+      <PitwallBackground glow="top-left" />
+      <Navbar />
+      <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+        <RaceSubNav
+          raceId={raceId}
+          raceName={race?.name}
+          roundNumber={race?.roundNumber}
+          country={race?.circuit?.country}
+          date={race?.date}
+          activeTab="results"
+        />
+        <div className="p-8 rounded-2xl bg-red-950/40 border border-red-500/30 text-center">
+          <p className="f-mono text-sm text-red-400">{error}</p>
+        </div>
       </main>
     </div>
   );
