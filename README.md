@@ -113,12 +113,7 @@ npm install && npm run dev
 
 ## Default Credentials (local dev)
 
-| Role | Username | Password |
-|---|---|---|
-| Admin | admin | pitwall2024 |
-| Engineer | engineer | telemetry2024 |
-
-A VIEWER account can be created via `POST /api/auth/register`.
+Seeding now fails closed — `ADMIN_PASSWORD` and `ENGINEER_PASSWORD` must be set in `backend/.env` or the backend refuses to start. There is no fallback password. Pick your own values; a VIEWER account can also be created via `POST /api/auth/register`.
 
 Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `backend/.env`.
 
@@ -131,8 +126,8 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `JWT_SECRET` | Yes (prod) | `f1-pitwall-super-secret-key-...` | HS256 signing key — min 32 characters |
-| `ADMIN_PASSWORD` | No | `pitwall2024` | Password seeded for the `admin` user on first startup |
-| `ENGINEER_PASSWORD` | No | `telemetry2024` | Password seeded for the `engineer` user on first startup |
+| `ADMIN_PASSWORD` | **Yes** | *(none)* | Password seeded for the `admin` user on first startup — startup fails if unset |
+| `ENGINEER_PASSWORD` | **Yes** | *(none)* | Password seeded for the `engineer` user on first startup — startup fails if unset |
 | `ALLOWED_ORIGINS` | No | `http://localhost:3000` | Comma-separated CORS origins — local/self-hosted override only |
 | `FRONTEND_URL` | Yes (prod) | `https://f1-pitwall.vercel.app` | The CORS origin `application-prod.properties` actually reads in production (Render sets this, not `ALLOWED_ORIGINS`) |
 | `GOOGLE_CLIENT_ID` | No (dev) | `dummy-local` | Google OAuth 2.0 client ID |
