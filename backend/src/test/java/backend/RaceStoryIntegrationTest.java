@@ -38,7 +38,7 @@ class RaceStoryIntegrationTest {
         if (jwtToken == null) {
             Map<String, String> body = Map.of(
                     "username", "admin",
-                    "password", "pitwall2024"
+                    "password", "test-only-admin-password"
             );
             ResponseEntity<Map> resp = rest.postForEntity(
                     url("/api/auth/login"), body, Map.class);

@@ -2,6 +2,7 @@ package backend.service;
 
 import backend.model.OtpToken;
 import backend.repository.OtpTokenRepository;
+import backend.security.OtpAttemptService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class OtpService {
 
     private final OtpTokenRepository otpTokenRepository;
     private final EmailService emailService;
+    private final OtpAttemptService otpAttemptService;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     @Transactional
@@ -36,16 +38,22 @@ public class OtpService {
 
     @Transactional
     public boolean verifyOtp(String email, String code, OtpToken.OtpType type) {
+        if (otpAttemptService.isLocked(email, type)) {
+            log.warn("[OTP] {} verification locked out for {} — too many failed attempts", type, email);
+            return false;
+        }
         return otpTokenRepository
                 .findTopByEmailAndCodeAndTypeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
                         email, code, type, LocalDateTime.now())
                 .map(otp -> {
                     otp.setUsed(true);
                     otpTokenRepository.save(otp);
+                    otpAttemptService.reset(email, type);
                     log.info("[OTP] Verified {} OTP for {}", type, email);
                     return true;
                 })
                 .orElseGet(() -> {
+                    otpAttemptService.recordFailure(email, type);
                     log.warn("[OTP] Invalid/expired {} OTP attempt for {}", type, email);
                     return false;
                 });
