@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -34,7 +35,11 @@ public class CircuitRaceSeeder {
     }
 
     private List<Circuit> seedCircuits() {
-        List<Circuit> circuits = circuitRepo.saveAll(List.of(
+        Set<String> existingNames = circuitRepo.findAll().stream()
+                .map(Circuit::getName)
+                .collect(Collectors.toSet());
+
+        List<Circuit> newCircuits = List.of(
                 Circuit.builder().name("Albert Park Circuit").country("Australia").city("Melbourne")
                         .type(CircuitType.STREET).totalLaps(58).lengthKm(5.278f).lapRecordSec(80.235f)
                         .lapRecordHolder("Charles Leclerc").turnCount(16).build(),
@@ -107,9 +112,24 @@ public class CircuitRaceSeeder {
                 Circuit.builder().name("Yas Marina Circuit").country("UAE").city("Abu Dhabi")
                         .type(CircuitType.PERMANENT).totalLaps(58).lengthKm(5.281f).lapRecordSec(88.391f)
                         .lapRecordHolder("Max Verstappen").turnCount(16).build()
-        ));
+        );
+
+        List<Circuit> toSave = newCircuits.stream()
+                .filter(c -> !existingNames.contains(c.getName()))
+                .collect(Collectors.toList());
+
+        if (!toSave.isEmpty()) {
+            circuitRepo.saveAll(toSave);
+        }
+
         log.info("[Pitwall] 24 circuits seeded");
-        return circuits;
+
+        // Return all circuits (existing + new) so seedRaces can look every one up by name.
+        return newCircuits.stream()
+                .map(c -> circuitRepo.findAll().stream()
+                        .filter(existing -> existing.getName().equals(c.getName()))
+                        .findFirst().orElse(c))
+                .collect(Collectors.toList());
     }
 
     private void seedRaces(List<Circuit> circuits) {

@@ -248,7 +248,7 @@ public class TeamDriverSeeder {
         // deploy — Lindblad, Perez, Bottas).
         for (Driver gridDriver : drivers) {
             if (gridDriver.getTeam() == null) continue;
-            driverRepo.findByCarNumber(gridDriver.getCarNumber()).ifPresent(existing -> {
+            driverRepo.findByNameAndCarNumber(gridDriver.getName(), gridDriver.getCarNumber()).ifPresent(existing -> {
                 if (existing.getTeam() == null) {
                     existing.setTeam(gridDriver.getTeam());
                     driverRepo.save(existing);

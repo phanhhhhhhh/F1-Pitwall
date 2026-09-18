@@ -77,7 +77,7 @@ class TeamDriverSeederTest {
 
         Driver lindblad = Driver.builder().name("Arvid Lindblad").carNumber(41).team(null).build();
         when(driverRepo.findAll()).thenReturn(List.of(lindblad));
-        when(driverRepo.findByCarNumber(41)).thenReturn(Optional.of(lindblad));
+        when(driverRepo.findByNameAndCarNumber("Arvid Lindblad", 41)).thenReturn(Optional.of(lindblad));
 
         new TeamDriverSeeder(teamRepo, driverRepo, tyreRepo).seed();
 
@@ -96,7 +96,7 @@ class TeamDriverSeederTest {
 
         Driver lawson = Driver.builder().name("Liam Lawson").carNumber(30).team(team("Red Bull Racing")).build();
         when(driverRepo.findAll()).thenReturn(List.of(lawson));
-        when(driverRepo.findByCarNumber(30)).thenReturn(Optional.of(lawson));
+        when(driverRepo.findByNameAndCarNumber("Liam Lawson", 30)).thenReturn(Optional.of(lawson));
 
         new TeamDriverSeeder(teamRepo, driverRepo, tyreRepo).seed();
 
