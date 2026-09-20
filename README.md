@@ -199,16 +199,17 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 
 ### In-Memory State (lost on restart)
 
-All of the following are stored in `ConcurrentHashMap` and are **lost on application restart** (Render free tier restarts frequently due to inactivity):
+All of the following are held in memory and are **lost on application restart** (Render free tier restarts frequently due to inactivity):
 
 | Component | What's stored | Impact on restart |
 |---|---|---|
-| `TokenBlacklistService` | SHA-256 hashes of revoked JWT access + refresh tokens | Previously logged-out users can use their old tokens again until natural expiration |
 | `AccountLockoutService` | Failed login attempts per username | Lockout counters reset — a brute-force attacker gets a fresh 5 attempts |
 | `RateLimitFilter` | Bucket4j token buckets per IP | Rate-limit counters reset — a flooder gets a fresh 5 req/min allowance |
 | `TelemetrySimulator` | Simulated speed/RPM/gear per driver | Simulation state resets from lap-start values |
 
-**Mitigation (future):** a durable store (e.g. Redis via Upstash free tier) would persist these across restarts. Nothing in the backend uses Redis today.
+**Persisted:** `TokenBlacklistService` (revoked JWT hashes) is written through to the `blacklisted_tokens` table (Flyway `V4`) and reloaded on startup, so logouts survive a restart. Expired rows are purged hourly.
+
+**Mitigation (future):** for the components above, a durable store (e.g. Redis via Upstash free tier) would persist these across restarts. Nothing in the backend uses Redis today.
 
 ### Database Migration
 
