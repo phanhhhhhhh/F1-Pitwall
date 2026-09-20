@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
+import { calcUndercut, type PitLossMode } from "../lib/undercut-math";
 
 export default function UndercutCalculator({ className = "" }: { className?: string }) {
   // Inputs
@@ -9,32 +10,12 @@ export default function UndercutCalculator({ className = "" }: { className?: str
   const [freshTyreAdvantage, setFreshTyreAdvantage] = useState(1.4); // s/lap faster on fresh rubber
   const [wornTyreDeg, setWornTyreDeg] = useState(0.5); // s/lap lost on old tyres
   const [leaderResponseLaps, setLeaderResponseLaps] = useState(1); // Laps before leader pits
-  const [pitLossMode, setPitLossMode] = useState<"GREEN" | "VSC" | "SC">("GREEN");
+  const [pitLossMode, setPitLossMode] = useState<PitLossMode>("GREEN");
 
-  const pitLossSec = pitLossMode === "GREEN" ? 22.0 : pitLossMode === "VSC" ? 12.0 : 9.5;
-
-  // Calculation:
-  // Car A (Chaser) pits at Lap 0.
-  // Car A loses pitLossSec on Lap 0, but gains freshTyreAdvantage on Out-Lap and subsequent laps.
-  // Car B (Leader) stays out for leaderResponseLaps, losing wornTyreDeg each lap, then pits losing pitLossSec.
-  const result = useMemo(() => {
-    // Delta gained by Chaser over response laps:
-    // Total pace delta per lap = freshTyreAdvantage + wornTyreDeg
-    const paceDeltaPerLap = freshTyreAdvantage + wornTyreDeg;
-    const totalPaceGained = paceDeltaPerLap * leaderResponseLaps;
-
-    // When both cars have completed their stops:
-    // Net Delta = totalPaceGained - initialGap
-    const netDelta = totalPaceGained - initialGap;
-    const isSuccessful = netDelta > 0;
-
-    return {
-      netDelta: Math.abs(netDelta),
-      isSuccessful,
-      totalPaceGained,
-      pitLossSec,
-    };
-  }, [initialGap, freshTyreAdvantage, wornTyreDeg, leaderResponseLaps, pitLossSec]);
+  const result = useMemo(
+    () => calcUndercut({ initialGap, freshTyreAdvantage, wornTyreDeg, leaderResponseLaps, pitLossMode }),
+    [initialGap, freshTyreAdvantage, wornTyreDeg, leaderResponseLaps, pitLossMode],
+  );
 
   return (
     <div className={`p-5 rounded-3xl bg-zinc-950/90 border border-zinc-800 shadow-2xl backdrop-blur-xl ${className}`}>
@@ -187,7 +168,7 @@ export default function UndercutCalculator({ className = "" }: { className?: str
       <div className="p-4 rounded-2xl bg-black/60 border border-zinc-800/80">
         <div className="flex items-center justify-between text-xs f-mono mb-3">
           <span className="text-zinc-400 font-bold uppercase">REJOINING TRACK PROJECTION</span>
-          <span className="text-zinc-500">Pit Loss: {pitLossSec.toFixed(1)}s</span>
+          <span className="text-zinc-500">Pit Loss: {result.pitLossSec.toFixed(1)}s</span>
         </div>
 
         <div className="relative h-10 w-full bg-zinc-950 rounded-xl border border-zinc-800 p-1 flex items-center overflow-hidden">
