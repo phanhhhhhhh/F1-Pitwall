@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import { getTeamColor } from "../lib/f1-theme";
 import type { DriverStanding, ConstructorStanding } from "../types/f1";
 

@@ -10,6 +10,7 @@ import { SkeletonCard } from "../components/LoadingSkeleton";
 import UndercutCalculator from "../components/UndercutCalculator";
 
 import { BASE_URL as API } from "../lib/api-client";
+import { PIT_LOSS, calcRaceTime, calcStintTime, formatTime, formatLapTime } from "../lib/strategy-math";
 import type { CircuitRef } from "../types/f1";
 
 // ─── local tyre data (lap-time penalty + degradation model) ──────────────────
@@ -32,7 +33,6 @@ interface TyreCompoundApi {
   degradationRate: number;
 }
 
-const PIT_LOSS = 22;
 const STRATEGY_COLORS = [F1.red, "#3b82f6", F1.green, F1.gold, "#a855f7"];
 const STRATEGY_NAMES = ["Strategy A", "Strategy B", "Strategy C", "Strategy D", "Strategy E"];
 
@@ -47,36 +47,6 @@ interface SavedPlan {
   plannedCompounds: string;
   stints: { tyre: string; laps: number }[];
   raceName: string;
-}
-
-// ─── pure helpers ─────────────────────────────────────────────────────────────
-function calcRaceTime(stints: Stint[], base: number, perf: TyrePerfTable): number {
-  let total = 0;
-  stints.forEach(stint => {
-    const p = perf[stint.tyre] ?? perf.HARD;
-    for (let lap = 1; lap <= stint.laps; lap++) total += base + p.lapTime + p.degradation * lap;
-  });
-  return total + (stints.length - 1) * PIT_LOSS;
-}
-
-function calcStintTime(stint: Stint, base: number, perf: TyrePerfTable): number {
-  const p = perf[stint.tyre] ?? perf.HARD;
-  let total = 0;
-  for (let lap = 1; lap <= stint.laps; lap++) total += base + p.lapTime + p.degradation * lap;
-  return total;
-}
-
-function formatTime(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = (sec % 60).toFixed(1);
-  return h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
-}
-
-function formatLapTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = (sec % 60).toFixed(3);
-  return `${m}:${s.padStart(6, "0")}`;
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
