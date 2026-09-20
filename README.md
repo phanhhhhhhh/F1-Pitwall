@@ -203,11 +203,11 @@ All of the following are held in memory and are **lost on application restart** 
 
 | Component | What's stored | Impact on restart |
 |---|---|---|
-| `AccountLockoutService` | Failed login attempts per username | Lockout counters reset — a brute-force attacker gets a fresh 5 attempts |
+| `AccountLockoutService` | Sub-threshold failed-login counters (active lockouts are persisted) | Counters below the 5-attempt threshold reset |
 | `RateLimitFilter` | Bucket4j token buckets per IP | Rate-limit counters reset — a flooder gets a fresh 5 req/min allowance |
 | `TelemetrySimulator` | Simulated speed/RPM/gear per driver | Simulation state resets from lap-start values |
 
-**Persisted:** `TokenBlacklistService` (revoked JWT hashes) is written through to the `blacklisted_tokens` table (Flyway `V4`) and reloaded on startup, so logouts survive a restart. Expired rows are purged hourly.
+**Persisted:** `AccountLockoutService` writes active lockouts to `account_lockouts` (Flyway `V5`) and reloads them on startup. `TokenBlacklistService` (revoked JWT hashes) is written through to the `blacklisted_tokens` table (Flyway `V4`) and reloaded on startup, so logouts survive a restart. Expired rows are purged hourly.
 
 **Mitigation (future):** for the components above, a durable store (e.g. Redis via Upstash free tier) would persist these across restarts. Nothing in the backend uses Redis today.
 
