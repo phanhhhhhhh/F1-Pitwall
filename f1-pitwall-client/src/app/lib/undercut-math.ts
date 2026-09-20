@@ -12,7 +12,7 @@ export interface UndercutInput {
 
 /** Chaser pits first; each lap the leader stays out the chaser gains fresh-tyre pace plus the leader's wear. */
 export function calcUndercut(i: UndercutInput) {
-  const pitLossSec = PIT_LOSS_BY_MODE[i.pitLossMode];
+  const pitLossSec = PIT_LOSS_BY_MODE[i.pitLossMode] ?? PIT_LOSS_BY_MODE.GREEN;
   const totalPaceGained = (i.freshTyreAdvantage + i.wornTyreDeg) * i.leaderResponseLaps;
   const netDelta = totalPaceGained - i.initialGap;
   return { netDelta: Math.abs(netDelta), isSuccessful: netDelta > 0, totalPaceGained, pitLossSec };

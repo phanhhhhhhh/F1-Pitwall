@@ -4,8 +4,6 @@ import backend.model.BlacklistedToken;
 import backend.repository.BlacklistedTokenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -33,14 +31,16 @@ public class TokenBlacklistService {
         this.repository = repository;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    // @PostConstruct: must finish before the web server binds, or revoked/locked state is
+    // ignored while the seeders run.
+    @jakarta.annotation.PostConstruct
     public void loadPersisted() {
         try {
             repository.findByExpiresAtAfter(Instant.now())
                     .forEach(t -> blacklist.put(t.getTokenHash(), t.getExpiresAt()));
             log.info("[Auth] Restored {} revoked tokens", blacklist.size());
         } catch (RuntimeException e) {
-            log.warn("[Auth] Could not restore revoked tokens: {}", e.getMessage());
+            log.error("[Auth] Could not restore revoked tokens: {}", e.getMessage());
         }
     }
 
@@ -52,7 +52,7 @@ public class TokenBlacklistService {
             repository.save(new BlacklistedToken(hash, expiry));
         } catch (RuntimeException e) {
             // Still revoked in memory for this run; persistence is best-effort.
-            log.warn("[Auth] Could not persist revoked token: {}", e.getMessage());
+            log.error("[Auth] Could not persist revoked token: {}", e.getMessage());
         }
     }
 
