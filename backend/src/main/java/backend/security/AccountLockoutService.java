@@ -6,8 +6,6 @@ import backend.model.AccountLockout;
 import backend.repository.AccountLockoutRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -40,13 +38,15 @@ public class AccountLockoutService {
         this.repository = repository;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    // @PostConstruct: must finish before the web server binds, or revoked/locked state is
+    // ignored while the seeders run.
+    @jakarta.annotation.PostConstruct
     public void loadPersisted() {
         try {
             repository.findByLockedUntilAfter(Instant.now()).forEach(l ->
                     attempts.put(l.getUsername(), new FailedAttempt(MAX_ATTEMPTS, l.getLockedUntil())));
         } catch (RuntimeException e) {
-            log.warn("[Auth] Could not restore account lockouts: {}", e.getMessage());
+            log.error("[Auth] Could not restore account lockouts: {}", e.getMessage());
         }
     }
 
@@ -54,7 +54,7 @@ public class AccountLockoutService {
         try {
             repository.save(new AccountLockout(username, until));
         } catch (RuntimeException e) {
-            log.warn("[Auth] Could not persist lockout: {}", e.getMessage());
+            log.error("[Auth] Could not persist lockout: {}", e.getMessage());
         }
     }
 

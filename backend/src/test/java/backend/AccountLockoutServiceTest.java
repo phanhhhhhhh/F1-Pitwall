@@ -2,6 +2,7 @@ package backend;
 
 import backend.repository.AccountLockoutRepository;
 import backend.security.AccountLockoutService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +16,9 @@ class AccountLockoutServiceTest {
 
     @Autowired AccountLockoutService service;
     @Autowired AccountLockoutRepository repository;
+
+    @AfterEach
+    void clean() { repository.deleteAll(); }
 
     @Test
     void locksAfterFiveFailuresAndSurvivesRestart() {

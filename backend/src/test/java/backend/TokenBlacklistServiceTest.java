@@ -2,6 +2,7 @@ package backend;
 
 import backend.repository.BlacklistedTokenRepository;
 import backend.security.TokenBlacklistService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +16,9 @@ class TokenBlacklistServiceTest {
 
     @Autowired TokenBlacklistService service;
     @Autowired BlacklistedTokenRepository repository;
+
+    @AfterEach
+    void clean() { repository.deleteAll(); }
 
     @Test
     void blacklistedTokenIsRejectedAndUnknownIsNot() {
@@ -34,16 +38,19 @@ class TokenBlacklistServiceTest {
     }
 
     @Test
-    void expiredEntriesAreNotRestoredAndArePurged() {
-        service.blacklist("token-expired", -1_000);
+    void expiredEntriesAreNotRestoredAndArePurged() throws InterruptedException {
+        service.blacklist("token-expired", 20);
+        service.blacklist("token-live", 60_000);
+        Thread.sleep(50);
         assertThat(service.isBlacklisted("token-expired")).isFalse();
 
         TokenBlacklistService restarted = new TokenBlacklistService(repository);
         restarted.loadPersisted();
         assertThat(restarted.isBlacklisted("token-expired")).isFalse();
+        assertThat(restarted.isBlacklisted("token-live")).isTrue();
 
+        assertThat(repository.count()).isEqualTo(2);
         service.cleanup();
-        assertThat(repository.count()).isEqualTo(
-                repository.findByExpiresAtAfter(java.time.Instant.now()).size());
+        assertThat(repository.count()).isEqualTo(1);
     }
 }
