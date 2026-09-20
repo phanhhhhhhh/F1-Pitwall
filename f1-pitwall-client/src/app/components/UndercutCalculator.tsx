@@ -3,10 +3,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 
-interface UndercutCalculatorProps {
-  className?: string;
-}
-
 export default function UndercutCalculator({ className = "" }: { className?: string }) {
   // Inputs
   const [initialGap, setInitialGap] = useState(1.8); // Seconds behind leader

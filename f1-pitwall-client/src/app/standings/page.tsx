@@ -169,7 +169,7 @@ export default function StandingsPage() {
 
             {viewFeature === "calculator" && (
               <div className="mb-6">
-                <ChampionshipCalculator initialStandings={drivers} season={season} />
+                <ChampionshipCalculator initialStandings={drivers} />
               </div>
             )}
 

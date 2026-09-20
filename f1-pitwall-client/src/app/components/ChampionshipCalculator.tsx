@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { motion } from "framer-motion";
 import { getTeamColor } from "../lib/f1-theme";
 import type { DriverStanding } from "../types/f1";
 
 interface ChampionshipCalculatorProps {
   initialStandings: DriverStanding[];
-  season: number;
 }
 
 const F1_POINTS_MAP: Record<string, number> = {
@@ -27,7 +25,6 @@ const F1_POINTS_MAP: Record<string, number> = {
 
 export default function ChampionshipCalculator({
   initialStandings,
-  season,
 }: ChampionshipCalculatorProps) {
   // Scenario picks for top 6 drivers: { [driverId]: { finish: string, fastestLap: boolean } }
   const [scenarios, setScenarios] = useState<
