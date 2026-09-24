@@ -57,8 +57,11 @@ export default function CommandPalette({
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
+      // Reset on open; the palette stays mounted while closed, so this can't be a remount.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setQuery("");
       setSelectedIndex(0);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [isOpen]);
 

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { AuthResponse, User, clearTokens, getAccessToken, authFetch, serverLogout } from "../lib/pitwall-auth";
 import { BASE_URL as API_URL } from "../lib/api-client";
+import { hardNavigate } from "../lib/navigation";
 
 interface AuthContextType {
   user: User | null;
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!getAccessToken()) return;
           const path = window.location.pathname;
           const isPublic = PUBLIC_PATHS.some(p => path.startsWith(p));
-          if (!isPublic) { clearTokens(); window.location.href = "/login"; }
+          if (!isPublic) { clearTokens(); hardNavigate("/login"); }
           else { clearTokens(); }
         }
       })
@@ -87,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ id: 0, username: data.username, email: "", role: data.role, createdAt: new Date().toISOString() });
   };
 
-  const logout = () => { serverLogout(); setUser(null); window.location.href = "/login"; };
+  const logout = () => { serverLogout(); setUser(null); hardNavigate("/login"); };
 
   // Re-fetch /me so Navbar etc. pick up profile changes without a full reload
   const refreshUser = async () => {

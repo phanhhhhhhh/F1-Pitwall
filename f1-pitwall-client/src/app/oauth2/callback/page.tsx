@@ -6,6 +6,7 @@ import { setTokens } from "../../lib/pitwall-auth";
 import { motion } from "framer-motion";
 import PitwallBackground from "../../components/PitwallBackground";
 import { F1 } from "../../lib/f1-theme";
+import { hardNavigate } from "../../lib/navigation";
 
 /* ── Animated Google "G" mark ────────────────────────────────────────────── */
 function GoogleMark() {
@@ -144,7 +145,7 @@ function CallbackHandler() {
         }
 
         // Delay nhỏ để sessionStorage kịp ghi trước khi redirect
-        setTimeout(() => { window.location.href = "/"; }, 300);
+        setTimeout(() => { hardNavigate("/"); }, 300);
     }, [searchParams, router]);
 
     if (error) {
