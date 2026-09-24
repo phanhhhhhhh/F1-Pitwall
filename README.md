@@ -9,7 +9,7 @@ A full-stack Formula 1 race engineering SaaS platform for the 2026 season — li
 ## Features
 
 - **Pit Wall OS Design System** — broadcast-inspired UI with F1 red, Saira Condensed typography, chamfered cards, timing-tower rows, animated count-ups, and responsive mobile layout
-- **Authentication** — username/password login with JWT (access + refresh tokens), Google OAuth 2.0 with 2FA, passwordless OTP login, forgot/reset password flow; BCrypt hashing; role-based access (ADMIN / ENGINEER / VIEWER)
+- **Authentication** — username/password login with JWT (access + refresh tokens), Google OAuth 2.0 with 2FA, passwordless OTP login, forgot/reset password flow; BCrypt hashing; role-based access (ADMIN / ENGINEER / VIEWER). Passwords are 8–72 characters; changing or resetting one revokes every existing session. Accounts whose email was never verified are claimed by whoever later proves the mailbox (Google, OTP, reset), which removes any password set beforehand. The Google callback carries only a one-time code, exchanged for tokens by `POST /api/auth/oauth2/exchange`
 - **Live WebSocket Telemetry** — simulated speed, RPM, gear, throttle, brake, and DRS pushed every second via STOMP/SockJS; per-driver and aggregated topics. Clients authenticate with their access token in the STOMP `CONNECT` header, may only subscribe to `/topic/telemetry` and `/topic/notifications`, and cannot publish
 - **Race Weekend Hub** — dynamic session tabs (FP1/FP2/FP3) with fastest-lap results per driver fetched from the OpenF1 API; weekend schedule with LIVE / UPCOMING / COMPLETED status badges; 30-minute cache with manual refresh
 - **OpenF1 Live Race Integration** — auto-detects currently-live sessions and switches the Tyres tab to real compound/age/stint data polled every 30 seconds; falls back to the telemetry simulator when no race is active
@@ -17,7 +17,7 @@ A full-stack Formula 1 race engineering SaaS platform for the 2026 season — li
 - **Race Management** — submit P1–P22 results with automatic F1 points (including fastest-lap bonus); 2026 sprint points; race status lifecycle (SCHEDULED → ONGOING → COMPLETED / CANCELLED / RED_FLAGGED)
 - **Pit Strategy Simulator** — model up to 5 multi-stop strategies per circuit with a per-lap tyre degradation model (backed by real Pirelli compound data via `/api/tyrecompounds`), pit-stop loss, and race-time deltas; save/load plans per circuit; includes an undercut/overcut pit-window calculator
 - **Qualifying Results** — Q1/Q2/Q3 times and grid positions synced from the Jolpica API; per-race and bulk sync
-- **Pre-seeded 2026 Season** — 22 drivers, 11 teams, 24 circuits, 24 Grands Prix + 6 Sprint races auto-loaded on first startup
+- **Pre-seeded Seasons** — 2025 and 2026 are loaded on first startup: 24 drivers, 14 teams (2025 and 2026 names), 28 circuits, and 30 races per season (24 Grands Prix + 6 Sprints)
 - **Notifications** — RACE_RESULT, DNF, and STATUS_CHANGE notifications broadcast via STOMP WebSocket; unread count badge, mark-read, bulk dismiss
 - **Profile & Account Management** — editable display name, email, phone, date of birth, location, bio; avatar upload to Supabase Storage with instant navbar preview
 - **Admin Panel** — dashboard stats, user CRUD + role management, data migration tools (seed sprints, fix duplicates, clear/recalculate results)
