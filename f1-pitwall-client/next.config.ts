@@ -1,16 +1,19 @@
 import type { NextConfig } from "next";
 
-// connect-src is intentionally broad (https:/wss:) rather than pinned to one
-// origin: the backend API host is set per-deploy via NEXT_PUBLIC_API_URL and
-// isn't known at build time here. Tighten this to the exact API origin once
-// it's fixed for a given environment.
+// connect-src is pinned to the API origin (fetch + SockJS/STOMP over http(s) and ws(s)) and
+// Supabase Storage (avatar uploads). NEXT_PUBLIC_API_URL is inlined at build time, so the
+// policy always matches the deploy it ships with.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_ORIGIN = new URL(API_URL).origin;
+const API_WS_ORIGIN = API_ORIGIN.replace(/^http/, "ws");
+
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' https://*.supabase.co https://lh3.googleusercontent.com data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https: wss:",
+  `connect-src 'self' ${API_ORIGIN} ${API_WS_ORIGIN} https://*.supabase.co`,
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
