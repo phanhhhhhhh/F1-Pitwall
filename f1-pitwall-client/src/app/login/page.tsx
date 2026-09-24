@@ -71,6 +71,7 @@ function LoginForm() {
     if (err === "oauth_failed") setError("Google login failed. Please try again.");
     if (err === "otp_failed") setError("Failed to send 2FA code. Please try again.");
     if (err === "no_email") setError("Google account has no email.");
+    if (err === "email_unverified") setError("Google has not verified this email address.");
   }, [searchParams]);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -259,7 +260,7 @@ function LoginForm() {
                             autoFocus
                           />
                           <p className="f-mono text-zinc-600 text-[10px] mt-2 text-center">
-                            Sent to {otpEmail} · expires in 5 min
+                            If {otpEmail} is registered, a code was sent · expires in 5 min
                           </p>
                         </div>
                         <div className="flex gap-3">

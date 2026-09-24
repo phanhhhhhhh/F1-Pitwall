@@ -3,6 +3,7 @@ import {
   ApiError,
   authFetch,
   clearTokens,
+  exchangeOauth2Code,
   getAccessToken,
   isApiError,
   setTokens,
@@ -141,5 +142,36 @@ describe("authFetch", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(authFetch("http://api.test/thing")).rejects.toMatchObject({ status: 408 });
+  });
+});
+
+describe("exchangeOauth2Code", () => {
+  afterEach(() => {
+    clearTokens();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the one-time code and stores the returned tokens", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ accessToken: "acc", refreshToken: "ref", username: "sam", role: "VIEWER", expiresIn: 900 }),
+    );
+
+    const data = await exchangeOauth2Code("the-code");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/auth\/oauth2\/exchange$/);
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ code: "the-code" });
+    expect(data.username).toBe("sam");
+    expect(getAccessToken()).toBe("acc");
+    expect(localStorage.getItem("pitwall_username")).toBe("sam");
+  });
+
+  it("throws the server's message and stores nothing when the code is rejected", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ error: "Invalid or expired login code" }, { status: 401 }),
+    );
+
+    await expect(exchangeOauth2Code("stale")).rejects.toThrow("Invalid or expired login code");
+    expect(getAccessToken()).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { setTokens } from "../../lib/pitwall-auth";
+import { exchangeOauth2Code } from "../../lib/pitwall-auth";
 import { motion } from "framer-motion";
 import PitwallBackground from "../../components/PitwallBackground";
 import { F1 } from "../../lib/f1-theme";
@@ -83,16 +83,11 @@ function CallbackHandler() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        const accessToken = searchParams.get("accessToken");
-        const refreshToken = searchParams.get("refreshToken");
-        const username = searchParams.get("username");
-        const role = searchParams.get("role");
+        const code = searchParams.get("code");
         const state = searchParams.get("state");
         const err = searchParams.get("error");
 
-        // Scrub the token-bearing query string from history immediately —
-        // it must not linger in browser history / Referer headers even if
-        // we bail out below.
+        // Scrub the query string from history immediately, even if we bail out below.
         if (typeof window !== "undefined" && window.location.search) {
             window.history.replaceState({}, "", window.location.pathname);
         }
@@ -104,8 +99,8 @@ function CallbackHandler() {
             return;
         }
 
-        if (!accessToken || !refreshToken) {
-            setError("Invalid callback — missing tokens.");
+        if (!code) {
+            setError("Invalid callback — missing login code.");
             setTimeout(() => router.push("/login"), 3000);
             return;
         }
@@ -113,8 +108,7 @@ function CallbackHandler() {
         // Login-CSRF guard: reject a callback that doesn't carry back the state
         // this browser generated when it started the flow. OAuth2SuccessHandler
         // echoes the nonce it read from the oauth_state cookie, so a legitimate
-        // login always has both sides present — missing or mismatched now fails
-        // closed instead of silently allowing the login through.
+        // login always has both sides present — missing or mismatched fails closed.
         if (typeof window !== "undefined") {
             let expectedState: string | null = null;
             try {
@@ -135,17 +129,13 @@ function CallbackHandler() {
             }
         }
 
-        // Store tokens
-        setTokens(accessToken, refreshToken);
-
-        // Store username/role for Navbar — phải lưu trước khi redirect
-        if (typeof window !== "undefined") {
-            localStorage.setItem("pitwall_username", username || "");
-            localStorage.setItem("pitwall_role", role || "VIEWER");
-        }
-
-        // Delay nhỏ để sessionStorage kịp ghi trước khi redirect
-        setTimeout(() => { hardNavigate("/"); }, 300);
+        // Swap the one-time code for tokens; exchangeOauth2Code stores them.
+        exchangeOauth2Code(code)
+            .then(() => hardNavigate("/"))
+            .catch(() => {
+                setError("Login expired or was already used. Please try again.");
+                setTimeout(() => router.push("/login"), 3000);
+            });
     }, [searchParams, router]);
 
     if (error) {

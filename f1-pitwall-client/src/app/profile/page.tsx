@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { authFetch, clearTokens, isApiError } from "../lib/pitwall-auth";
+import { authFetch, clearTokens, isApiError, setTokens } from "../lib/pitwall-auth";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import { BASE_URL as API } from "../lib/api-client";
@@ -139,7 +139,7 @@ export default function ProfilePage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPwd !== confirmPwd) { showPwdMsg("Passwords do not match", false); return; }
-    if (newPwd.length < 6)     { showPwdMsg("Min 6 characters", false);       return; }
+    if (newPwd.length < 8)     { showPwdMsg("Min 8 characters", false);       return; }
     setPwdLoading(true);
     try {
       const res = await authFetch(`${API}/api/auth/change-password`, {
@@ -147,6 +147,9 @@ export default function ProfilePage() {
         body: JSON.stringify({ currentPassword: currentPwd, newPassword: newPwd }),
       });
       if (res.ok) {
+        // The server revokes every earlier token on a password change and returns a fresh pair.
+        const data = await res.json().catch(() => ({}));
+        if (data.accessToken && data.refreshToken) setTokens(data.accessToken, data.refreshToken);
         showPwdMsg("Password changed successfully");
         setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
       } else {
@@ -165,7 +168,7 @@ export default function ProfilePage() {
   const initials  = displayedName.slice(0, 2).toUpperCase() || "??";
 
   const strength = newPwd.length === 0 ? 0
-    : newPwd.length < 6   ? 1
+    : newPwd.length < 8   ? 1
     : newPwd.length < 10  ? 2
     : /[A-Z]/.test(newPwd) && /[0-9]/.test(newPwd) ? 4 : 3;
   const strengthColors = ["", "#ef4444", "#f97316", "#eab308", "#22c55e"];
@@ -539,7 +542,7 @@ export default function ProfilePage() {
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   {[
                     { key: "cur", label: "CURRENT PASSWORD", value: currentPwd, set: setCurrentPwd, ph: "Enter current password" },
-                    { key: "new", label: "NEW PASSWORD",     value: newPwd,     set: setNewPwd,     ph: "Min 6 characters" },
+                    { key: "new", label: "NEW PASSWORD",     value: newPwd,     set: setNewPwd,     ph: "Min 8 characters" },
                     { key: "con", label: "CONFIRM PASSWORD", value: confirmPwd, set: setConfirmPwd, ph: "Repeat new password" },
                   ].map(f => (
                     <div key={f.key}>
