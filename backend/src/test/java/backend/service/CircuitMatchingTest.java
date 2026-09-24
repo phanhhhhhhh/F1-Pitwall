@@ -55,7 +55,7 @@ class CircuitMatchingTest {
 
     /** Picks the best session in a country, mirroring how the service scores candidates. */
     private static Session bestMatch(String circuitName, String city, String country) {
-        Set<String> ours = CircuitGeometryService.tokens(circuitName + " " + city);
+        Set<String> ours = CircuitMatching.tokens(circuitName + " " + city);
 
         List<Session> inCountry = OPENF1_2025.stream()
                 .filter(s -> s.country().equalsIgnoreCase(country))
@@ -64,8 +64,8 @@ class CircuitMatchingTest {
         Session best = null;
         int bestScore = 0;
         for (Session session : inCountry) {
-            int score = CircuitGeometryService.overlap(
-                    ours, CircuitGeometryService.tokens(session.shortName() + " " + session.location()));
+            int score = CircuitMatching.overlap(
+                    ours, CircuitMatching.tokens(session.shortName() + " " + session.location()));
             if (score > bestScore) {
                 bestScore = score;
                 best = session;
@@ -156,11 +156,11 @@ class CircuitMatchingTest {
         ));
 
         for (Entry entry : calendar) {
-            Set<String> ours = CircuitGeometryService.tokens(entry.name() + " " + entry.city());
+            Set<String> ours = CircuitMatching.tokens(entry.name() + " " + entry.city());
             int ownScore = OPENF1_2025.stream()
                     .filter(s -> s.shortName().equals(entry.expected()))
-                    .mapToInt(s -> CircuitGeometryService.overlap(
-                            ours, CircuitGeometryService.tokens(s.shortName() + " " + s.location())))
+                    .mapToInt(s -> CircuitMatching.overlap(
+                            ours, CircuitMatching.tokens(s.shortName() + " " + s.location())))
                     .max()
                     .orElse(0);
 
@@ -168,8 +168,8 @@ class CircuitMatchingTest {
 
             for (Session other : OPENF1_2025) {
                 if (other.shortName().equals(entry.expected())) continue;
-                int otherScore = CircuitGeometryService.overlap(
-                        ours, CircuitGeometryService.tokens(other.shortName() + " " + other.location()));
+                int otherScore = CircuitMatching.overlap(
+                        ours, CircuitMatching.tokens(other.shortName() + " " + other.location()));
                 assertThat(otherScore)
                         .as("%s must not match %s more strongly than its own session",
                                 entry.name(), other.shortName())
@@ -181,14 +181,14 @@ class CircuitMatchingTest {
     @Test
     @DisplayName("strips accents so São Paulo and Montréal still match")
     void accentsDoNotBreakMatching() {
-        assertThat(CircuitGeometryService.tokens("São Paulo")).contains("sao", "paulo");
-        assertThat(CircuitGeometryService.tokens("Montréal")).contains("montreal");
+        assertThat(CircuitMatching.tokens("São Paulo")).contains("sao", "paulo");
+        assertThat(CircuitMatching.tokens("Montréal")).contains("montreal");
     }
 
     @Test
     @DisplayName("drops filler words that every circuit name contains")
     void stopwordsCarryNoSignal() {
-        Set<String> tokens = CircuitGeometryService.tokens("Circuit International de Racing Park");
+        Set<String> tokens = CircuitMatching.tokens("Circuit International de Racing Park");
         assertThat(tokens).isEmpty();
     }
 }
