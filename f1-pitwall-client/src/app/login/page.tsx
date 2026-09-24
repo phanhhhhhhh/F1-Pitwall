@@ -298,11 +298,6 @@ function LoginForm() {
               </p>
             </div>
           </AuthCard>
-
-          {/* Test credentials */}
-          <div className="mt-3 text-center">
-            <p className="f-mono text-zinc-700 text-[10px]">Test: admin / REDACTED</p>
-          </div>
         </motion.div>
       </motion.div>
     </div>

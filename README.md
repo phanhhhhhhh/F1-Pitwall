@@ -126,7 +126,7 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `JWT_SECRET` | Yes (prod) | `f1-pitwall-super-secret-key-...` | HS256 signing key — min 32 characters |
+| `JWT_SECRET` | **Yes** | *(none)* | HS256 signing key — min 32 characters; startup fails if unset |
 | `ADMIN_PASSWORD` | **Yes** | *(none)* | Password seeded for the `admin` user on first startup — startup fails if unset |
 | `ENGINEER_PASSWORD` | **Yes** | *(none)* | Password seeded for the `engineer` user on first startup — startup fails if unset |
 | `ALLOWED_ORIGINS` | No | `http://localhost:3000` | Comma-separated CORS origins — local/self-hosted override only |
