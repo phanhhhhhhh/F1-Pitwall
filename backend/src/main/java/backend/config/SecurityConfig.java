@@ -66,6 +66,8 @@ public class SecurityConfig {
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // These read the caller's identity, so anonymous access must be 401 (not a 500 from a null user).
+                        .requestMatchers("/api/auth/me", "/api/auth/profile", "/api/auth/change-password").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()
                         // OAuth2 endpoints phải public
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()

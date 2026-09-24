@@ -2,6 +2,7 @@ package backend.controller;
 
 import backend.model.User;
 import backend.repository.UserRepository;
+import backend.security.PasswordPolicy;
 import backend.repository.DriverRepository;
 import backend.repository.TeamRepository;
 import backend.repository.RaceRepository;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.*;
 
 @RestController
@@ -70,6 +72,10 @@ public class AdminController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         try {
             User.Role newRole = User.Role.valueOf(body.get("role").toUpperCase());
+            if (user.getRole() == User.Role.ADMIN && newRole != User.Role.ADMIN
+                    && userRepo.countByRole(User.Role.ADMIN) <= 1) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Cannot demote the only admin"));
+            }
             user.setRole(newRole);
             userRepo.save(user);
             return ResponseEntity.ok(Map.of(
@@ -91,11 +97,13 @@ public class AdminController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         String newPassword = body.get("password");
-        if (newPassword == null || newPassword.length() < 6) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters"));
+        String problem = PasswordPolicy.violation(newPassword);
+        if (problem != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", problem));
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(Instant.now());
         userRepo.save(user);
         return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
     }
@@ -123,8 +131,9 @@ public class AdminController {
         if (username == null || username.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "username is required"));
         }
-        if (password == null || password.length() < 6) {
-            return ResponseEntity.badRequest().body(Map.of("error", "password must be at least 6 characters"));
+        String passwordProblem = PasswordPolicy.violation(password);
+        if (passwordProblem != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", passwordProblem));
         }
         if (email == null || email.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "email is required"));

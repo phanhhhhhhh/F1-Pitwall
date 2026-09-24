@@ -1,6 +1,7 @@
 package backend.service;
 
 import backend.model.User;
+import backend.security.PitwallUserDetails;
 import backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -21,12 +22,12 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "User '" + username + "' does not exist in the Pitwall system"));
 
-        return new org.springframework.security.core.userdetails.User(
+        return new PitwallUserDetails(
                 user.getUsername(),
                 user.getPassword(),
                 user.isActive(),
-                true, true, true,
-                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())),
+                user.getPasswordChangedAt()
         );
     }
 }

@@ -82,7 +82,8 @@ public class JwtService {
         final String type = extractClaim(token, claims -> claims.get("type", String.class));
         return username.equals(userDetails.getUsername())
                 && !isTokenExpired(token)
-                && "access".equals(type);
+                && "access".equals(type)
+                && issuedAfterPasswordChange(token, userDetails);
     }
 
     public boolean isRefreshTokenValid(String token, UserDetails userDetails) {
@@ -90,7 +91,22 @@ public class JwtService {
         final String type = extractClaim(token, claims -> claims.get("type", String.class));
         return username.equals(userDetails.getUsername())
                 && !isTokenExpired(token)
-                && "refresh".equals(type);
+                && "refresh".equals(type)
+                && issuedAfterPasswordChange(token, userDetails);
+    }
+
+    /**
+     * A password change or reset invalidates every token issued before it. Compared at second
+     * granularity (JWT iat has no sub-second part), so a token minted in the same second as the
+     * change — e.g. the fresh pair returned by change-password — stays valid.
+     */
+    private boolean issuedAfterPasswordChange(String token, UserDetails userDetails) {
+        if (!(userDetails instanceof PitwallUserDetails details) || details.getPasswordChangedAt() == null) {
+            return true;
+        }
+        Date issuedAt = extractClaim(token, Claims::getIssuedAt);
+        return issuedAt != null
+                && issuedAt.toInstant().getEpochSecond() >= details.getPasswordChangedAt().getEpochSecond();
     }
 
     public Date extractExpiration(String token) {
