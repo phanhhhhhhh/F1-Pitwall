@@ -15,6 +15,22 @@ jobs:
       run:
         working-directory: backend
 
+    # Real PostgreSQL for the Flyway migration test below (the other tests use H2).
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: f1_pitwall_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +45,12 @@ jobs:
         run: ./mvnw --batch-mode test -Dspring.profiles.active=test
         env:
           JWT_SECRET: ci-test-secret-key-with-at-least-32-chars
+
+      - name: Flyway migrations + schema validation on PostgreSQL
+        run: ./mvnw --batch-mode test -Dtest=FlywayPostgresMigrationTest -Dspring.profiles.active=test
+        env:
+          JWT_SECRET: ci-test-secret-key-with-at-least-32-chars
+          PG_TEST_URL: jdbc:postgresql://localhost:5432/f1_pitwall_db
 
       - name: OSIV=false regression guard
         run: ./mvnw --batch-mode test -Dtest=OpenInViewRegressionTest -Dspring.profiles.active=test,ci
