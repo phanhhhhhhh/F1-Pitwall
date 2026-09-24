@@ -2,6 +2,7 @@
 
 import { BASE_URL as API } from "../../lib/api-client";
 import { F1 } from "../../lib/f1-theme";
+import { hardNavigate } from "../../lib/navigation";
 
 interface GoogleButtonProps {
   label?: string;
@@ -9,24 +10,24 @@ interface GoogleButtonProps {
 }
 
 export function GoogleButton({ label = "Continue with Google", className = "" }: GoogleButtonProps) {
-  // Bind this browser to the OAuth round-trip so the callback can reject a
-  // crafted /oauth2/callback?accessToken=... link that didn't originate from
-  // a login this tab actually started (login CSRF / session fixation).
+  // Bind this browser to the OAuth round-trip so the callback can reject a crafted
+  // /oauth2/callback link that didn't come from a login this tab started (login CSRF /
+  // session fixation).
   //
-  // The nonce goes in sessionStorage (read back by the callback page) AND in
-  // a SameSite=Lax cookie — the cookie is what actually survives the redirect
-  // through Google and back, since OAuth2SuccessHandler reads it server-side
-  // and echoes it back as `state` on the final /oauth2/callback redirect.
-  const handleClick = () => {
+  // The nonce is kept in sessionStorage and sent to the API as `client_state`. It rides inside
+  // OAuth's own `state` through Google and comes back on the final redirect, where the callback
+  // page compares it. A cookie can't do this job: the SPA and API are different sites, so a
+  // cookie set here is never sent to the API.
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     try {
       const state = crypto.randomUUID();
       sessionStorage.setItem("oauth_state", state);
-      const secure = window.location.protocol === "https:" ? "; Secure" : "";
-      document.cookie = `oauth_state=${state}; path=/; max-age=300; samesite=lax${secure}`;
+      e.preventDefault();
+      hardNavigate(`${API}/oauth2/authorize/google?client_state=${state}`);
     } catch {
-      // sessionStorage/cookies unavailable (private mode / disabled) — the
-      // callback page fails closed in that case, so login is blocked rather
-      // than silently skipping the check.
+      // sessionStorage unavailable (private mode / disabled): fall through to the plain link.
+      // The callback page fails closed without a nonce, so login is blocked rather than
+      // silently skipping the check.
     }
   };
 

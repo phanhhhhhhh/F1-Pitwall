@@ -117,13 +117,8 @@ function CallbackHandler() {
             } catch {
                 // sessionStorage unavailable — nothing to compare against, fails closed below.
             }
-            try {
-                document.cookie = "oauth_state=; path=/; max-age=0";
-            } catch {
-                // ignore — best-effort cleanup
-            }
             if (!expectedState || !state || state !== expectedState) {
-                setError("Invalid callback — login could not be verified.");
+                setError("Login could not be verified. Please start again from the login page.");
                 setTimeout(() => router.push("/login"), 3000);
                 return;
             }

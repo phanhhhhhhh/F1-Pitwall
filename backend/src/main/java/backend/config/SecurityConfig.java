@@ -20,7 +20,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import backend.security.ClientStateAuthorizationRequestResolver;
 import backend.security.OAuth2SuccessHandler;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 import java.util.List;
 
@@ -33,6 +35,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final RateLimitFilter rateLimitFilter;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final ClientRegistrationRepository clientRegistrations;
 
     @Value("${allowed.origins:http://localhost:3000}")
     private List<String> allowedOrigins;
@@ -88,8 +91,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
-                        .authorizationEndpoint(auth ->
-                                auth.baseUri("/oauth2/authorize")
+                        .authorizationEndpoint(auth -> auth
+                                .baseUri("/oauth2/authorize")
+                                .authorizationRequestResolver(
+                                        new ClientStateAuthorizationRequestResolver(clientRegistrations, "/oauth2/authorize"))
                         )
                         .redirectionEndpoint(redirect ->
                                 redirect.baseUri("/login/oauth2/code/*")

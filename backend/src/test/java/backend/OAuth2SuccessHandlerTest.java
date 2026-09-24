@@ -85,6 +85,32 @@ class OAuth2SuccessHandlerTest {
     }
 
     @Test
+    @DisplayName("echoes the browser nonce carried in the OAuth state back to the SPA")
+    void echoesClientState() throws Exception {
+        when(users.findByEmail("new@gmail.com")).thenReturn(Optional.empty());
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setParameter("state", "springRandom.0f8fad5b-d9cb-469f-a165-70867728950e");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(req, res, google("new@gmail.com", true));
+
+        assertThat(redirectOf(res)).endsWith("&state=0f8fad5b-d9cb-469f-a165-70867728950e");
+    }
+
+    @Test
+    @DisplayName("sends no state when the flow did not start from the SPA")
+    void noStateWithoutNonce() throws Exception {
+        when(users.findByEmail("new@gmail.com")).thenReturn(Optional.empty());
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setParameter("state", "springRandomOnly");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(req, res, google("new@gmail.com", true));
+
+        assertThat(redirectOf(res)).doesNotContain("state=");
+    }
+
+    @Test
     @DisplayName("refuses a Google email that Google has not verified")
     void unverifiedGoogleEmailRefused() throws Exception {
         MockHttpServletResponse res = new MockHttpServletResponse();
