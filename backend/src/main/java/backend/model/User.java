@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -59,6 +60,14 @@ public class User {
 
     @Column(name = "is_active")
     private boolean isActive;
+
+    /** Mailbox ownership proven (Google login, OTP, reset, or operator-provisioned). */
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
+    /** JWTs issued before this instant are rejected — set on every password change/reset. */
+    @Column(name = "password_changed_at")
+    private Instant passwordChangedAt;
 
     public enum Role { ADMIN, ENGINEER, VIEWER }
 

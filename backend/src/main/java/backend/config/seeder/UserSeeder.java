@@ -34,6 +34,7 @@ public class UserSeeder {
                     .password(passwordEncoder.encode(adminPassword))
                     .email("admin@pitwall.f1")
                     .role(User.Role.ADMIN)
+                    .emailVerified(true)
                     .build());
             log.info("[Pitwall] Admin seeded");
         }
@@ -48,6 +49,7 @@ public class UserSeeder {
                     .password(passwordEncoder.encode(engineerPassword))
                     .email("engineer@pitwall.f1")
                     .role(User.Role.ENGINEER)
+                    .emailVerified(true)
                     .build());
         }
     }

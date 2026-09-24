@@ -6,7 +6,10 @@ import backend.model.User;
 import backend.repository.UserRepository;
 import backend.security.AccountLockoutService;
 import backend.security.JwtService;
+import backend.security.OAuthLoginCodeStore;
+import backend.security.PasswordPolicy;
 import backend.security.TokenBlacklistService;
+import backend.service.EmailOwnershipService;
 import backend.service.OtpService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,6 +35,9 @@ import java.util.Objects;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
+    private static final java.util.regex.Pattern EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
@@ -42,6 +49,8 @@ public class AuthController {
     private final OtpService otpService;
     private final AccountLockoutService accountLockoutService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final EmailOwnershipService emailOwnershipService;
+    private final OAuthLoginCodeStore oAuthLoginCodeStore;
 
     @Value("${app.jwt.access-token-expiration}")
     private long accessTokenExpiration;
@@ -88,6 +97,9 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        String passwordProblem = PasswordPolicy.violation(request.getPassword());
+        if (passwordProblem != null)
+            return ResponseEntity.badRequest().body(Map.of("error", passwordProblem));
         if (userRepository.existsByUsername(request.getUsername()))
             return ResponseEntity.badRequest().body(Map.of("error", "Username '" + request.getUsername() + "' already exists"));
         if (userRepository.existsByEmail(request.getEmail()))
@@ -141,40 +153,29 @@ public class AuthController {
     }
 
     @PatchMapping("/profile")
-    public ResponseEntity<?> updateProfile(@RequestBody Map<String, String> body) {
-        String username = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
+    public ResponseEntity<?> updateProfile(@Valid @RequestBody UpdateProfileRequest body) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username).orElseThrow();
 
-        if (body.containsKey("displayName")) {
-            String v = body.get("displayName").trim();
-            user.setDisplayName(v.isEmpty() ? null : v);
-        }
-        if (body.containsKey("email")) {
-            String v = body.get("email").trim();
-            if (!v.equals(user.getEmail())) {
-                if (userRepository.existsByEmail(v))
+        if (body.getDisplayName() != null) user.setDisplayName(blankToNull(body.getDisplayName()));
+        if (body.getEmail() != null) {
+            String email = body.getEmail().trim();
+            if (email.isEmpty() || !EMAIL_PATTERN.matcher(email).matches())
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid email format"));
+            if (!email.equalsIgnoreCase(user.getEmail())) {
+                if (userRepository.existsByEmail(email))
                     return ResponseEntity.badRequest().body(Map.of("error", "Email is already in use"));
-                user.setEmail(v);
+                user.setEmail(email);
+                // A new address is unproven until its owner completes an OTP/Google login.
+                user.setEmailVerified(false);
             }
         }
-        if (body.containsKey("avatarUrl")) {
-            String v = body.get("avatarUrl").trim();
-            user.setAvatarUrl(v.isEmpty() ? null : v);
-        }
-        if (body.containsKey("phone")) {
-            String v = body.get("phone").trim();
-            user.setPhone(v.isEmpty() ? null : v);
-        }
-        if (body.containsKey("bio")) {
-            String v = body.get("bio").trim();
-            user.setBio(v.isEmpty() ? null : v);
-        }
-        if (body.containsKey("location")) {
-            String v = body.get("location").trim();
-            user.setLocation(v.isEmpty() ? null : v);
-        }
-        if (body.containsKey("dateOfBirth")) {
-            String v = body.get("dateOfBirth").trim();
+        if (body.getAvatarUrl() != null) user.setAvatarUrl(blankToNull(body.getAvatarUrl()));
+        if (body.getPhone() != null) user.setPhone(blankToNull(body.getPhone()));
+        if (body.getBio() != null) user.setBio(blankToNull(body.getBio()));
+        if (body.getLocation() != null) user.setLocation(blankToNull(body.getLocation()));
+        if (body.getDateOfBirth() != null) {
+            String v = body.getDateOfBirth().trim();
             try {
                 user.setDateOfBirth(v.isEmpty() ? null : LocalDate.parse(v));
             } catch (Exception e) {
@@ -187,23 +188,36 @@ public class AuthController {
         return ResponseEntity.ok(buildUserResponse(user));
     }
 
+    private static String blankToNull(String value) {
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body) {
-        String username = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
         String currentPassword = body.get("currentPassword");
         String newPassword     = body.get("newPassword");
         if (currentPassword == null || newPassword == null)
             return ResponseEntity.badRequest().body(Map.of("error", "currentPassword and newPassword are required"));
-        if (newPassword.length() < 6)
-            return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 8 characters"));
+        String problem = PasswordPolicy.violation(newPassword);
+        if (problem != null)
+            return ResponseEntity.badRequest().body(Map.of("error", problem));
         User user = userRepository.findByUsername(username).orElseThrow();
         boolean isOAuthUser = user.getPassword() == null || user.getPassword().isEmpty();
         if (!isOAuthUser && !passwordEncoder.matches(currentPassword, user.getPassword()))
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Current password is incorrect"));
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(Instant.now());
         userRepository.save(user);
         log.info("[Auth] Password changed for user: {}", username);
-        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+        // Every earlier token is now revoked (including the caller's), so hand back a fresh pair.
+        AuthResponse fresh = buildAuthResponse(user);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Password changed successfully");
+        response.put("accessToken", fresh.getAccessToken());
+        response.put("refreshToken", fresh.getRefreshToken());
+        return ResponseEntity.ok(response);
     }
 
     // ── Logout ─────────────────────────────────────────────────────────────────
@@ -270,14 +284,17 @@ public class AuthController {
         String newPassword = body.get("newPassword");
         if (email == null || code == null || newPassword == null)
             return ResponseEntity.badRequest().body(Map.of("error", "email, otp, and newPassword are required"));
-        if (newPassword.length() < 6)
-            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters"));
+        String problem = PasswordPolicy.violation(newPassword);
+        if (problem != null)
+            return ResponseEntity.badRequest().body(Map.of("error", problem));
         if (!otpService.verifyOtp(email.trim(), code.trim(), OtpToken.OtpType.FORGOT_PASSWORD))
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
         User user = userRepository.findByEmail(email.trim()).orElse(null);
         if (user == null)
             return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(Instant.now());
+        user.setEmailVerified(true); // the OTP proved control of the mailbox
         userRepository.save(user);
         log.info("[Auth] Password reset via OTP for email: {}", email);
         return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
@@ -290,15 +307,18 @@ public class AuthController {
         String email = body.get("email");
         if (email == null || email.isBlank())
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
-        if (!userRepository.existsByEmail(email.trim()))
-            return ResponseEntity.badRequest().body(Map.of("error", "No account found with this email"));
+        sendOtpQuietly(email.trim(), OtpToken.OtpType.LOGIN_OTP);
+        return ResponseEntity.ok(Map.of("message", "If this email is registered, a code has been sent"));
+    }
+
+    /** Sends only to known addresses and never reports the outcome, so the response can't be used to probe for accounts. */
+    private void sendOtpQuietly(String email, OtpToken.OtpType type) {
+        if (!userRepository.existsByEmail(email)) return;
         try {
-            otpService.sendOtp(email.trim(), OtpToken.OtpType.LOGIN_OTP);
+            otpService.sendOtp(email, type);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+            log.warn("[Auth] {} OTP send failed for {}: {}", type, email, e.getMessage());
         }
-        return ResponseEntity.ok(Map.of("message", "OTP sent to your email"));
     }
 
     @PostMapping("/otp/verify")
@@ -312,7 +332,7 @@ public class AuthController {
         User user = userRepository.findByEmail(email.trim()).orElse(null);
         if (user == null)
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
-        return ResponseEntity.ok(buildAuthResponse(user));
+        return ResponseEntity.ok(buildAuthResponse(emailOwnershipService.claim(user)));
     }
 
     // ── OAuth2 2FA ───────────────────────────────────────────────────────────
@@ -322,14 +342,7 @@ public class AuthController {
         String email = body.get("email");
         if (email == null || email.isBlank())
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
-        if (!userRepository.existsByEmail(email.trim()))
-            return ResponseEntity.ok(Map.of("message", "OTP sent"));
-        try {
-            otpService.sendOtp(email.trim(), OtpToken.OtpType.OAUTH_2FA);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
-        }
+        sendOtpQuietly(email.trim(), OtpToken.OtpType.OAUTH_2FA);
         return ResponseEntity.ok(Map.of("message", "OTP sent"));
     }
 
@@ -344,7 +357,16 @@ public class AuthController {
         User user = userRepository.findByEmail(email.trim()).orElse(null);
         if (user == null)
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
-        return ResponseEntity.ok(buildAuthResponse(user));
+        return ResponseEntity.ok(buildAuthResponse(emailOwnershipService.claim(user)));
+    }
+
+    /** Swaps the one-time code from the Google redirect for the real tokens. */
+    @PostMapping("/oauth2/exchange")
+    public ResponseEntity<?> exchangeOauth2Code(@RequestBody Map<String, String> body) {
+        return oAuthLoginCodeStore.consume(body.get("code"))
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid or expired login code")));
     }
 
     private AuthResponse buildAuthResponse(User user) {

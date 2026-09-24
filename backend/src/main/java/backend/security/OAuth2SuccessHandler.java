@@ -1,8 +1,10 @@
 package backend.security;
 
 import backend.model.OtpToken;
+import backend.dto.AuthResponse;
 import backend.model.User;
 import backend.repository.UserRepository;
+import backend.service.EmailOwnershipService;
 import backend.service.OtpService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +32,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final OtpService otpService;
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final EmailOwnershipService emailOwnershipService;
+    private final OAuthLoginCodeStore loginCodeStore;
 
     @Value("${allowed.origins:http://localhost:3000}")
     private String allowedOrigins;
@@ -53,13 +57,20 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             return;
         }
 
-        User user = userRepository.findByEmail(email).orElseGet(() -> {
+        // Only a mailbox Google has verified may claim or create an account.
+        if (!Boolean.TRUE.equals(oAuth2User.getAttribute("email_verified"))) {
+            log.warn("[OAuth2] Google email not verified for {}", email);
+            response.sendRedirect(getFrontendUrl() + "/login?error=email_unverified");
+            return;
+        }
+
+        User user = userRepository.findByEmail(email).map(emailOwnershipService::claim).orElseGet(() -> {
             String baseUsername = email.split("@")[0].replaceAll("[^a-zA-Z0-9_]", "");
             String username = baseUsername;
             int suffix = 1;
             while (userRepository.existsByUsername(username)) username = baseUsername + suffix++;
             User newUser = User.builder()
-                    .username(username).email(email).password("").role(User.Role.VIEWER)
+                    .username(username).email(email).password("").role(User.Role.VIEWER).emailVerified(true)
                     .build();
             log.info("[OAuth2] Created new user from Google: {} ({})", username, email);
             return userRepository.save(newUser);
@@ -97,11 +108,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             response.addCookie(expired);
         }
 
+        // Tokens never travel in the URL: the SPA swaps this one-time code for them via POST
+        // /api/auth/oauth2/exchange.
+        String code = loginCodeStore.issue(AuthResponse.builder()
+                .accessToken(accessToken).refreshToken(refreshToken)
+                .username(user.getUsername()).role(user.getRole().name())
+                .expiresIn(accessTokenExpiration / 1000).build());
+
         String redirectUrl = getFrontendUrl() + "/oauth2/callback"
-                + "?accessToken="  + URLEncoder.encode(accessToken,  StandardCharsets.UTF_8)
-                + "&refreshToken=" + URLEncoder.encode(refreshToken, StandardCharsets.UTF_8)
-                + "&username="     + URLEncoder.encode(user.getUsername(), StandardCharsets.UTF_8)
-                + "&role="         + URLEncoder.encode(user.getRole().name(), StandardCharsets.UTF_8)
+                + "?code=" + URLEncoder.encode(code, StandardCharsets.UTF_8)
                 + (state != null ? "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8) : "");
 
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
