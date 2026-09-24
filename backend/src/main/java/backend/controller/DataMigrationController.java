@@ -7,6 +7,7 @@ import backend.model.enums.RaceStatus;
 import backend.repository.CircuitRepository;
 import backend.repository.RaceRepository;
 import backend.repository.RaceResultRepository;
+import backend.service.AdminAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,7 +27,9 @@ public class DataMigrationController {
     private final RaceRepository raceRepo;
     private final CircuitRepository circuitRepo;
     private final RaceResultRepository raceResultRepo;
+    private final AdminAuditService audit;
 
+    @Transactional
     @PostMapping("/add-sprint-races")
     public ResponseEntity<Map<String, Object>> addSprintRaces() {
         List<String> added = new ArrayList<>();
@@ -71,9 +74,11 @@ public class DataMigrationController {
             raceRepo.save(race);
             added.add(name);
         }
+        audit.record("MIGRATION_ADD_SPRINT_RACES", null, added.size() + " added");
         return ResponseEntity.ok(Map.of("added", added, "skipped", skipped, "total", added.size()));
     }
 
+    @Transactional
     @PostMapping("/fix-duplicates")
     public ResponseEntity<Map<String, Object>> fixDuplicates() {
         List<String> fixed = new ArrayList<>();
@@ -105,6 +110,7 @@ public class DataMigrationController {
             }
         }
 
+        audit.record("MIGRATION_FIX_DUPLICATES", null, totalDeleted + " deleted");
         return ResponseEntity.ok(Map.of(
                 "fixed", fixed,
                 "totalDeleted", totalDeleted,
@@ -127,6 +133,7 @@ public class DataMigrationController {
                     .orElseThrow(() -> new RuntimeException("Not found: " + addToId));
             correct.setHasFastestLap(true);
             raceResultRepo.save(correct);
+            audit.record("MIGRATION_FIX_FASTEST_LAP", "results " + removeFromId + " -> " + addToId, null);
 
             return ResponseEntity.ok(Map.of("success", true,
                     "removed", wrong.getDriver().getName(),
@@ -137,10 +144,12 @@ public class DataMigrationController {
         }
     }
 
+    @Transactional
     @DeleteMapping("/clear-race/{raceId}")
     public ResponseEntity<Map<String, Object>> clearRaceResults(@PathVariable Long raceId) {
         int count = raceResultRepo.findByRaceIdOrderByFinishPosition(raceId).size();
         raceResultRepo.deleteByRaceId(raceId);
+        audit.record("MIGRATION_CLEAR_RACE", "race " + raceId, count + " results deleted");
         return ResponseEntity.ok(Map.of("deleted", count, "raceId", raceId));
     }
 
@@ -166,6 +175,7 @@ public class DataMigrationController {
             if (position != null) result.setFinishPosition(position);
 
             raceResultRepo.save(result);
+            audit.record("MIGRATION_UPDATE_RESULT", "result " + resultId, "points=" + points + ", position=" + position);
 
             return ResponseEntity.ok(Map.of("success", true,
                     "driver", result.getDriver().getName(),
