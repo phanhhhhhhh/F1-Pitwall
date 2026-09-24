@@ -43,7 +43,6 @@ public class OpenF1LiveService {
 
     // ─── Internal computation methods (not cached, called by scheduled task and force-fetch) ───
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> computeLiveSessionStatus() {
         try {
             Map<String, Object> liveSession = getLiveSession();
@@ -334,18 +333,19 @@ public class OpenF1LiveService {
 
     @CacheEvict(value = {"liveSessionStatus", "liveTyreData"}, allEntries = true)
     public Map<String, Object> forceFetch() {
-        Map<String, Object> session = computeLiveSessionStatus();
-        boolean isLive = session != null && Boolean.TRUE.equals(session.get("isLive"));
-        Integer sessionKey = isLive ? toInt(session.get("sessionKey")) : null;
+        Map<String, Object> computed = computeLiveSessionStatus();
+        Map<String, Object> session = computed != null && Boolean.TRUE.equals(computed.get("isLive")) ? computed : null;
+        boolean isLive = session != null;
+        Integer sessionKey = session != null ? toInt(session.get("sessionKey")) : null;
         List<Map<String, Object>> data = sessionKey != null ? computeLiveTyreData(sessionKey) : List.of();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("isLive", isLive);
         result.put("sessionKey", sessionKey);
-        result.put("sessionName", isLive ? session.get("sessionName") : "");
-        result.put("sessionType", isLive ? session.get("sessionType") : "");
-        result.put("circuitName", isLive ? session.get("circuitName") : "");
-        result.put("countryName", isLive ? session.get("countryName") : "");
+        result.put("sessionName", session != null ? session.get("sessionName") : "");
+        result.put("sessionType", session != null ? session.get("sessionType") : "");
+        result.put("circuitName", session != null ? session.get("circuitName") : "");
+        result.put("countryName", session != null ? session.get("countryName") : "");
         result.put("driversCount", data.size());
         result.put("data", data);
         return result;

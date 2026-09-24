@@ -1,6 +1,5 @@
 package backend.controller;
 
-import backend.model.QualifyingResult;
 import backend.service.QualifyingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

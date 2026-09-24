@@ -1,10 +1,8 @@
 package backend;
 
-import backend.model.enums.RaceStatus;
 import backend.repository.QualifyingResultRepository;
 import backend.repository.RaceRepository;
 import backend.service.QualifyingService;
-import backend.model.Race;
 import backend.model.QualifyingResult;
 import backend.model.Driver;
 import org.junit.jupiter.api.DisplayName;
