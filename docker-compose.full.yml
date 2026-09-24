@@ -29,7 +29,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/f1_pitwall_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
-      JWT_SECRET: f1pitwall2026supersecretkey_changethisinproduction
+      # Set these in a root-level .env (see .env.example); compose refuses to start without them.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (min 32 chars)}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      ENGINEER_PASSWORD: ${ENGINEER_PASSWORD:?set ENGINEER_PASSWORD in .env}
       FRONTEND_URL: http://localhost:3000
     ports:
       - "8080:8080"
