@@ -89,12 +89,12 @@ class OAuth2SuccessHandlerTest {
     void echoesClientState() throws Exception {
         when(users.findByEmail("new@gmail.com")).thenReturn(Optional.empty());
         MockHttpServletRequest req = new MockHttpServletRequest();
-        req.setParameter("state", "springRandom.0f8fad5b-d9cb-469f-a165-70867728950e");
+        req.setParameter("state", "springRandom.test-nonce-not-a-secret-01");
         MockHttpServletResponse res = new MockHttpServletResponse();
 
         handler.onAuthenticationSuccess(req, res, google("new@gmail.com", true));
 
-        assertThat(redirectOf(res)).endsWith("&state=0f8fad5b-d9cb-469f-a165-70867728950e");
+        assertThat(redirectOf(res)).endsWith("&state=test-nonce-not-a-secret-01");
     }
 
     @Test

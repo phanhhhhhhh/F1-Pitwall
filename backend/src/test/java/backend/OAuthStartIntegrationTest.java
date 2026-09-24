@@ -27,7 +27,7 @@ class OAuthStartIntegrationTest {
     @Test
     @DisplayName("client_state is appended to the OAuth state sent to Google")
     void nonceRidesInState() throws Exception {
-        String nonce = "0f8fad5b-d9cb-469f-a165-70867728950e";
+        String nonce = "test-nonce-not-a-secret-01";
         String location = mvc.perform(get("/oauth2/authorize/google").param("client_state", nonce))
                 .andExpect(status().is3xxRedirection())
                 .andReturn().getResponse().getHeader("Location");

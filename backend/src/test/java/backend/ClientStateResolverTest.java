@@ -12,8 +12,8 @@ class ClientStateResolverTest {
     @Test
     @DisplayName("extracts the nonce after the last dot")
     void extracts() {
-        assertThat(ClientStateAuthorizationRequestResolver.clientStateFrom("AbC-_123.0f8fad5b-d9cb-469f-a165-70867728950e"))
-                .isEqualTo("0f8fad5b-d9cb-469f-a165-70867728950e");
+        assertThat(ClientStateAuthorizationRequestResolver.clientStateFrom("AbC-_123.test-nonce-not-a-secret-01"))
+                .isEqualTo("test-nonce-not-a-secret-01");
     }
 
     @Test
