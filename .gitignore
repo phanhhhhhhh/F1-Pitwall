@@ -31,3 +31,4 @@ secrets.txt
 
 # OMC runtime state (không cần track)
 .omc/
+.vercel
