@@ -1,6 +1,8 @@
 package backend.controller;
 
+import backend.model.AdminAuditEntry;
 import backend.model.User;
+import backend.service.AdminAuditService;
 import backend.repository.UserRepository;
 import backend.security.PasswordPolicy;
 import backend.repository.DriverRepository;
@@ -30,6 +32,7 @@ public class AdminController {
     private final RaceResultRepository raceResultRepo;
     private final NotificationRepository notificationRepo;
     private final PasswordEncoder passwordEncoder;
+    private final AdminAuditService audit;
 
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats() {
@@ -49,6 +52,11 @@ public class AdminController {
         stats.put("usersByRole", byRole);
 
         return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/audit")
+    public ResponseEntity<List<AdminAuditEntry>> getAuditLog() {
+        return ResponseEntity.ok(audit.recent());
     }
 
     @GetMapping("/users")
@@ -76,8 +84,10 @@ public class AdminController {
                     && userRepo.countByRole(User.Role.ADMIN) <= 1) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Cannot demote the only admin"));
             }
+            User.Role oldRole = user.getRole();
             user.setRole(newRole);
             userRepo.save(user);
+            audit.record("USER_ROLE_CHANGED", user.getUsername(), oldRole + " -> " + newRole);
             return ResponseEntity.ok(Map.of(
                     "id", user.getId(),
                     "username", user.getUsername(),
@@ -105,6 +115,7 @@ public class AdminController {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setPasswordChangedAt(Instant.now());
         userRepo.save(user);
+        audit.record("USER_PASSWORD_RESET", user.getUsername(), null);
         return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
     }
 
@@ -118,6 +129,7 @@ public class AdminController {
         }
 
         userRepo.deleteById(id);
+        audit.record("USER_DELETED", user.getUsername(), "role " + user.getRole());
         return ResponseEntity.ok(Map.of("message", "User deleted"));
     }
 
@@ -162,6 +174,7 @@ public class AdminController {
                 .build();
 
         User saved = userRepo.save(user);
+        audit.record("USER_CREATED", saved.getUsername(), "role " + saved.getRole());
         return ResponseEntity.ok(Map.of(
                 "id", saved.getId(),
                 "username", saved.getUsername(),
