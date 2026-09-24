@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { authFetch, clearTokens, isApiError, setTokens } from "../lib/pitwall-auth";
+import { avatarFileName } from "../lib/avatar";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import { BASE_URL as API } from "../lib/api-client";
@@ -94,14 +95,14 @@ export default function ProfilePage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { showFeedback("Please select an image file", false); return; }
+    const fileName = avatarFileName(file.type);
+    if (!fileName)                      { showFeedback("Use a PNG, JPEG, WebP or GIF image", false); return; }
     if (file.size > 2 * 1024 * 1024)    { showFeedback("Image must be smaller than 2MB", false); return; }
     setUploadLoading(true);
     setAvatarPreview(URL.createObjectURL(file));
     try {
       const supabase = getSupabaseClient();
-      const fileName = `${user?.username || "user"}-${Date.now()}.${file.name.split(".").pop()}`;
-      const { error } = await supabase.storage.from("avatars").upload(fileName, file, { upsert: true, contentType: file.type });
+      const { error } = await supabase.storage.from("avatars").upload(fileName, file, { upsert: false, contentType: file.type });
       if (error) throw error;
       const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
       setProfile(p => ({ ...p, avatarUrl: urlData.publicUrl }));
