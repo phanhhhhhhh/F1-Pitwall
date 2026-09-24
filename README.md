@@ -165,11 +165,11 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 │   │   ├── config/                 # SecurityConfig, GlobalExceptionHandler, DataSeeder
 │   │   ├── controller/             # 21 REST controllers
 │   │   ├── dto/                    # Request/response DTOs
-│   │   ├── model/                  # 18 JPA entities + enums
-│   │   ├── repository/             # 18 Spring Data repositories
+│   │   ├── model/                  # 21 JPA entities + enums
+│   │   ├── repository/             # 21 Spring Data repositories
 │   │   ├── scheduler/              # TelemetrySimulator (1 s tick)
-│   │   ├── security/               # JwtService, JwtAuthenticationFilter, OAuth2SuccessHandler
-│   │   ├── service/                # 25 service classes (business logic + external APIs)
+│   │   ├── security/               # JwtService, JwtAuthenticationFilter, OAuth2SuccessHandler, PasswordPolicy, OAuthLoginCodeStore
+│   │   ├── service/                # 27 service classes (business logic + external APIs)
 │   │   └── websocket/              # WebSocketConfig, StompAuthChannelInterceptor, TelemetryPayload
 │   ├── src/main/resources/
 │   │   ├── application.properties       # Default (dev) config
@@ -208,13 +208,13 @@ All of the following are held in memory and are **lost on application restart** 
 | `RateLimitFilter` | Bucket4j token buckets per IP | Rate-limit counters reset — a flooder gets a fresh 5 req/min allowance |
 | `TelemetrySimulator` | Simulated speed/RPM/gear per driver | Simulation state resets from lap-start values |
 
-**Persisted:** `AccountLockoutService` writes active lockouts to `account_lockouts` (Flyway `V5`) and reloads them on startup. `TokenBlacklistService` (revoked JWT hashes) is written through to the `blacklisted_tokens` table (Flyway `V4`) and reloaded on startup, so logouts survive a restart. Expired rows are purged hourly.
+**Persisted:** `AccountLockoutService` writes active lockouts to `account_lockouts` (Flyway `V5`) and reloads them on startup. `TokenBlacklistService` (revoked JWT hashes) is written through to the `blacklisted_tokens` table (Flyway `V4`) and reloaded on startup, so logouts survive a restart. Expired rows are purged hourly. Admin actions (user create/role/password/delete and the data-repair endpoints) are appended to `admin_audit_log` (Flyway `V7`), readable by admins at `GET /api/admin/audit`. OTP codes are stored only as HMAC-SHA256 digests.
 
 **Mitigation (future):** for the components above, a durable store (e.g. Redis via Upstash free tier) would persist these across restarts. Nothing in the backend uses Redis today.
 
 ### Database Migration
 
-**Flyway owns the schema.** `spring.jpa.hibernate.ddl-auto=validate` in every profile — Hibernate only checks the entities against what the migrations built and never issues DDL itself. Schema changes go in a new `backend/src/main/resources/db/migration/V<n>__*.sql`. `V1__baseline.sql` is a `pg_dump` of the pre-Flyway schema; `baseline-on-migrate` lets an already-populated database adopt it. Tests build their schema from the entities (`ddl-auto=create-drop`, Flyway disabled) and are unaffected.
+**Flyway owns the schema.** `spring.jpa.hibernate.ddl-auto=validate` in every profile — Hibernate only checks the entities against what the migrations built and never issues DDL itself. Schema changes go in a new `backend/src/main/resources/db/migration/V<n>__*.sql`. `V1__baseline.sql` is a `pg_dump` of the pre-Flyway schema; `baseline-on-migrate` lets an already-populated database adopt it. Most tests build their schema from the entities on H2 (`ddl-auto=create-drop`, Flyway disabled); CI additionally runs `FlywayPostgresMigrationTest` against a real PostgreSQL 15 service, applying every migration and validating the entities against the result. Run it locally with `PG_TEST_URL=jdbc:postgresql://localhost:5432/<empty db> ./mvnw test -Dtest=FlywayPostgresMigrationTest`.
 
 Model-only entities that were never wired to a feature (`CarSetup`, `DriverContract`, `Sponsorship`, `Engineer`, `Championship`) were removed in `V2__drop_unused_entities.sql`. `StrategyPlan` is now backed by a real API (`StrategyPlanController` / `StrategyPlanService`).
 
