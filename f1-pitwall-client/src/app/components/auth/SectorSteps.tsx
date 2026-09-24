@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { F1 } from "../../lib/f1-theme";
 
 interface SectorStepsProps {
@@ -19,7 +19,7 @@ export function SectorSteps({ steps, currentIndex }: SectorStepsProps) {
           <div key={label} className="flex items-center">
             {/* Step pill */}
             <div className="flex flex-col items-center gap-1">
-              <motion.div
+              <m.div
                 className="w-7 h-7 rounded-full flex items-center justify-center f-mono text-[10px] font-black"
                 animate={{
                   scale: active ? [1, 1.15, 1] : done ? [1, 1.1, 1] : 1,
@@ -43,7 +43,7 @@ export function SectorSteps({ steps, currentIndex }: SectorStepsProps) {
                 }}
               >
                 {done ? "✓" : i + 1}
-              </motion.div>
+              </m.div>
               <span
                 className="f-mono text-[9px] uppercase tracking-wider"
                 style={{
@@ -58,7 +58,7 @@ export function SectorSteps({ steps, currentIndex }: SectorStepsProps) {
             {i < steps.length - 1 && (
               <div className="flex-1 h-px mx-2 mb-4 relative overflow-hidden" style={{ width: "40px", background: F1.hairline }}>
                 {done && (
-                  <motion.div
+                  <m.div
                     className="absolute inset-0 h-full"
                     initial={{ width: "0%" }}
                     animate={{ width: "100%" }}

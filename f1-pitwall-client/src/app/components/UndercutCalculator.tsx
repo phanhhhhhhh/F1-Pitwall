@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { calcUndercut, type PitLossMode } from "../lib/undercut-math";
 
 export default function UndercutCalculator({ className = "" }: { className?: string }) {
@@ -176,7 +176,7 @@ export default function UndercutCalculator({ className = "" }: { className?: str
           <div className="absolute inset-x-0 h-1 bg-zinc-800" />
 
           {/* Car A (Chaser) */}
-          <motion.div
+          <m.div
             className="absolute flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-600 text-white font-bold f-cond text-xs shadow-[0_0_12px_rgba(225,6,0,0.6)] z-10"
             animate={{
               left: result.isSuccessful ? "58%" : "34%",
@@ -184,10 +184,10 @@ export default function UndercutCalculator({ className = "" }: { className?: str
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <span>🏎️ CAR A (CHASER)</span>
-          </motion.div>
+          </m.div>
 
           {/* Car B (Leader) */}
-          <motion.div
+          <m.div
             className="absolute flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-700 text-white font-bold f-cond text-xs shadow-md z-10"
             animate={{
               left: result.isSuccessful ? "38%" : "52%",
@@ -195,7 +195,7 @@ export default function UndercutCalculator({ className = "" }: { className?: str
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <span>🏎️ CAR B (LEADER)</span>
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </div>

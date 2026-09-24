@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { tyre as tyreSpec } from "../lib/f1-theme";
 import type { TrackSample } from "../types/f1";
 
@@ -168,7 +168,7 @@ function SingleWheel({
           <span className="font-bold text-white">{data.wearPct}%</span>
         </div>
         <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-          <motion.div
+          <m.div
             className="h-full rounded-full"
             style={{
               backgroundColor: data.wearPct > 60 ? "#00E676" : data.wearPct > 35 ? "#FACC15" : "#EF4444",

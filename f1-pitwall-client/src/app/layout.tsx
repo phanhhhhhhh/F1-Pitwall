@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { SeasonProvider } from "./context/SeasonContext";
 import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
 import PitwallFooter from "./components/PitwallFooter";
+import MotionProvider from "./components/MotionProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,10 +33,12 @@ export default function RootLayout({
         <ErrorBoundaryWrapper>
           <SeasonProvider>
             <AuthProvider>
-              <div className="flex-1 flex flex-col">
-                {children}
-              </div>
-              <PitwallFooter />
+              <MotionProvider>
+                <div className="flex-1 flex flex-col">
+                  {children}
+                </div>
+                <PitwallFooter />
+              </MotionProvider>
             </AuthProvider>
           </SeasonProvider>
         </ErrorBoundaryWrapper>

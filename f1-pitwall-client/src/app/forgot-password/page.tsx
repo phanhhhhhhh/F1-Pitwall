@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { sendForgotPasswordOtp, resetPassword } from "../lib/pitwall-auth";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import PitwallBackground from "../components/PitwallBackground";
 import {
   AuthCard, AuthLogo, AuthInput, PrimaryButton,
@@ -82,11 +82,11 @@ export default function ForgotPasswordPage() {
     >
       <PitwallBackground glow="top-center" streaks={4} intensity={0.85} />
 
-      <motion.div
+      <m.div
         style={{ perspective: 1200 }}
         className="relative z-10 w-full max-w-md"
       >
-        <motion.div
+        <m.div
           initial={{ rotateY: -8, translateY: 30, opacity: 0 }}
           animate={{ rotateY: 0, translateY: 0, opacity: 1 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
@@ -101,14 +101,14 @@ export default function ForgotPasswordPage() {
             <div className="text-center mb-6">
               <AuthLogo
                 icon={
-                  <motion.span
+                  <m.span
                     key={step}
                     initial={{ scale: 0, rotate: -30 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ type: "spring", stiffness: 400, damping: 20 }}
                   >
                     {ICONS[step]}
-                  </motion.span>
+                  </m.span>
                 }
                 subtitle={SUBTITLES[step]}
                 size="sm"
@@ -131,7 +131,7 @@ export default function ForgotPasswordPage() {
             <AnimatePresence mode="wait">
               {/* Step 1: Email */}
               {step === "email" && (
-                <motion.form
+                <m.form
                   key="step-email"
                   initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}
                   transition={{ duration: 0.22 }}
@@ -147,12 +147,12 @@ export default function ForgotPasswordPage() {
                   <PrimaryButton isLoading={loading} disabled={loading}>
                     {loading ? "Sending..." : "Send Reset Code →"}
                   </PrimaryButton>
-                </motion.form>
+                </m.form>
               )}
 
               {/* Step 2: OTP + new password */}
               {step === "reset" && (
-                <motion.form
+                <m.form
                   key="step-reset"
                   initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}
                   transition={{ duration: 0.22 }}
@@ -209,12 +209,12 @@ export default function ForgotPasswordPage() {
                       </PrimaryButton>
                     </div>
                   </div>
-                </motion.form>
+                </m.form>
               )}
 
               {/* Step 3: Done */}
               {step === "done" && (
-                <motion.div
+                <m.div
                   key="step-done"
                   initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3 }}
@@ -228,14 +228,14 @@ export default function ForgotPasswordPage() {
                       boxShadow: "0 0 24px rgba(0,230,118,0.15)",
                     }}
                   >
-                    <motion.span
+                    <m.span
                       className="text-2xl text-green-400"
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: "spring", stiffness: 300, damping: 15 }}
                     >
                       ✓
-                    </motion.span>
+                    </m.span>
                   </div>
                   <div>
                     <p className="f-mono text-zinc-300 text-sm">Access code updated successfully.</p>
@@ -244,7 +244,7 @@ export default function ForgotPasswordPage() {
                   <PrimaryButton onClick={() => router.push("/login")} type="button">
                     Back to Login →
                   </PrimaryButton>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -256,8 +256,8 @@ export default function ForgotPasswordPage() {
               </p>
             </div>
           </AuthCard>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </div>
   );
 }

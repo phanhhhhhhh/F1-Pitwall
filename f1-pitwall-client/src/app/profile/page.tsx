@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { authFetch, clearTokens, isApiError, setTokens } from "../lib/pitwall-auth";
 import { avatarFileName } from "../lib/avatar";
 import { useAuth } from "../context/AuthContext";
@@ -306,7 +306,7 @@ export default function ProfilePage() {
               style={activeTab === tab ? { background: `${roleCfg.color}20`, color: roleCfg.color } : {}}
             >
               {activeTab === tab && (
-                <motion.span
+                <m.span
                   layoutId="tab-underline"
                   className="absolute inset-0 rounded-lg"
                   style={{ background: `${roleCfg.color}18`, borderColor: `${roleCfg.color}30` }}
@@ -323,7 +323,7 @@ export default function ProfilePage() {
         {/* ── Global feedback banner ──────────────────────────────────── */}
         <AnimatePresence>
           {feedback.msg && (
-            <motion.div
+            <m.div
               key="fb"
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -335,7 +335,7 @@ export default function ProfilePage() {
               }`}
             >
               {feedback.msg}
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -344,7 +344,7 @@ export default function ProfilePage() {
         {/* ══════════════════════════════════════════════════════════════ */}
         <AnimatePresence mode="wait">
           {activeTab === "profile" && (
-            <motion.div
+            <m.div
               key="profile-tab"
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -497,14 +497,14 @@ export default function ProfilePage() {
                   </span>
                 </button>
               </form>
-            </motion.div>
+            </m.div>
           )}
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* SECURITY TAB                                                  */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === "security" && (
-            <motion.div
+            <m.div
               key="security-tab"
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -524,7 +524,7 @@ export default function ProfilePage() {
 
                 <AnimatePresence>
                   {pwdFeedback.msg && (
-                    <motion.div
+                    <m.div
                       key="pwdfb"
                       initial={{ opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -536,7 +536,7 @@ export default function ProfilePage() {
                       }`}
                     >
                       {pwdFeedback.msg}
-                    </motion.div>
+                    </m.div>
                   )}
                 </AnimatePresence>
 
@@ -621,7 +621,7 @@ export default function ProfilePage() {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </main>

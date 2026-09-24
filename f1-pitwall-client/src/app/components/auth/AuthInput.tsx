@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { F1 } from "../../lib/f1-theme";
 
 interface AuthInputProps {
@@ -78,7 +78,7 @@ export function AuthInput({
         {/* Bottom accent scan-line on focus */}
         <AnimatePresence>
           {active && !hasError && (
-            <motion.div
+            <m.div
               initial={{ scaleX: 0 }}
               animate={{ scaleX: 1 }}
               exit={{ scaleX: 0 }}

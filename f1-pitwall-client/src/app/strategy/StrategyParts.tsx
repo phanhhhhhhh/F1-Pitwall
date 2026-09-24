@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { tyre } from "../lib/f1-theme";
 import type { Stint, TyrePerfTable, TyreType } from "./model";
 
@@ -20,7 +20,7 @@ export function StintBar({
   // Pit-stop marker rendered to the right of every non-last stint
   return (
     <>
-      <motion.div
+      <m.div
         className="relative flex items-center justify-center overflow-hidden"
         style={{ width: `${pct * 100}%`, background: spec.color, minWidth: 4 }}
         initial={{ scaleX: 0, originX: 0 }}
@@ -44,10 +44,10 @@ export function StintBar({
             {spec.letter}{stint.laps}
           </span>
         )}
-      </motion.div>
+      </m.div>
       {/* Pit-stop marker (▼ wrench icon) between stints */}
       {!isLast && (
-        <motion.div
+        <m.div
           className="flex-shrink-0 flex items-center justify-center"
           style={{ width: 18, background: "transparent", position: "relative", zIndex: 10 }}
           initial={{ opacity: 0, y: -4 }}
@@ -67,7 +67,7 @@ export function StintBar({
               <path d="M5 9 L2 3 L5 5 L8 3 Z" fill="rgba(255,255,255,0.7)" />
             </svg>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </>
   );

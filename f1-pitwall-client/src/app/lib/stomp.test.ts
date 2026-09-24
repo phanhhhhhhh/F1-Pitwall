@@ -25,11 +25,17 @@ beforeEach(() => {
   clearTokens();
 });
 
+/** Starts a subscription and waits for the lazily imported STOMP client to be constructed. */
+async function start(...args: Parameters<typeof subscribeToTopic>) {
+  const stop = subscribeToTopic(...args);
+  await vi.waitFor(() => expect(created).toHaveLength(1));
+  return { stop, client: created[0] };
+}
+
 describe("subscribeToTopic", () => {
-  it("sends the access token in the CONNECT header, not the URL", () => {
+  it("sends the access token in the CONNECT header, not the URL", async () => {
     setTokens("access-1", "refresh-1");
-    subscribeToTopic("/topic/telemetry", () => {});
-    const client = created[0];
+    const { client } = await start("/topic/telemetry", () => {});
 
     client.config.beforeConnect();
 
@@ -38,10 +44,9 @@ describe("subscribeToTopic", () => {
     expect(client.activate).toHaveBeenCalledOnce();
   });
 
-  it("re-reads the token on each reconnect so a refreshed token is used", () => {
+  it("re-reads the token on each reconnect so a refreshed token is used", async () => {
     setTokens("old", "r");
-    subscribeToTopic("/topic/telemetry", () => {});
-    const client = created[0];
+    const { client } = await start("/topic/telemetry", () => {});
     client.config.beforeConnect();
 
     setTokens("new", "r");
@@ -50,21 +55,19 @@ describe("subscribeToTopic", () => {
     expect(client.connectHeaders.Authorization).toBe("Bearer new");
   });
 
-  it("gives up instead of reconnecting when the user has no token", () => {
-    subscribeToTopic("/topic/telemetry", () => {});
-    const client = created[0];
+  it("gives up instead of reconnecting when the user has no token", async () => {
+    const { client } = await start("/topic/telemetry", () => {});
 
     client.config.beforeConnect();
 
     expect(client.deactivate).toHaveBeenCalledOnce();
   });
 
-  it("subscribes on connect, forwards frame bodies, and reports status", () => {
+  it("subscribes on connect, forwards frame bodies, and reports status", async () => {
     setTokens("a", "r");
     const onMessage = vi.fn();
     const onStatus = vi.fn();
-    subscribeToTopic("/topic/notifications", onMessage, onStatus);
-    const client = created[0];
+    const { client } = await start("/topic/notifications", onMessage, onStatus);
 
     client.config.onConnect();
     expect(onStatus).toHaveBeenLastCalledWith(true);
@@ -78,12 +81,22 @@ describe("subscribeToTopic", () => {
     expect(onStatus).toHaveBeenLastCalledWith(false);
   });
 
-  it("returns a cleanup function that deactivates the client", () => {
+  it("returns a cleanup function that deactivates the client", async () => {
+    setTokens("a", "r");
+    const { stop, client } = await start("/topic/telemetry", () => {});
+
+    stop();
+
+    expect(client.deactivate).toHaveBeenCalledOnce();
+  });
+
+  it("never connects when unsubscribed before the STOMP chunks finish loading", async () => {
     setTokens("a", "r");
     const stop = subscribeToTopic("/topic/telemetry", () => {});
 
     stop();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(created[0].deactivate).toHaveBeenCalledOnce();
+    expect(created).toHaveLength(0);
   });
 });

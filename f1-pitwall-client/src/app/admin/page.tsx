@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { useCountUp } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
@@ -19,7 +19,7 @@ const ROLE_COLORS = {
 function StatTile({ label, value, color, delay }: { label: string; value: number; color: string; delay: number }) {
   const displayed = useCountUp(value, 900, delay);
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.38, delay: delay / 1000 }}
@@ -35,7 +35,7 @@ function StatTile({ label, value, color, delay }: { label: string; value: number
         style={{ background: `radial-gradient(circle at 50% 0%, ${color}12, transparent 70%)` }} />
       <p className="f-cond font-black text-5xl tabular-nums relative z-10" style={{ color }}>{displayed}</p>
       <p className="f-mono text-xs text-zinc-600 mt-2 tracking-widest relative z-10">{label}</p>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -162,7 +162,7 @@ export default function AdminPage() {
 
           <AnimatePresence>
             {feedback && (
-              <motion.div
+              <m.div
                 key="adm-fb"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -174,7 +174,7 @@ export default function AdminPage() {
                 }`}
               >
                 {feedback}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
@@ -213,7 +213,7 @@ export default function AdminPage() {
 
             {/* ════════════════════════════════ STATS TAB ══════════════ */}
             {tab === "stats" && stats && (
-              <motion.div
+              <m.div
                 key="stats-tab"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -281,12 +281,12 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
             {/* ════════════════════════════════ DATA TAB ═══════════════ */}
             {tab === "data" && (
-              <motion.div
+              <m.div
                 key="data-tab"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -340,7 +340,7 @@ export default function AdminPage() {
                 {/* Sync results */}
                 <AnimatePresence>
                   {syncResult && (
-                    <motion.div
+                    <m.div
                       key="sync-result"
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -382,7 +382,7 @@ export default function AdminPage() {
                       {syncResult.total === 0 && syncResult.errors.length === 0 && (
                         <p className="text-zinc-500 text-sm f-mono">All races already synced.</p>
                       )}
-                    </motion.div>
+                    </m.div>
                   )}
                 </AnimatePresence>
 
@@ -408,12 +408,12 @@ export default function AdminPage() {
                     ))}
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
             {/* ════════════════════════════════ USERS TAB ══════════════ */}
             {tab === "users" && (
-              <motion.div
+              <m.div
                 key="users-tab"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -450,7 +450,7 @@ export default function AdminPage() {
                     </thead>
                     <tbody>
                       {users.map((user, idx) => (
-                        <motion.tr
+                        <m.tr
                           key={user.id}
                           initial={{ opacity: 0, x: -8 }}
                           animate={{ opacity: 1, x: 0 }}
@@ -491,12 +491,12 @@ export default function AdminPage() {
                               </button>
                             </div>
                           </td>
-                        </motion.tr>
+                        </m.tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         )}
@@ -504,14 +504,14 @@ export default function AdminPage() {
         {/* ── Create User Modal ────────────────────────────────────────── */}
         <AnimatePresence>
           {showCreate && (
-            <motion.div
+            <m.div
               key="create-modal"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
             >
-              <motion.div
+              <m.div
                 initial={{ scale: 0.92, y: 24 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.92, y: 24 }}
@@ -567,22 +567,22 @@ export default function AdminPage() {
                     CANCEL
                   </button>
                 </div>
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           )}
         </AnimatePresence>
 
         {/* ── Reset Password Modal ─────────────────────────────────────── */}
         <AnimatePresence>
           {resetUser && (
-            <motion.div
+            <m.div
               key="reset-modal"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
             >
-              <motion.div
+              <m.div
                 initial={{ scale: 0.92, y: 24 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.92, y: 24 }}
@@ -617,8 +617,8 @@ export default function AdminPage() {
                     CANCEL
                   </button>
                 </div>
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           )}
         </AnimatePresence>
 

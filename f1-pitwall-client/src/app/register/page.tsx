@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { register } from "../lib/pitwall-auth";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import PitwallBackground from "../components/PitwallBackground";
 import {
   AuthCard, AuthLogo, AuthInput, PrimaryButton,
@@ -60,11 +60,11 @@ export default function RegisterPage() {
     >
       <PitwallBackground glow="top-center" streaks={5} intensity={0.85} />
 
-      <motion.div
+      <m.div
         style={{ perspective: 1200 }}
         className={`relative z-10 w-full max-w-md transition-all duration-600 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
       >
-        <motion.div
+        <m.div
           initial={{ rotateY: -8, translateY: 30, opacity: 0 }}
           animate={{ rotateY: 0, translateY: 0, opacity: 1 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
@@ -83,9 +83,9 @@ export default function RegisterPage() {
             </AnimatePresence>
 
             {/* Google */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <m.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <GoogleButton />
-            </motion.div>
+            </m.div>
 
             {/* Divider */}
             <div className="flex items-center gap-3 my-4">
@@ -97,7 +97,7 @@ export default function RegisterPage() {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-3.5">
               {fields.map((f, i) => (
-                <motion.div
+                <m.div
                   key={f.key}
                   initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 + i * 0.05 }}
@@ -116,11 +116,11 @@ export default function RegisterPage() {
                       ) : undefined
                     }
                   />
-                </motion.div>
+                </m.div>
               ))}
 
               {/* Role notice — FIA badge style */}
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
                 className="rounded-lg px-4 py-3 flex items-center gap-3"
                 style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${F1.hairline}` }}
@@ -132,14 +132,14 @@ export default function RegisterPage() {
                   </p>
                   <p className="f-mono text-[9px] text-zinc-600">Contact admin to upgrade</p>
                 </div>
-              </motion.div>
+              </m.div>
 
               {/* Submit */}
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
+              <m.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
                 <PrimaryButton isLoading={isLoading} disabled={isLoading}>
                   {isLoading ? "Creating Account..." : "Create Account →"}
                 </PrimaryButton>
-              </motion.div>
+              </m.div>
             </form>
 
             {/* Footer */}
@@ -150,8 +150,8 @@ export default function RegisterPage() {
               </p>
             </div>
           </AuthCard>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </div>
   );
 }

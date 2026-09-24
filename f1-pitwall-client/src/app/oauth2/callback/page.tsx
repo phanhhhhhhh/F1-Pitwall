@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { exchangeOauth2Code } from "../../lib/pitwall-auth";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import PitwallBackground from "../../components/PitwallBackground";
 import { F1 } from "../../lib/f1-theme";
 import { hardNavigate } from "../../lib/navigation";
@@ -64,7 +64,7 @@ function LoadingDots() {
     return (
         <span className="inline-flex gap-1 items-end ml-1">
             {[0, 1, 2].map(i => (
-                <motion.span
+                <m.span
                     key={i}
                     className="w-1 h-1 rounded-full"
                     style={{ background: "#71717a" }}
@@ -135,7 +135,7 @@ function CallbackHandler() {
 
     if (error) {
         return (
-            <motion.div
+            <m.div
                 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                 className="text-center z-10 relative"
             >
@@ -149,7 +149,7 @@ function CallbackHandler() {
                 <p className="f-mono text-zinc-600 text-xs">Redirecting to login</p>
                 <div className="flex justify-center mt-2 gap-1">
                     {[0,1,2].map(i => (
-                        <motion.div
+                        <m.div
                             key={i}
                             className="w-1 h-1 rounded-full"
                             style={{ background: "#52525b" }}
@@ -158,12 +158,12 @@ function CallbackHandler() {
                         />
                     ))}
                 </div>
-            </motion.div>
+            </m.div>
         );
     }
 
     return (
-        <motion.div
+        <m.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -208,7 +208,7 @@ function CallbackHandler() {
 
                 {/* Progress bar */}
                 <div className="mt-5 h-px rounded-full overflow-hidden" style={{ background: F1.hairline }}>
-                    <motion.div
+                    <m.div
                         className="h-full"
                         style={{ background: `linear-gradient(90deg,${F1.red},#ff5a3c)` }}
                         initial={{ width: "0%" }}
@@ -220,7 +220,7 @@ function CallbackHandler() {
                 {/* Bottom accent */}
                 <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
             </div>
-        </motion.div>
+        </m.div>
     );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import { subscribeToTopic } from "../lib/stomp";
 import { BASE_URL as API } from "../lib/api-client";
@@ -135,7 +135,7 @@ export default function NotificationBell() {
       {/* ── Dropdown panel ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {open && (
-          <motion.div
+          <m.div
             key="notif-panel"
             initial={{ opacity: 0, scale: 0.96, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -188,7 +188,7 @@ export default function NotificationBell() {
                   <p className="f-mono text-zinc-600 text-xs tracking-widest">NO NOTIFICATIONS</p>
                 </div>
               ) : (
-                <motion.div
+                <m.div
                   initial="hidden"
                   animate="visible"
                   variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
@@ -196,7 +196,7 @@ export default function NotificationBell() {
                   {notifications.map(n => {
                     const accent = TYPE_ACCENT[n.type] || "#71717a";
                     return (
-                      <motion.div
+                      <m.div
                         key={n.id}
                         variants={{
                           hidden:  { opacity: 0, x: -10 },
@@ -228,10 +228,10 @@ export default function NotificationBell() {
                             style={{ backgroundColor: "#E10600", boxShadow: "0 0 5px rgba(225,6,0,0.7)" }}
                           />
                         )}
-                      </motion.div>
+                      </m.div>
                     );
                   })}
-                </motion.div>
+                </m.div>
               )}
             </div>
 
@@ -241,7 +241,7 @@ export default function NotificationBell() {
                 <p className="f-mono text-[10px] text-zinc-700 tracking-widest">{notifications.length} TOTAL</p>
               </div>
             )}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>
