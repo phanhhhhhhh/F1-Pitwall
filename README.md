@@ -10,7 +10,7 @@ A full-stack Formula 1 race engineering SaaS platform for the 2026 season — li
 
 - **Pit Wall OS Design System** — broadcast-inspired UI with F1 red, Saira Condensed typography, chamfered cards, timing-tower rows, animated count-ups, and responsive mobile layout
 - **Authentication** — username/password login with JWT (access + refresh tokens), Google OAuth 2.0 with 2FA, passwordless OTP login, forgot/reset password flow; BCrypt hashing; role-based access (ADMIN / ENGINEER / VIEWER)
-- **Live WebSocket Telemetry** — simulated speed, RPM, gear, throttle, brake, and DRS pushed every second via STOMP/SockJS; per-driver and aggregated topics
+- **Live WebSocket Telemetry** — simulated speed, RPM, gear, throttle, brake, and DRS pushed every second via STOMP/SockJS; per-driver and aggregated topics. Clients authenticate with their access token in the STOMP `CONNECT` header, may only subscribe to `/topic/telemetry` and `/topic/notifications`, and cannot publish
 - **Race Weekend Hub** — dynamic session tabs (FP1/FP2/FP3) with fastest-lap results per driver fetched from the OpenF1 API; weekend schedule with LIVE / UPCOMING / COMPLETED status badges; 30-minute cache with manual refresh
 - **OpenF1 Live Race Integration** — auto-detects currently-live sessions and switches the Tyres tab to real compound/age/stint data polled every 30 seconds; falls back to the telemetry simulator when no race is active
 - **Driver & Constructor Championship Standings** — real 2026 points system; wins, podiums, fastest laps, gap to leader/previous; top-6 surfaced on the Overview dashboard; CSV and PDF export
@@ -73,6 +73,7 @@ Render (backend Docker + PostgreSQL) · Vercel (frontend edge) · Supabase Stora
 ### 1. Start PostgreSQL
 
 ```bash
+cp .env.example .env    # compose refuses to start without JWT_SECRET / ADMIN_PASSWORD / ENGINEER_PASSWORD
 docker compose -f docker-compose.full.yml up -d postgres
 ```
 
@@ -169,7 +170,7 @@ Google OAuth requires real credentials — set `GOOGLE_CLIENT_ID` and `GOOGLE_CL
 │   │   ├── scheduler/              # TelemetrySimulator (1 s tick)
 │   │   ├── security/               # JwtService, JwtAuthenticationFilter, OAuth2SuccessHandler
 │   │   ├── service/                # 25 service classes (business logic + external APIs)
-│   │   └── websocket/              # WebSocketConfig, TelemetryPayload
+│   │   └── websocket/              # WebSocketConfig, StompAuthChannelInterceptor, TelemetryPayload
 │   ├── src/main/resources/
 │   │   ├── application.properties       # Default (dev) config
 │   │   └── application-prod.properties  # Production overrides
