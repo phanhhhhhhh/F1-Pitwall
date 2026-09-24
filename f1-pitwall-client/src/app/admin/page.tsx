@@ -109,7 +109,7 @@ export default function AdminPage() {
   };
 
   const resetPassword = async () => {
-    if (!resetUser || newPassword.length < 6) return;
+    if (!resetUser || newPassword.length < 8) return;
     const res = await authFetch(`${API}/api/admin/users/${resetUser.id}/password`, {
       method: "PATCH",
       body: JSON.stringify({ password: newPassword }),
@@ -525,7 +525,7 @@ export default function AdminPage() {
                   {[
                     { label: "USERNAME", key: "username", type: "text",     ph: "e.g. engineer1" },
                     { label: "EMAIL",    key: "email",    type: "email",    ph: "user@pitwall.f1" },
-                    { label: "PASSWORD", key: "password", type: "password", ph: "min 6 chars" },
+                    { label: "PASSWORD", key: "password", type: "password", ph: "min 8 chars" },
                   ].map(f => (
                     <div key={f.key}>
                       <label className="f-mono text-xs text-zinc-500 tracking-widest block mb-1.5">{f.label}</label>
@@ -597,7 +597,7 @@ export default function AdminPage() {
                 </p>
                 <input
                   type="password"
-                  placeholder="New password (min 6 chars)"
+                  placeholder="New password (min 8 chars)"
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   className="w-full bg-zinc-800/80 border border-zinc-700/50 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/50 mb-5 f-mono"
@@ -605,7 +605,7 @@ export default function AdminPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={resetPassword}
-                    disabled={newPassword.length < 6}
+                    disabled={newPassword.length < 8}
                     className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white f-cond font-black py-3 rounded-lg text-sm transition-colors chamfer-sm"
                   >
                     RESET

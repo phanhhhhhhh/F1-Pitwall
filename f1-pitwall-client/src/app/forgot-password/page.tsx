@@ -62,7 +62,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError("");
     if (!otp.trim()) { setError("OTP is required"); return; }
-    if (newPassword.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (newPassword.length < 8) { setError("Password must be at least 8 characters"); return; }
     if (newPassword !== confirmPassword) { setError("Passwords do not match"); return; }
     setLoading(true);
     try {

@@ -302,6 +302,26 @@ export async function verifyOauth2Otp(email: string, otp: string): Promise<AuthR
     return data;
 }
 
+/** Swaps the one-time code from the Google redirect for tokens (they never ride in the URL). */
+export async function exchangeOauth2Code(code: string): Promise<AuthResponse> {
+    const res = await fetch(`${API_URL}/api/auth/oauth2/exchange`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Login could not be completed");
+    }
+    const data: AuthResponse = await res.json();
+    setTokens(data.accessToken, data.refreshToken);
+    if (isBrowser()) {
+        localStorage.setItem("pitwall_username", data.username);
+        localStorage.setItem("pitwall_role", data.role);
+    }
+    return data;
+}
+
 export async function sendOauth2Otp(email: string): Promise<void> {
     const res = await fetch(`${API_URL}/api/auth/oauth2/resend-otp`, {
         method: "POST",
