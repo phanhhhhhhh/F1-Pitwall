@@ -6,6 +6,11 @@ updates:
   - package-ecosystem: npm
     directory: /f1-pitwall-client
     schedule: { interval: weekly }
+    groups:
+      # react-dom peers on the exact react minor, so they must move together (a lone
+      # react-dom bump fails npm ci with ERESOLVE).
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
   - package-ecosystem: docker
     directory: /backend
     schedule: { interval: weekly }
