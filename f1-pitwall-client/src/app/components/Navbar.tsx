@@ -9,6 +9,7 @@ import { useSeason } from "../context/SeasonContext";
 import NotificationBell from "./NotificationBell";
 import SeasonSelector from "./SeasonSelector";
 import CommandPalette from "./CommandPalette";
+import { hardNavigate } from "../lib/navigation";
 
 interface NavItem { href: string; label: string; live?: boolean; }
 
@@ -140,7 +141,7 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogout = () => { clearTokens(); window.location.href = "/login"; };
+  const handleLogout = () => { clearTokens(); hardNavigate("/login"); };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

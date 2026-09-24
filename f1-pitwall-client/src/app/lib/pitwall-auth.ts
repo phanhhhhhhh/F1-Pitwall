@@ -1,4 +1,5 @@
 import { BASE_URL as API_URL } from "./api-client";
+import { hardNavigate } from "./navigation";
 
 export interface AuthResponse {
     accessToken: string;
@@ -177,7 +178,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
             });
         } else {
             clearTokens();
-            if (isBrowser()) window.location.href = "/login";
+            if (isBrowser()) hardNavigate("/login");
         }
     }
 

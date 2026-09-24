@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import PitwallBackground from "../../components/PitwallBackground";
 import { RedLine, Spinner, ErrorBanner } from "../../components/auth";
 import { F1 } from "../../lib/f1-theme";
+import { hardNavigate } from "../../lib/navigation";
 
 const OTP_EXPIRY_SECONDS = 300;
 
@@ -98,7 +99,7 @@ function PendingHandler() {
                 localStorage.setItem("pitwall_username", data.username);
                 localStorage.setItem("pitwall_role", data.role);
             }
-            setTimeout(() => { window.location.href = "/"; }, 200);
+            setTimeout(() => { hardNavigate("/"); }, 200);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Verification failed");
         } finally {
