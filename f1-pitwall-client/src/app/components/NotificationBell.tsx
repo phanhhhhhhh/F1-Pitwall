@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
+import { subscribeToTopic } from "../lib/stomp";
 import { BASE_URL as API } from "../lib/api-client";
 import type { NotificationItem } from "../types/f1";
 
@@ -53,51 +54,14 @@ export default function NotificationBell() {
   /* ── WebSocket live notifications ──────────────────────────────────────── */
   useEffect(() => {
     if (!getAccessToken()) return;
-
-    const loadAndConnect = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (typeof window !== "undefined" && (window as any).Stomp) {
-        connectWs();
-        return;
+    return subscribeToTopic("/topic/notifications", (body) => {
+      const notif: NotificationItem = JSON.parse(body);
+      setNotifications(prev => [notif, ...prev].slice(0, 50));
+      setUnreadCount(prev => prev + 1);
+      if (Notification.permission === "granted") {
+        new Notification(notif.title, { body: notif.message, icon: "/favicon.ico" });
       }
-
-      const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js";
-      s.onerror = () => console.warn("[NotificationBell] Failed to load SockJS — WebSocket notifications unavailable");
-      s.onload = () => {
-        const s2 = document.createElement("script");
-        s2.src = "https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js";
-        s2.onerror = () => console.warn("[NotificationBell] Failed to load StompJS");
-        s2.onload = () => setTimeout(connectWs, 200);
-        document.head.appendChild(s2);
-      };
-      document.head.appendChild(s);
-    };
-
-    const connectWs = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const w = window as any;
-      const factory = w.Stomp ?? w.StompJs?.Stomp;
-      if (!factory) return;
-      const wsUrl = API + "/ws";
-      const client = factory.over(() => new w.SockJS(wsUrl));
-      client.debug = () => { };
-      client.connect({}, () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        client.subscribe("/topic/notifications", (msg: any) => {
-          const notif: NotificationItem = JSON.parse(msg.body);
-          setNotifications(prev => [notif, ...prev].slice(0, 50));
-          setUnreadCount(prev => prev + 1);
-          if (Notification.permission === "granted") {
-            new Notification(notif.title, { body: notif.message, icon: "/favicon.ico" });
-          }
-        });
-      }, () => {
-        console.warn("[NotificationBell] WebSocket connection failed");
-      });
-    };
-
-    loadAndConnect();
+    });
   }, []);
 
   /* ── data helpers ──────────────────────────────────────────────────────── */

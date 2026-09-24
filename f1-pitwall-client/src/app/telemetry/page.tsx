@@ -6,6 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { authFetch } from "../lib/pitwall-auth";
+import { subscribeToTopic } from "../lib/stomp";
 import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
 import PitwallBackground from "../components/PitwallBackground";
 import Navbar from "../components/Navbar";
@@ -23,23 +24,6 @@ import type {
   CircuitInfo,
   CircuitGeometry,
 } from "../types/f1";
-
-declare global {
-  interface Window {
-    SockJS: new (url: string) => unknown;
-    Stomp?: StompFactory;
-    StompJs?: { Stomp: StompFactory };
-  }
-}
-
-interface TelemetryFrame { body: string; }
-interface StompClient {
-  debug: ((message: string) => void) | null;
-  connect: (headers: Record<string, string>, onConnect: () => void, onError?: (error: unknown) => void) => void;
-  subscribe: (destination: string, callback: (message: TelemetryFrame) => void) => { unsubscribe: () => void };
-  disconnect: (callback?: () => void) => void;
-}
-interface StompFactory { over: (webSocketFactory: () => unknown) => StompClient; }
 
 const MAX_HISTORY = 40;
 
@@ -202,37 +186,16 @@ export default function TelemetryPage() {
   const [liveTyreData, setLiveTyreData] = useState<LiveTyreData[]>([]);
   const [circuits, setCircuits] = useState<CircuitInfo[]>([]);
   const [geometry, setGeometry] = useState<CircuitGeometry | null>(null);
-  const stompRef = useRef<StompClient | null>(null);
-
   useEffect(() => {
-    const connect = () => {
-      const stompFactory = window.Stomp ?? window.StompJs?.Stomp;
-      if (!stompFactory) { setTimeout(connect, 500); return; }
-      const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/ws";
-      const stompClient = stompFactory.over(() => new window.SockJS(wsUrl));
-      stompClient.debug = null;
-      stompClient.connect({}, () => {
-        setConnected(true);
-        stompClient.subscribe("/topic/telemetry", (msg: TelemetryFrame) => {
-          const data: TelemetryData[] = JSON.parse(msg.body);
-          setDrivers(data);
-          setSpeedHistory(prev => { const n = { ...prev }; data.forEach(d => { n[d.driverName] = [...(n[d.driverName] || []).slice(-(MAX_HISTORY - 1)), d.speed]; }); return n; });
-        });
-      }, () => setConnected(false));
-      stompRef.current = stompClient;
-    };
-    const s1 = document.createElement("script");
-    s1.src = "https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js";
-    s1.onerror = () => console.warn("[Telemetry] SockJS load failed");
-    document.head.appendChild(s1);
-    s1.onload = () => {
-      const s2 = document.createElement("script");
-      s2.src = "https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js";
-      s2.onerror = () => console.warn("[Telemetry] StompJS load failed");
-      document.head.appendChild(s2);
-      s2.onload = () => setTimeout(connect, 100);
-    };
-    return () => { stompRef.current?.disconnect(); };
+    return subscribeToTopic(
+      "/topic/telemetry",
+      (body) => {
+        const data: TelemetryData[] = JSON.parse(body);
+        setDrivers(data);
+        setSpeedHistory(prev => { const n = { ...prev }; data.forEach(d => { n[d.driverName] = [...(n[d.driverName] || []).slice(-(MAX_HISTORY - 1)), d.speed]; }); return n; });
+      },
+      setConnected,
+    );
   }, []);
 
   const checkLiveStatus = async () => {
@@ -255,6 +218,8 @@ export default function TelemetryPage() {
   };
 
   useEffect(() => {
+    // Fetch-on-mount then poll; checkLiveStatus only sets state after its await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkLiveStatus();
     const id = setInterval(checkLiveStatus, 15000);
     return () => clearInterval(id);
