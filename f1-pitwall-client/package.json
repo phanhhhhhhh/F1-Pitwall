@@ -33,7 +33,7 @@
     "@types/sockjs-client": "^1.5.4",
     "@vitejs/plugin-react": "^6.1.1",
     "babel-plugin-react-compiler": "1.0.0",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "^16.3.5",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",
