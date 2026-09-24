@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests -B
 
 # ─── Stage 2: Run ──────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app
 
 # Run unprivileged — nothing in the app writes to the filesystem.
