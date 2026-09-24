@@ -1,5 +1,5 @@
 # ─── Stage 1: Build ────────────────────────────────────────────────────────
-FROM maven:3.9.6-eclipse-temurin-21 AS builder
+FROM maven:3.9.15-eclipse-temurin-26 AS builder
 WORKDIR /app
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
