@@ -4,14 +4,12 @@ import backend.dto.ConstructorStandingResponse;
 import backend.dto.DriverStandingResponse;
 import backend.dto.RaceResultResponse;
 import backend.model.Race;
-import backend.model.enums.RaceStatus;
 import backend.repository.RaceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
-import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;

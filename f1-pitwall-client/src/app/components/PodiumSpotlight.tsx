@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { getTeamColor, flagForNationality } from "../lib/f1-theme";
 import type { DriverStanding } from "../types/f1";
 
@@ -51,7 +51,7 @@ export default function PodiumSpotlight({ standings }: PodiumSpotlightProps) {
           const flag = flagForNationality(driver.nationality);
 
           return (
-            <motion.div
+            <m.div
               key={rank}
               initial={{ y: 50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -106,7 +106,7 @@ export default function PodiumSpotlight({ standings }: PodiumSpotlightProps) {
                   <span>◎ {driver.podiums || 0}P</span>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           );
         })}
       </div>

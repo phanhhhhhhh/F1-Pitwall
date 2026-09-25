@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { flagForCountry } from "../lib/f1-theme";
 import { BASE_URL as API } from "../lib/api-client";
+import { useVisibleInterval } from "../lib/useVisibleInterval";
 import type { WidgetSession, WeekendData } from "../types/f1";
 
 const SESSION_COLORS: Record<string, string> = {
@@ -66,11 +67,7 @@ export default function RaceWeekendWidget() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchWeekend();
-    const dataInterval = setInterval(fetchWeekend, 5 * 60 * 1000);
-    return () => clearInterval(dataInterval);
-  }, [fetchWeekend]);
+  useVisibleInterval(fetchWeekend, 5 * 60 * 1000);
 
   useEffect(() => {
     const tickInterval = setInterval(() => setTick(t => t + 1), 1000);
@@ -157,7 +154,7 @@ export default function RaceWeekendWidget() {
       {/* ── Live session hero banner ────────────────────────────────────── */}
       <AnimatePresence>
         {currentSession && (
-          <motion.div
+          <m.div
             key="live-banner"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -183,14 +180,14 @@ export default function RaceWeekendWidget() {
                 <p className="f-mono text-xs text-zinc-600">remaining</p>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* ── Next session banner ─────────────────────────────────────────── */}
       <AnimatePresence>
         {!currentSession && nextSession && (
-          <motion.div
+          <m.div
             key="next-banner"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -210,7 +207,7 @@ export default function RaceWeekendWidget() {
                 <p className="f-mono text-xs text-zinc-600">{formatLocalTime(nextSession.dateStart)}</p>
               </div>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -224,7 +221,7 @@ export default function RaceWeekendWidget() {
           const label  = SESSION_LABELS[session.name] || session.name;
 
           return (
-            <motion.div
+            <m.div
               key={session.sessionKey || idx}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
@@ -288,7 +285,7 @@ export default function RaceWeekendWidget() {
                 )}
                 {isDone && <p className="f-mono text-[10px] text-zinc-700">DONE</p>}
               </div>
-            </motion.div>
+            </m.div>
           );
         })}
       </div>

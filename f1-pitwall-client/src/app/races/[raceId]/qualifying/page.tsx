@@ -9,7 +9,7 @@ import RaceSubNav from "../../../components/RaceSubNav";
 import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable } from "../../../components/LoadingSkeleton";
 import { F1, getTeamColor } from "../../../lib/f1-theme";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { BASE_URL as API } from "../../../lib/api-client";
 import type { QualifyingResult, PenaltyItem } from "../../../types/f1";
 
@@ -149,7 +149,7 @@ export default function QualifyingPage() {
 
                 {/* ── No data state */}
                 {!hasData ? (
-                    <motion.div
+                    <m.div
                         className="flex flex-col items-center justify-center text-center py-24 border border-dashed rounded-2xl"
                         style={{ borderColor: "rgba(255,255,255,.07)" }}
                         initial={{ opacity: 0, y: 12 }}
@@ -163,13 +163,13 @@ export default function QualifyingPage() {
                         <p className="f-mono text-xs text-zinc-500 max-w-xs">
                             Session not yet complete · Data syncs automatically once qualifying has finished
                         </p>
-                    </motion.div>
+                    </m.div>
                 ) : (
                     <div className="space-y-8">
 
                         {/* ── Pole position hero */}
                         {poleDriver && (
-                            <motion.div
+                            <m.div
                                 initial={{ opacity: 0, y: 16 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
@@ -235,11 +235,11 @@ export default function QualifyingPage() {
                                         </div>
                                     );
                                 })()}
-                            </motion.div>
+                            </m.div>
                         )}
 
                         {/* ── Starting grid (2-wide layout) */}
-                        <motion.div
+                        <m.div
                             initial={{ opacity: 0, y: 14 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.1 }}
@@ -271,7 +271,7 @@ export default function QualifyingPage() {
                                         const right = results[rowIdx * 2 + 1];
 
                                         return (
-                                            <motion.div
+                                            <m.div
                                                 key={rowIdx}
                                                 className="flex gap-2 sm:gap-3"
                                                 initial={{ opacity: 0, x: -6 }}
@@ -346,15 +346,15 @@ export default function QualifyingPage() {
                                                         </div>
                                                     );
                                                 })}
-                                            </motion.div>
+                                            </m.div>
                                         );
                                     })}
                                 </div>
                             </div>
-                        </motion.div>
+                        </m.div>
 
                         {/* ── Qualifying times table with Q1/Q2/Q3 columns */}
-                        <motion.div
+                        <m.div
                             initial={{ opacity: 0, y: 14 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.18 }}
@@ -414,7 +414,7 @@ export default function QualifyingPage() {
                                                 </div>
                                             )}
 
-                                            <motion.div
+                                            <m.div
                                                 key={r.id}
                                                 className="grid grid-cols-[40px_1fr_auto_auto_auto_auto] sm:grid-cols-[48px_1fr_1fr_auto_auto_auto] items-center px-4 sm:px-6 py-3 border-b transition-colors group"
                                                 style={{
@@ -479,15 +479,15 @@ export default function QualifyingPage() {
                                                         ? <TimeDelta time={r.q1TimeRaw} best={bestQ1} />
                                                         : <span className="f-mono text-xs text-zinc-700">—</span>}
                                                 </div>
-                                            </motion.div>
+                                            </m.div>
                                         </>
                                     );
                                 })}
                             </div>
-                        </motion.div>
+                        </m.div>
 
                         {/* ── Q session summary pills */}
-                        <motion.div
+                        <m.div
                             className="flex flex-wrap gap-3 pt-2"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -508,11 +508,11 @@ export default function QualifyingPage() {
                                     <span className="f-cond font-black text-base" style={{ color: color.text }}>{time}</span>
                                 </div>
                             ))}
-                        </motion.div>
+                        </m.div>
 
                         {/* ── Active penalties list (admin) ── */}
                         {penalties.length > 0 && (
-                            <motion.div
+                            <m.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.4 }}
@@ -535,7 +535,7 @@ export default function QualifyingPage() {
                                         </div>
                                     ))}
                                 </div>
-                            </motion.div>
+                            </m.div>
                         )}
 
                     </div>

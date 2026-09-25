@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { getTeamColor } from "../lib/f1-theme";
 import type { TelemetryData } from "../types/f1";
 
@@ -154,7 +154,7 @@ export default function SteeringWheelHUD({
           </div>
 
           {/* Huge Gear Display */}
-          <motion.div
+          <m.div
             key={gear}
             initial={{ scale: 0.8, opacity: 0.5 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -162,7 +162,7 @@ export default function SteeringWheelHUD({
             className="text-7xl font-black f-orbitron leading-none text-white my-1 drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]"
           >
             {gear === 0 ? "N" : gear === -1 ? "R" : gear}
-          </motion.div>
+          </m.div>
 
           {/* Speed Indicator */}
           <div className="flex items-baseline gap-1 mt-1">
@@ -189,7 +189,7 @@ export default function SteeringWheelHUD({
               <div className="h-full w-px bg-zinc-800 absolute" />
             </div>
             {/* Moving G Ball */}
-            <motion.div
+            <m.div
               className="w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00E5FF] absolute"
               animate={{
                 x: Math.min(22, Math.max(-22, Number(gLat) * 6)),

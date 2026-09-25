@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { authFetch } from "../lib/pitwall-auth";
 import { BASE_URL as API } from "../lib/api-client";
@@ -266,14 +266,14 @@ export default function CircuitsPage() {
         {/* Modal Circuit View */}
         <AnimatePresence>
           {selectedCircuit && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedCircuit(null)}
               className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
             >
-              <motion.div
+              <m.div
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
@@ -324,8 +324,8 @@ export default function CircuitsPage() {
                 >
                   CLOSE CIRCUIT DETAILS
                 </button>
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           )}
         </AnimatePresence>
       </main>

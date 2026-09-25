@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
+import dynamic from "next/dynamic";
+import { m, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { subscribeToTopic } from "../lib/stomp";
+import { useVisibleInterval } from "../lib/useVisibleInterval";
 import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
 import PitwallBackground from "../components/PitwallBackground";
 import Navbar from "../components/Navbar";
 import SteeringWheelHUD from "../components/SteeringWheelHUD";
-import LiveTrackMap from "../components/LiveTrackMap";
-import TelemetryComparator from "../components/TelemetryComparator";
 import TyreThermalDisplay from "../components/TyreThermalDisplay";
 import GForceCircle from "../components/GForceCircle";
 import { BASE_URL as API } from "../lib/api-client";
 import { fetchCircuitGeometry } from "../lib/f1-data";
+import type { SeriesPoint } from "../components/TelemetryDetailChart";
 import type {
   TelemetryData,
   LiveTyreData,
@@ -24,6 +22,12 @@ import type {
   CircuitInfo,
   CircuitGeometry,
 } from "../types/f1";
+
+// Heavy views (recharts, map canvas) load only when their mode is opened.
+const chartLoading = () => <div className="h-[220px]" aria-hidden />;
+const DetailChart = dynamic(() => import("../components/TelemetryDetailChart"), { ssr: false, loading: chartLoading });
+const LiveTrackMap = dynamic(() => import("../components/LiveTrackMap"), { ssr: false });
+const TelemetryComparator = dynamic(() => import("../components/TelemetryComparator"), { ssr: false });
 
 const MAX_HISTORY = 40;
 
@@ -75,50 +79,6 @@ function SpeedChart({ data, color }: { data: number[]; color: string }) {
     ctx.fillStyle = color; ctx.fill();
   }, [data, color]);
   return <canvas ref={canvasRef} width={220} height={50} className="w-full" />;
-}
-
-type SeriesPoint = { i: number; a?: number; b?: number };
-function DetailChart({
-  data, colorA, colorB, labelA, labelB, height = 220, domain,
-}: {
-  data: SeriesPoint[]; colorA: string; colorB?: string;
-  labelA: string; labelB?: string; height?: number; domain?: [number, number];
-}) {
-  return (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
-        <defs>
-          <linearGradient id="strokeA" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={colorA} stopOpacity={0.45} />
-            <stop offset="100%" stopColor={colorA} stopOpacity={1} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-        <XAxis dataKey="i" hide />
-        <YAxis
-          domain={domain ?? ["auto", "auto"]} width={38}
-          tick={{ fill: "rgba(255,255,255,0.32)", fontSize: 9, fontFamily: "var(--font-geist-mono),monospace" }}
-          axisLine={false} tickLine={false}
-        />
-        <Tooltip
-          cursor={{ stroke: "rgba(255,255,255,0.18)", strokeWidth: 1 }}
-          contentStyle={{
-            background: "rgba(10,10,12,.92)", border: `1px solid ${F1.hairline}`,
-            borderRadius: 10, fontSize: 11, fontFamily: "var(--font-geist-mono),monospace",
-            boxShadow: "0 8px 30px rgba(0,0,0,.6)",
-          }}
-          labelStyle={{ display: "none" }}
-          itemStyle={{ padding: 0 }}
-        />
-        <Line type="monotone" dataKey="a" name={labelA} stroke="url(#strokeA)" strokeWidth={2.5}
-          dot={false} isAnimationActive={false} connectNulls />
-        {colorB && (
-          <Line type="monotone" dataKey="b" name={labelB} stroke={colorB} strokeWidth={2.5}
-            dot={false} isAnimationActive={false} connectNulls strokeDasharray="0" />
-        )}
-      </LineChart>
-    </ResponsiveContainer>
-  );
 }
 
 function TyreChip({ type, size = "sm" }: { type: string; size?: "sm" | "lg" }) {
@@ -217,13 +177,7 @@ export default function TelemetryPage() {
     } catch (e) { console.error(e); }
   };
 
-  useEffect(() => {
-    // Fetch-on-mount then poll; checkLiveStatus only sets state after its await.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    checkLiveStatus();
-    const id = setInterval(checkLiveStatus, 15000);
-    return () => clearInterval(id);
-  }, []);
+  useVisibleInterval(checkLiveStatus, 15000);
 
   useEffect(() => {
     authFetch(`${API}/api/circuits`)
@@ -307,20 +261,20 @@ export default function TelemetryPage() {
           <div className="flex items-center gap-2.5 flex-wrap">
             {/* Segmented mode control */}
             <div className="relative flex gap-1 p-1 rounded-2xl border border-white/10 bg-black/60 backdrop-blur-md">
-              {MODES.map(m => {
-                const active = mode === m.key;
-                const acc = m.key === "single" ? F1.red : m.key === "compare" ? "#3671C6" : m.key === "radar" ? "#00E5FF" : F1.orange;
+              {MODES.map(item => {
+                const active = mode === item.key;
+                const acc = item.key === "single" ? F1.red : item.key === "compare" ? "#3671C6" : item.key === "radar" ? "#00E5FF" : F1.orange;
                 return (
-                  <button key={m.key} onClick={() => setMode(m.key)}
+                  <button key={item.key} onClick={() => setMode(item.key)}
                     className="relative px-3.5 py-1.5 rounded-xl f-cond text-xs font-black tracking-wide transition-colors"
                     style={{ color: active ? acc : "rgba(255,255,255,.55)" }}>
                     {active && (
-                      <motion.span layoutId="modePill" className="absolute inset-0 rounded-xl border"
+                      <m.span layoutId="modePill" className="absolute inset-0 rounded-xl border"
                         style={{ borderColor: `${acc}66`, background: `${acc}22` }}
                         transition={{ type: "spring", stiffness: 380, damping: 30 }} />
                     )}
                     <span className="relative z-10 flex items-center gap-1.5">
-                      {m.label}
+                      {item.label}
                     </span>
                   </button>
                 );
@@ -339,7 +293,7 @@ export default function TelemetryPage() {
 
         {/* Live session banner */}
         {liveStatus && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+          <m.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
             className="flex items-center justify-between mb-6 px-4 py-3 rounded-2xl border bg-black/40 backdrop-blur-md flex-wrap gap-3 border-zinc-800">
             <div className="flex items-center gap-3 flex-wrap">
               {liveStatus.isLive && <span className="w-2 h-2 rounded-full bg-red-600 live-pulse" />}
@@ -359,12 +313,12 @@ export default function TelemetryPage() {
               className="f-mono text-[11px] border border-zinc-700 hover:border-red-500 text-zinc-400 hover:text-white px-3 py-1 rounded-lg transition-all tracking-wider bg-zinc-900/60">
               ↻ SYNC NOW
             </button>
-          </motion.div>
+          </m.div>
         )}
 
         <AnimatePresence mode="wait">
           {mode === "radar" && (
-            <motion.div key="radar" {...PANEL}>
+            <m.div key="radar" {...PANEL}>
               <LiveTrackMap
                 telemetryList={drivers}
                 selectedDriverId={selectedDriver?.driverName}
@@ -372,23 +326,23 @@ export default function TelemetryPage() {
                 circuits={circuits}
                 circuitId={activeCircuit?.id}
               />
-            </motion.div>
+            </m.div>
           )}
 
           {mode === "compare" && (
-            <motion.div key="compare" {...PANEL}>
+            <m.div key="compare" {...PANEL}>
               <TelemetryComparator />
-            </motion.div>
+            </m.div>
           )}
 
           {mode === "tyres" && (
-            <motion.div key="tyres" {...PANEL}>
+            <m.div key="tyres" {...PANEL}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 {["SOFT", "MEDIUM", "HARD", "INTERMEDIATE"].map((compound, i) => {
                   const spec = tyreSpec(compound);
                   const count = tyreCards.filter(d => (d.tyreType || "").toUpperCase() === compound).length;
                   return (
-                    <motion.div key={compound} variants={STAGGER} custom={i} initial="hidden" animate="show"
+                    <m.div key={compound} variants={STAGGER} custom={i} initial="hidden" animate="show"
                       className="relative rounded-2xl border border-zinc-800 bg-black/60 overflow-hidden px-4 py-3.5 shadow-xl">
                       <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: spec.color }} />
                       <div className="flex items-center justify-between">
@@ -398,7 +352,7 @@ export default function TelemetryPage() {
                         </div>
                         <TyreChip type={compound} size="lg" />
                       </div>
-                    </motion.div>
+                    </m.div>
                   );
                 })}
               </div>
@@ -412,7 +366,7 @@ export default function TelemetryPage() {
                   const lifeColor = life < 20 ? F1.red : life < 50 ? F1.gold : spec.color;
                   const pitIn = Math.max(0, maxLaps - d.lap);
                   return (
-                    <motion.div key={d.carNumber} variants={STAGGER} custom={idx} initial="hidden" animate="show"
+                    <m.div key={d.carNumber} variants={STAGGER} custom={idx} initial="hidden" animate="show"
                       whileHover={{ y: -4 }}
                       className="group relative rounded-2xl border border-zinc-800 bg-black/70 overflow-hidden shadow-xl p-4">
                       <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: col, boxShadow: `0 0 12px ${col}` }} />
@@ -435,7 +389,7 @@ export default function TelemetryPage() {
                           <span className="f-cond font-black text-sm tabular-nums" style={{ color: lifeColor }}>{life.toFixed(0)}%</span>
                         </div>
                         <div className="h-2 rounded-full overflow-hidden bg-zinc-900">
-                          <motion.div className="h-full rounded-full" initial={false} animate={{ width: `${life}%` }}
+                          <m.div className="h-full rounded-full" initial={false} animate={{ width: `${life}%` }}
                             style={{ background: `linear-gradient(90deg,${lifeColor}99,${lifeColor})` }} />
                         </div>
                       </div>
@@ -453,15 +407,15 @@ export default function TelemetryPage() {
                           <p className="f-mono text-[8px] text-zinc-500">PIT IN</p>
                         </div>
                       </div>
-                    </motion.div>
+                    </m.div>
                   );
                 })}
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {mode === "single" && (
-            <motion.div key="single" {...PANEL} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <m.div key="single" {...PANEL} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Column: Driver Selection List (col-span-4) */}
               <div className="lg:col-span-4">
                 <div className="flex items-center gap-2 mb-3">
@@ -473,7 +427,7 @@ export default function TelemetryPage() {
                     const col = getTeamColor(d.teamName, d.teamColor);
                     const isSelected = d.driverName === (selected || (drivers[0]?.driverName || "Max Verstappen"));
                     return (
-                      <motion.div key={d.driverName} variants={STAGGER} custom={idx} initial="hidden" animate="show"
+                      <m.div key={d.driverName} variants={STAGGER} custom={idx} initial="hidden" animate="show"
                         onClick={() => setSelected(d.driverName)}
                         whileHover={{ y: -2 }}
                         className={`relative rounded-2xl p-3.5 cursor-pointer transition-all border shadow-md ${
@@ -496,7 +450,7 @@ export default function TelemetryPage() {
                           </div>
                         </div>
                         <SpeedChart data={speedHistory[d.driverName] || [d.speed]} color={col} />
-                      </motion.div>
+                      </m.div>
                     );
                   })}
                 </div>
@@ -559,7 +513,7 @@ export default function TelemetryPage() {
                   </>
                 )}
               </div>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </main>

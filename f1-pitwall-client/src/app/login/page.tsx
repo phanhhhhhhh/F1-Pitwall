@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login, sendLoginOtp, verifyLoginOtp } from "../lib/pitwall-auth";
 import { Suspense } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import PitwallBackground from "../components/PitwallBackground";
 import {
   AuthCard, AuthLogo, AuthInput, PrimaryButton,
@@ -40,7 +40,7 @@ function ModeTab({ active, onClick, label }: { active: boolean; onClick: () => v
       }}
     >
       {active && (
-        <motion.div
+        <m.div
           layoutId="modeIndicator"
           className="absolute inset-0 rounded-md"
           style={{ background: "rgba(225,6,0,0.06)", border: "1px solid rgba(225,6,0,0.20)" }}
@@ -140,11 +140,11 @@ function LoginForm() {
         <circle cx="80" cy="80" r="76" fill="none" stroke={F1.red} strokeWidth="0.5" strokeDasharray="6 10" />
       </svg>
 
-      <motion.div
+      <m.div
         style={{ perspective: 1200 }}
         className="relative z-10 w-full max-w-md"
       >
-        <motion.div
+        <m.div
           initial={{ rotateY: -8, translateY: 30, opacity: 0 }}
           animate={{ rotateY: 0, translateY: 0, opacity: 1 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
@@ -164,26 +164,26 @@ function LoginForm() {
             </AnimatePresence>
 
             {/* Google */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <m.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <GoogleButton />
-            </motion.div>
+            </m.div>
 
             <OrDivider />
 
             {/* Mode tabs — sector-themed */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
               className="flex gap-1 mb-5 p-1 rounded-lg"
               style={{ background: "rgba(0,0,0,0.35)", border: `1px solid ${F1.hairline}` }}
             >
               <ModeTab active={mode === "password"} onClick={() => switchMode("password")} label="S1 PASSWORD" />
               <ModeTab active={mode === "otp"} onClick={() => switchMode("otp")} label="S2 OTP" />
-            </motion.div>
+            </m.div>
 
             {/* Forms */}
             <AnimatePresence mode="wait">
               {mode === "password" && (
-                <motion.form
+                <m.form
                   key="pw-form"
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.22 }}
@@ -212,12 +212,12 @@ function LoginForm() {
                   <PrimaryButton isLoading={isLoading} disabled={isLoading}>
                     {isLoading ? "Authenticating..." : "Enter Pitwall →"}
                   </PrimaryButton>
-                </motion.form>
+                </m.form>
               )}
 
               {/* OTP login */}
               {mode === "otp" && (
-                <motion.div
+                <m.div
                   key="otp-form"
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.22 }}
@@ -225,7 +225,7 @@ function LoginForm() {
                 >
                   <AnimatePresence mode="wait">
                     {otpStep === "email" ? (
-                      <motion.form
+                      <m.form
                         key="otp-email"
                         initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
                         transition={{ duration: 0.2 }}
@@ -241,9 +241,9 @@ function LoginForm() {
                         <PrimaryButton isLoading={isLoading} disabled={isLoading}>
                           {isLoading ? "Sending..." : "Send OTP →"}
                         </PrimaryButton>
-                      </motion.form>
+                      </m.form>
                     ) : (
-                      <motion.div
+                      <m.div
                         key="otp-code"
                         initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
                         transition={{ duration: 0.2 }}
@@ -283,10 +283,10 @@ function LoginForm() {
                             </PrimaryButton>
                           </div>
                         </div>
-                      </motion.div>
+                      </m.div>
                     )}
                   </AnimatePresence>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -298,8 +298,8 @@ function LoginForm() {
               </p>
             </div>
           </AuthCard>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </div>
   );
 }

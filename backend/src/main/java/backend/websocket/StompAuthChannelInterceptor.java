@@ -45,7 +45,8 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-        StompCommand command = accessor == null ? null : accessor.getCommand();
+        if (accessor == null) return message;
+        StompCommand command = accessor.getCommand();
         if (command == null) return message;
 
         switch (command) {

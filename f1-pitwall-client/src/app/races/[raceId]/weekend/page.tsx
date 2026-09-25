@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import type { RaceInfo } from "../../../types/f1";
 import { authFetch } from "../../../lib/pitwall-auth";
 import { F1, getTeamColor } from "../../../lib/f1-theme";
@@ -80,7 +80,7 @@ function PracticeTable({ results, loading, accent }: { results: SessionResult[];
         const isP1 = r.position === 1;
 
         return (
-          <motion.div
+          <m.div
             key={r.driverNumber}
             className="grid grid-cols-[44px_1fr_auto_auto_auto_auto] items-center px-4 sm:px-6 py-3 border-b transition-colors hover:bg-white/[0.02]"
             style={{ borderColor: "rgba(255,255,255,.04)", background: isP1 ? `${accent}08` : "transparent" }}
@@ -133,7 +133,7 @@ function PracticeTable({ results, loading, accent }: { results: SessionResult[];
             <div className="text-right">
               <span className="f-mono text-xs text-zinc-500">{r.lapsCompleted}</span>
             </div>
-          </motion.div>
+          </m.div>
         );
       })}
     </div>
@@ -272,7 +272,7 @@ export default function RaceWeekendPage() {
 
         {/* No sessions fallback */}
         {sessions.length === 0 && (
-          <motion.div className="flex flex-col items-center justify-center py-24 border border-dashed rounded-2xl"
+          <m.div className="flex flex-col items-center justify-center py-24 border border-dashed rounded-2xl"
             style={{ borderColor: F1.hairline }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <p className="f-cond font-black text-xl text-white mb-1">Session Data Unavailable</p>
@@ -280,13 +280,13 @@ export default function RaceWeekendPage() {
               OpenF1 session data for this race weekend could not be found.
               This race may be too far in the past or future.
             </p>
-          </motion.div>
+          </m.div>
         )}
 
         {sessions.length > 0 && (
           <>
             {/* Session tabs */}
-            <motion.div className="flex gap-2 flex-wrap mb-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.1 }}>
+            <m.div className="flex gap-2 flex-wrap mb-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.1 }}>
               {sessions.map(s => {
                 const isActive = activeSession?.sessionKey === s.sessionKey;
                 const col = SESSION_ACCENT[s.name] ?? F1.red;
@@ -302,12 +302,12 @@ export default function RaceWeekendPage() {
                   </button>
                 );
               })}
-            </motion.div>
+            </m.div>
 
             {/* Session meta */}
             <AnimatePresence>
               {activeSession && (
-                <motion.div
+                <m.div
                   key={activeSession.sessionKey}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -359,7 +359,7 @@ export default function RaceWeekendPage() {
                       </Link>
                     </div>
                   )}
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </>

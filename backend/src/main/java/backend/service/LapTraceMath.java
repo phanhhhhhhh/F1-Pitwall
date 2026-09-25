@@ -132,7 +132,7 @@ final class LapTraceMath {
     static Derived derive(List<List<Double>> points, List<Sample> samples,
                           Float spanXM, Float spanZM, int expectedTurns) {
         int n = points == null ? 0 : points.size();
-        if (n < 8 || samples == null || samples.size() != n) return Derived.EMPTY;
+        if (points == null || n < 8 || samples == null || samples.size() != n) return Derived.EMPTY;
 
         // normalise() divided the centred plan view by half of its longer side, so multiplying by
         // that same half restores metres. Without the spans the shape is still usable but nothing

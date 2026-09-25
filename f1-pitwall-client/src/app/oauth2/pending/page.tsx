@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { verifyOauth2Otp, sendOauth2Otp } from "../../lib/pitwall-auth";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import PitwallBackground from "../../components/PitwallBackground";
 import { RedLine, Spinner, ErrorBanner } from "../../components/auth";
 import { F1 } from "../../lib/f1-theme";
@@ -124,7 +124,7 @@ function PendingHandler() {
     const resendAvailableAt = 240; // allow resend after 60 s elapsed
 
     return (
-        <motion.div
+        <m.div
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
@@ -284,7 +284,7 @@ function PendingHandler() {
                 <div className="h-px w-full" style={{ background: F1.hairline }} />
                 <div className="h-0.5 w-1/3 mx-auto" style={{ background: `linear-gradient(90deg,transparent,${F1.red},transparent)` }} />
             </div>
-        </motion.div>
+        </m.div>
     );
 }
 

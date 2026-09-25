@@ -2,7 +2,6 @@ package backend;
 
 import backend.model.Driver;
 import backend.model.Race;
-import backend.model.RaceResult;
 import backend.model.Team;
 import backend.model.enums.RaceStatus;
 import backend.repository.DriverRepository;
@@ -43,11 +42,6 @@ class RaceResultServiceTest {
     private Race race() {
         return Race.builder().id(1L).name("Australian Grand Prix").season(2026)
                 .roundNumber(1).status(RaceStatus.SCHEDULED).build();
-    }
-
-    private Race sprintRace() {
-        return Race.builder().id(25L).name("Chinese Grand Prix Sprint").season(2026)
-                .roundNumber(2).status(RaceStatus.COMPLETED).build();
     }
 
     private Driver driver(long id, String name, Team team) {

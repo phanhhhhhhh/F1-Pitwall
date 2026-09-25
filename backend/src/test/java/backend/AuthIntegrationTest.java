@@ -3,6 +3,7 @@ package backend;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.HttpClientErrorException;
@@ -25,6 +26,9 @@ class AuthIntegrationTest {
     @LocalServerPort
     private int port;
 
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() { };
+
     private final RestTemplate rest = new RestTemplate();
 
     private String url(String path) {
@@ -39,8 +43,8 @@ class AuthIntegrationTest {
                 "password", "test-only-admin-password"
         );
 
-        ResponseEntity<Map> response = rest.postForEntity(
-                url("/api/auth/login"), body, Map.class);
+        ResponseEntity<Map<String, Object>> response = rest.exchange(
+                url("/api/auth/login"), HttpMethod.POST, new HttpEntity<>(body), JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -76,8 +80,8 @@ class AuthIntegrationTest {
                 "email", uniqueUser + "@test.com"
         );
 
-        ResponseEntity<Map> response = rest.postForEntity(
-                url("/api/auth/register"), body, Map.class);
+        ResponseEntity<Map<String, Object>> response = rest.exchange(
+                url("/api/auth/register"), HttpMethod.POST, new HttpEntity<>(body), JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("accessToken")).isNotNull();
@@ -98,8 +102,8 @@ class AuthIntegrationTest {
     @Test
     @Order(5)
     void healthEndpointIsPublic() {
-        ResponseEntity<Map> response = rest.getForEntity(
-                url("/api/health"), Map.class);
+        ResponseEntity<Map<String, Object>> response = rest.exchange(
+                url("/api/health"), HttpMethod.GET, null, JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("status")).isEqualTo("UP");

@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -230,7 +229,6 @@ class OpenF1SyncServiceTest {
                     mock(RestTemplate.class));
         }
 
-        @SuppressWarnings("unchecked")
         private backend.model.Team resolve(OpenF1SyncService svc, String constructorName, int season)
                 throws Exception {
             java.lang.reflect.Method m = OpenF1SyncService.class.getDeclaredMethod("resolveTeam", String.class, int.class);

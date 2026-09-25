@@ -64,8 +64,6 @@ public class TelemetrySimulator {
         int gear, lap;
         boolean drsActive;
         String tyreType;
-        double targetSpeed, currentCornerPhase;
-        boolean inCorner;
     }
 
     /**
@@ -113,8 +111,6 @@ public class TelemetrySimulator {
             s.throttle = 85 + RNG.nextDouble() * 15;
             s.brake = 0;
             s.drsActive = i < 3;
-            s.targetSpeed = s.speed;
-            s.inCorner = false;
             gap += 0.5 + RNG.nextDouble() * 2;
             driverStates.put(s.name, s);
         }
@@ -145,7 +141,6 @@ public class TelemetrySimulator {
      * Fields not available from the free OpenF1 API (speed, RPM, gear, brake, etc.)
      * are left at sensible defaults — the frontend should treat these as unavailable.
      */
-    @SuppressWarnings("unchecked")
     private List<TelemetryPayload> buildRealPayloads() {
         try {
             List<Map<String, Object>> liveData = openF1LiveService.getLiveData();

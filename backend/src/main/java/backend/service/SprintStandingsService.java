@@ -19,9 +19,6 @@ public class SprintStandingsService {
 
     private final RaceResultRepository raceResultRepo;
 
-    // Sprint points: 8-7-6-5-4-3-2-1 for P1-P8
-    private static final int[] SPRINT_POINTS = {8, 7, 6, 5, 4, 3, 2, 1};
-
     public List<DriverStandingResponse> getDriverStandings(int season) {
         List<RaceResult> allResults = raceResultRepo.findByRaceSeasonAndRaceStatus(season, RaceStatus.COMPLETED);
 

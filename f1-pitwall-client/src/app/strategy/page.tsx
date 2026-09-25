@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { F1, tyre } from "../lib/f1-theme";
 import Navbar from "../components/Navbar";
@@ -198,7 +198,7 @@ export default function StrategyPage() {
       <main className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
 
         {/* ── HEADER ── */}
-        <motion.div
+        <m.div
           className="flex items-end justify-between mb-10 flex-wrap gap-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -225,7 +225,7 @@ export default function StrategyPage() {
             </p>
           </div>
 
-          <motion.button
+          <m.button
             onClick={addStrategy}
             disabled={strategies.length >= 5}
             className="chamfer-sm relative overflow-hidden px-6 py-3 f-mono font-bold text-xs tracking-widest text-white transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -235,8 +235,8 @@ export default function StrategyPage() {
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-700 pointer-events-none" />
             + ADD STRATEGY
-          </motion.button>
-        </motion.div>
+          </m.button>
+        </m.div>
 
         {/* ── LOADING ── */}
         {loading ? (
@@ -258,7 +258,7 @@ export default function StrategyPage() {
             <div className="lg:col-span-1 space-y-4">
 
               {/* Circuit selector */}
-              <motion.div
+              <m.div
                 className="relative rounded-2xl overflow-hidden border"
                 style={{ background: F1.card, borderColor: F1.hairline }}
                 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -294,11 +294,11 @@ export default function StrategyPage() {
                     </div>
                   )}
                 </div>
-              </motion.div>
+              </m.div>
 
               {/* Saved strategies for this circuit's latest race */}
               {selectedCircuit && (
-                <motion.div
+                <m.div
                   className="relative rounded-2xl overflow-hidden border"
                   style={{ background: F1.card, borderColor: F1.hairline }}
                   initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -347,11 +347,11 @@ export default function StrategyPage() {
                       </div>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
 
               {/* Tyre compound reference */}
-              <motion.div
+              <m.div
                 className="relative rounded-2xl overflow-hidden border"
                 style={{ background: F1.card, borderColor: F1.hairline }}
                 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -370,7 +370,7 @@ export default function StrategyPage() {
                     <p className="f-mono text-xs font-bold text-white">{PIT_LOSS}s</p>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
 
               {/* Per-strategy editor cards */}
               <AnimatePresence>
@@ -381,7 +381,7 @@ export default function StrategyPage() {
                   const col       = strategy.color;
 
                   return (
-                    <motion.div
+                    <m.div
                       key={strategy.id}
                       className="relative rounded-2xl overflow-hidden border transition-shadow duration-300"
                       style={{
@@ -505,7 +505,7 @@ export default function StrategyPage() {
                           </span>
                         </div>
                       </div>
-                    </motion.div>
+                    </m.div>
                   );
                 })}
               </AnimatePresence>
@@ -515,7 +515,7 @@ export default function StrategyPage() {
             <div className="lg:col-span-2 space-y-5">
 
               {/* ── OPTIMAL STRATEGY HERO ── */}
-              <motion.div
+              <m.div
                 className="relative rounded-2xl overflow-hidden border-2 chamfer-lg"
                 style={{
                   borderColor: strategies[bestStratIdx]?.color,
@@ -580,10 +580,10 @@ export default function StrategyPage() {
                     </div>
                   )}
                 </div>
-              </motion.div>
+              </m.div>
 
               {/* ── STRATEGY TIMELINE VISUALIZATION ── */}
-              <motion.div
+              <m.div
                 className="relative rounded-2xl overflow-hidden border"
                 style={{ background: F1.card, borderColor: F1.hairline }}
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -622,7 +622,7 @@ export default function StrategyPage() {
                       const col       = strategy.color;
 
                       return (
-                        <motion.div
+                        <m.div
                           key={strategy.id}
                           onMouseEnter={() => setHoveredStrat(strategy.id)}
                           onMouseLeave={() => setHoveredStrat(null)}
@@ -634,7 +634,7 @@ export default function StrategyPage() {
                           {/* Row header */}
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2.5">
-                              <motion.div
+                              <m.div
                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                 style={{ background: col }}
                                 animate={{ boxShadow: isHov ? `0 0 10px ${col}` : `0 0 4px ${col}60` }}
@@ -701,15 +701,15 @@ export default function StrategyPage() {
                           {sIdx < strategies.length - 1 && (
                             <div className="mt-4 h-px" style={{ background: F1.hairline }} />
                           )}
-                        </motion.div>
+                        </m.div>
                       );
                     })}
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
 
               {/* ── TIME DELTA TABLE ── */}
-              <motion.div
+              <m.div
                 className="relative rounded-2xl overflow-hidden border"
                 style={{ background: F1.card, borderColor: F1.hairline }}
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -742,7 +742,7 @@ export default function StrategyPage() {
                         const col      = strategy.color;
 
                         return (
-                          <motion.tr
+                          <m.tr
                             key={strategy.id}
                             className="transition-colors duration-150 hover:bg-white/[0.025]"
                             style={{ borderBottom: `1px solid ${F1.hairline}` }}
@@ -789,16 +789,16 @@ export default function StrategyPage() {
                                 {isBest ? "FASTEST" : `+${gap.toFixed(1)}s`}
                               </span>
                             </td>
-                          </motion.tr>
+                          </m.tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-              </motion.div>
+              </m.div>
 
               {/* ── INFO NOTE ── */}
-              <motion.div
+              <m.div
                 className="rounded-xl border px-5 py-3.5"
                 style={{ background: "rgba(255,255,255,0.025)", borderColor: F1.hairline }}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -807,7 +807,7 @@ export default function StrategyPage() {
                 <p className="f-mono text-[10px] text-zinc-600 tracking-wide">
                   Base lap = circuit record + 2 s · Pit stop loss = {PIT_LOSS}s · Tyre degradation modelled as linear per lap · Last stint auto-fills to complete race distance
                 </p>
-              </motion.div>
+              </m.div>
 
               {/* ── UNDERCUT & PIT WINDOW CALCULATOR ── */}
               <UndercutCalculator />

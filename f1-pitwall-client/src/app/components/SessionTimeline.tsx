@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { F1, getTeamColor, tyre as tyreSpec } from "../lib/f1-theme";
 import { BASE_URL as API } from "../lib/api-client";
@@ -227,7 +227,7 @@ export default function SessionTimeline({ raceId }: { raceId: string | number })
             const cfg = EVENT_CONFIG[event.kind];
 
             return (
-              <motion.div
+              <m.div
                 key={`${event.kind}-${event.lap}-${idx}`}
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -353,7 +353,7 @@ export default function SessionTimeline({ raceId }: { raceId: string | number })
                     />
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             );
           })}
         </div>

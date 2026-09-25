@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 
 interface CommandItem {
   id: string;
@@ -120,7 +120,7 @@ export default function CommandPalette({
       {isOpen && (
         <div className="fixed inset-0 z-[999] flex items-start justify-center pt-20 px-4">
           {/* Backdrop */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -129,7 +129,7 @@ export default function CommandPalette({
           />
 
           {/* Modal Card */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.95, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
@@ -231,7 +231,7 @@ export default function CommandPalette({
               </div>
               <span className="text-zinc-600">F1-PITWALL QUICK PALETTE</span>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

@@ -336,20 +336,20 @@ public class OpenF1SyncService {
         List<Driver> allDrivers = driverRepo.findAll();
 
         try {
-            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            Map<String, Object> response = cast(restTemplate.getForObject(url, Map.class));
             if (response == null) return false;
 
-            Map<String, Object> mrData = (Map<String, Object>) response.get("MRData");
+            Map<String, Object> mrData = cast(response.get("MRData"));
             if (mrData == null) return false;
 
-            Map<String, Object> raceTable = (Map<String, Object>) mrData.get("RaceTable");
+            Map<String, Object> raceTable = cast(mrData.get("RaceTable"));
             if (raceTable == null) return false;
 
-            List<Map<String, Object>> raceList = (List<Map<String, Object>>) raceTable.get("Races");
+            List<Map<String, Object>> raceList = cast(raceTable.get("Races"));
             if (raceList == null || raceList.isEmpty()) return false;
 
             String resultKey = isSprint ? "SprintResults" : "Results";
-            List<Map<String, Object>> raceResults = (List<Map<String, Object>>) raceList.get(0).get(resultKey);
+            List<Map<String, Object>> raceResults = cast(raceList.get(0).get(resultKey));
             if (raceResults == null || raceResults.isEmpty()) return false;
 
             int[] pointsSystem = isSprint ? SPRINT_POINTS : RACE_POINTS;
@@ -359,7 +359,7 @@ public class OpenF1SyncService {
                 Integer position = toInt(r.get("position"));
                 String status = String.valueOf(r.getOrDefault("status", "Finished"));
 
-                Map<String, Object> driverMap = (Map<String, Object>) r.get("Driver");
+                Map<String, Object> driverMap = cast(r.get("Driver"));
                 if (driverMap == null) continue;
 
                 String givenName = String.valueOf(driverMap.getOrDefault("givenName", ""));
@@ -384,7 +384,7 @@ public class OpenF1SyncService {
                 boolean hasFastestLap = false;
                 if (!isSprint) {
                     try {
-                        Map<String, Object> fastestLap = (Map<String, Object>) r.get("FastestLap");
+                        Map<String, Object> fastestLap = cast(r.get("FastestLap"));
                         if (fastestLap != null) {
                             hasFastestLap = "1".equals(String.valueOf(fastestLap.getOrDefault("rank", "")));
                         }
@@ -755,5 +755,11 @@ public class OpenF1SyncService {
 
     private void sleep(long ms) {
         try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+
+    /** Narrows a decoded JSON node to the shape the caller expects; the JSON is only ever read. */
+    @SuppressWarnings("unchecked")
+    private static <T> T cast(Object node) {
+        return (T) node;
     }
 }

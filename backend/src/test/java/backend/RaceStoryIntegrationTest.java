@@ -3,6 +3,7 @@ package backend;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.HttpClientErrorException;
@@ -27,6 +28,11 @@ class RaceStoryIntegrationTest {
     @LocalServerPort
     private int port;
 
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() { };
+    private static final ParameterizedTypeReference<List<Object>> JSON_ARRAY =
+            new ParameterizedTypeReference<>() { };
+
     private final RestTemplate rest = new RestTemplate();
     private String jwtToken;
 
@@ -40,8 +46,8 @@ class RaceStoryIntegrationTest {
                     "username", "admin",
                     "password", "test-only-admin-password"
             );
-            ResponseEntity<Map> resp = rest.postForEntity(
-                    url("/api/auth/login"), body, Map.class);
+            ResponseEntity<Map<String, Object>> resp = rest.exchange(
+                    url("/api/auth/login"), HttpMethod.POST, new HttpEntity<>(body), JSON_OBJECT);
             jwtToken = (String) resp.getBody().get("accessToken");
         }
         HttpHeaders headers = new HttpHeaders();
@@ -53,9 +59,9 @@ class RaceStoryIntegrationTest {
     @Order(1)
     void pitStopsEndpointReturns200() {
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
-        ResponseEntity<List> response = rest.exchange(
+        ResponseEntity<List<Object>> response = rest.exchange(
                 url("/api/races/1/pit-stops"),
-                HttpMethod.GET, request, List.class);
+                HttpMethod.GET, request, JSON_ARRAY);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -65,9 +71,9 @@ class RaceStoryIntegrationTest {
     @Order(2)
     void weatherEndpointReturns200() {
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
-        ResponseEntity<List> response = rest.exchange(
+        ResponseEntity<List<Object>> response = rest.exchange(
                 url("/api/races/1/weather"),
-                HttpMethod.GET, request, List.class);
+                HttpMethod.GET, request, JSON_ARRAY);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -77,9 +83,9 @@ class RaceStoryIntegrationTest {
     @Order(3)
     void incidentsEndpointReturns200() {
         HttpEntity<Void> request = new HttpEntity<>(authHeaders());
-        ResponseEntity<List> response = rest.exchange(
+        ResponseEntity<List<Object>> response = rest.exchange(
                 url("/api/races/1/incidents"),
-                HttpMethod.GET, request, List.class);
+                HttpMethod.GET, request, JSON_ARRAY);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 
 type RaceFlag = "GREEN" | "YELLOW" | "VSC" | "SC" | "RED";
 
@@ -113,7 +113,7 @@ export default function RaceControlBanner({
         {/* Middle: Broadcast Event Ticker */}
         <div className="w-full lg:flex-1 max-w-xl overflow-hidden py-1 px-3 bg-black/50 rounded-xl border border-zinc-800/70">
           <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={tickerIndex}
               initial={{ y: 15, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -122,7 +122,7 @@ export default function RaceControlBanner({
               className="text-xs font-medium text-zinc-300 f-mono truncate text-center lg:text-left"
             >
               {announcements[tickerIndex]}
-            </motion.div>
+            </m.div>
           </AnimatePresence>
         </div>
 

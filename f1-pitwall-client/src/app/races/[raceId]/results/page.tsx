@@ -10,7 +10,7 @@ import PitwallBackground from "../../../components/PitwallBackground";
 import { SkeletonTable, SkeletonCard } from "../../../components/LoadingSkeleton";
 import { F1, getTeamColor } from "../../../lib/f1-theme";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import type { DriverRef, ResultRow, RaceResultResponse } from "../../../types/f1";
 import { BASE_URL as API } from "../../../lib/api-client";
 import SessionTimeline from "../../../components/SessionTimeline";
@@ -27,7 +27,7 @@ function PodiumBlock({ result, pos, delay }: { result: RaceResultResponse; pos: 
   const lastName = result.driverName.split(" ").slice(-1)[0].toUpperCase();
 
   return (
-    <motion.div
+    <m.div
       className="flex flex-col items-center gap-0 flex-1"
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
@@ -96,7 +96,7 @@ function PodiumBlock({ result, pos, delay }: { result: RaceResultResponse; pos: 
       >
         <span className="f-cond font-black text-5xl" style={{ color: `${medal}50` }}>{pos}</span>
       </div>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -260,7 +260,7 @@ export default function RaceResultsPage() {
         {/* ── Submitted success banner */}
         <AnimatePresence>
           {submitted && (
-            <motion.div
+            <m.div
               className="border rounded-2xl px-5 py-4 mb-6 flex items-center gap-3"
               style={{ background: "rgba(0,230,118,.07)", borderColor: "rgba(0,230,118,.2)" }}
               initial={{ opacity: 0, y: -8 }}
@@ -269,21 +269,21 @@ export default function RaceResultsPage() {
             >
               <span className="text-[#00E676] text-sm f-mono">✓ Results submitted — Championship standings updated automatically</span>
               <Link href="/standings" className="text-xs text-[#00E676] hover:text-emerald-300 f-mono ml-auto">VIEW STANDINGS →</Link>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
         {/* ── Feedback toast */}
         <AnimatePresence>
           {feedback && (
-            <motion.div
+            <m.div
               className={`mb-4 text-xs f-mono px-4 py-2.5 rounded-xl border inline-flex items-center gap-2 ${feedback.startsWith("✓") ? "text-[#00E676] border-[#00E676]/25 bg-[#00E676]/08" : "text-red-400 border-red-500/25 bg-red-500/08"}`}
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
             >
               {feedback}
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -292,7 +292,7 @@ export default function RaceResultsPage() {
           <div className="space-y-8">
 
             {/* Action bar */}
-            <motion.div
+            <m.div
               className="flex flex-wrap items-center gap-3 justify-end"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -313,12 +313,12 @@ export default function RaceResultsPage() {
               >
                 EDIT RESULTS
               </button>
-            </motion.div>
+            </m.div>
 
             {/* Podium visualization */}
             {hasPodium && (
               <div>
-                <motion.div
+                <m.div
                   className="flex items-center gap-2 mb-5"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -326,7 +326,7 @@ export default function RaceResultsPage() {
                 >
                   <span className="inline-block w-5 h-[2px]" style={{ background: F1.gold }} />
                   <span className="f-mono text-[10px] tracking-[0.35em] text-zinc-500">PODIUM FINISH</span>
-                </motion.div>
+                </m.div>
 
                 {/* P2 | P1 | P3 layout */}
                 <div
@@ -357,7 +357,7 @@ export default function RaceResultsPage() {
 
             {/* Full classification table */}
             <div>
-              <motion.div
+              <m.div
                 className="flex items-center gap-2 mb-5"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -366,7 +366,7 @@ export default function RaceResultsPage() {
                 <span className="inline-block w-5 h-[2px]" style={{ background: F1.red }} />
                 <span className="f-mono text-[10px] tracking-[0.35em] text-zinc-500">FULL CLASSIFICATION</span>
                 <span className="ml-auto f-mono text-[10px] text-[#00E676] border border-[#00E676]/25 bg-[#00E676]/08 px-3 py-1 rounded-lg font-bold">✓ RACE COMPLETE</span>
-              </motion.div>
+              </m.div>
 
               <div
                 className="rounded-2xl border overflow-hidden"
@@ -398,7 +398,7 @@ export default function RaceResultsPage() {
                   const isTop3 = !isDNF && r.finishPosition <= 3;
 
                   return (
-                    <motion.div
+                    <m.div
                       key={r.id}
                       className="grid grid-cols-[40px_1fr_auto_auto_auto] sm:grid-cols-[48px_1fr_auto_auto_auto_auto] items-center px-4 sm:px-6 py-3 border-b transition-colors group"
                       style={{
@@ -479,7 +479,7 @@ export default function RaceResultsPage() {
                           {r.points}
                         </span>
                       </div>
-                    </motion.div>
+                    </m.div>
                   );
                 })}
               </div>
@@ -488,7 +488,7 @@ export default function RaceResultsPage() {
 
         ) : mode === "view" && existingResults.length === 0 ? (
           // No data yet — premium empty state
-          <motion.div
+          <m.div
             className="flex flex-col items-center justify-center text-center py-24 border border-dashed rounded-2xl"
             style={{ borderColor: "rgba(255,255,255,.07)" }}
             initial={{ opacity: 0, y: 12 }}
@@ -502,11 +502,11 @@ export default function RaceResultsPage() {
             <p className="f-mono text-xs text-zinc-500 max-w-xs">
               Session not yet complete · Results will appear here once the race has finished
             </p>
-          </motion.div>
+          </m.div>
 
         ) : (
           // ── EDIT MODE
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
@@ -591,7 +591,7 @@ export default function RaceResultsPage() {
                 {submitting ? "SUBMITTING..." : "SUBMIT RESULTS →"}
               </button>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </main>
     </div>
