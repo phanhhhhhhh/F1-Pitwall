@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { authFetch, getAccessToken } from "../lib/pitwall-auth";
 import { subscribeToTopic } from "../lib/stomp";
+import { useVisibleInterval } from "../lib/useVisibleInterval";
 import { BASE_URL as API } from "../lib/api-client";
 import type { NotificationItem } from "../types/f1";
 
@@ -44,12 +45,9 @@ export default function NotificationBell() {
   }, []);
 
   /* ── poll unread count ─────────────────────────────────────────────────── */
-  useEffect(() => {
-    if (!getAccessToken()) return;
-    fetchCount();
-    const interval = setInterval(fetchCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  useVisibleInterval(() => {
+    if (getAccessToken()) void fetchCount();
+  }, 30000);
 
   /* ── WebSocket live notifications ──────────────────────────────────────── */
   useEffect(() => {

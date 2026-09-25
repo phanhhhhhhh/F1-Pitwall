@@ -5,6 +5,7 @@ import { m, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { flagForCountry } from "../lib/f1-theme";
 import { BASE_URL as API } from "../lib/api-client";
+import { useVisibleInterval } from "../lib/useVisibleInterval";
 import type { WidgetSession, WeekendData } from "../types/f1";
 
 const SESSION_COLORS: Record<string, string> = {
@@ -66,11 +67,7 @@ export default function RaceWeekendWidget() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchWeekend();
-    const dataInterval = setInterval(fetchWeekend, 5 * 60 * 1000);
-    return () => clearInterval(dataInterval);
-  }, [fetchWeekend]);
+  useVisibleInterval(fetchWeekend, 5 * 60 * 1000);
 
   useEffect(() => {
     const tickInterval = setInterval(() => setTick(t => t + 1), 1000);

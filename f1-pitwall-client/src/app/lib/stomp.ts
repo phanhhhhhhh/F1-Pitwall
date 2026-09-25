@@ -8,6 +8,10 @@ import { BASE_URL } from "./api-client";
  *
  * sockjs-client and @stomp/stompjs are imported on first use so routes that never subscribe
  * (and the global navbar before a user is signed in) do not ship them in their bundle.
+ *
+ * The socket is closed while the tab is hidden and reopened when it becomes visible again: an
+ * open socket (or its 5 s reconnect loop) from a forgotten tab would otherwise keep the backend
+ * awake around the clock and burn through its hosting plan's instance hours.
  */
 export function subscribeToTopic(
   topic: string,
@@ -39,9 +43,21 @@ export function subscribeToTopic(
         onWebSocketClose: () => onStatus?.(false),
         onStompError: () => onStatus?.(false),
       });
-      client.activate();
+      // Chained so a quick hide/show waits for the previous deactivation to finish before
+      // activating again, and so the latest visibility state always wins.
+      let transition: Promise<void> = Promise.resolve();
+      const syncWithVisibility = () => {
+        transition = transition.then(() => {
+          if (cancelled) return;
+          if (document.visibilityState === "hidden") return client.deactivate();
+          client.activate();
+        });
+      };
+      document.addEventListener("visibilitychange", syncWithVisibility);
+      syncWithVisibility();
       stop = () => {
-        void client.deactivate();
+        document.removeEventListener("visibilitychange", syncWithVisibility);
+        void transition.then(() => client.deactivate());
       };
     })
     .catch(() => {

@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { m, AnimatePresence } from "framer-motion";
 import { authFetch } from "../lib/pitwall-auth";
 import { subscribeToTopic } from "../lib/stomp";
+import { useVisibleInterval } from "../lib/useVisibleInterval";
 import { F1, getTeamColor, tyre as tyreSpec, flagForCountry } from "../lib/f1-theme";
 import PitwallBackground from "../components/PitwallBackground";
 import Navbar from "../components/Navbar";
@@ -176,13 +177,7 @@ export default function TelemetryPage() {
     } catch (e) { console.error(e); }
   };
 
-  useEffect(() => {
-    // Fetch-on-mount then poll; checkLiveStatus only sets state after its await.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    checkLiveStatus();
-    const id = setInterval(checkLiveStatus, 15000);
-    return () => clearInterval(id);
-  }, []);
+  useVisibleInterval(checkLiveStatus, 15000);
 
   useEffect(() => {
     authFetch(`${API}/api/circuits`)

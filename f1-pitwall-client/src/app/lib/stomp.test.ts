@@ -20,8 +20,18 @@ vi.mock("sockjs-client", () => ({ default: vi.fn() }));
 import { setTokens, clearTokens } from "./pitwall-auth";
 import { subscribeToTopic } from "./stomp";
 
+let visibility: DocumentVisibilityState = "visible";
+Object.defineProperty(document, "visibilityState", { configurable: true, get: () => visibility });
+
+/** Simulates the user switching away from (or back to) the tab. */
+function setVisibility(state: DocumentVisibilityState) {
+  visibility = state;
+  document.dispatchEvent(new Event("visibilitychange"));
+}
+
 beforeEach(() => {
   created.length = 0;
+  visibility = "visible";
   clearTokens();
 });
 
@@ -40,8 +50,8 @@ describe("subscribeToTopic", () => {
     client.config.beforeConnect();
 
     expect(client.connectHeaders).toEqual({ Authorization: "Bearer access-1" });
+    await vi.waitFor(() => expect(client.activate).toHaveBeenCalledOnce());
     expect(client.deactivate).not.toHaveBeenCalled();
-    expect(client.activate).toHaveBeenCalledOnce();
   });
 
   it("re-reads the token on each reconnect so a refreshed token is used", async () => {
@@ -87,7 +97,7 @@ describe("subscribeToTopic", () => {
 
     stop();
 
-    expect(client.deactivate).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(client.deactivate).toHaveBeenCalledOnce());
   });
 
   it("never connects when unsubscribed before the STOMP chunks finish loading", async () => {
@@ -98,5 +108,44 @@ describe("subscribeToTopic", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(created).toHaveLength(0);
+  });
+
+  it("disconnects while the tab is hidden and reconnects when it is visible again", async () => {
+    setTokens("a", "r");
+    const { client } = await start("/topic/telemetry", () => {});
+    await vi.waitFor(() => expect(client.activate).toHaveBeenCalledOnce());
+
+    setVisibility("hidden");
+    await vi.waitFor(() => expect(client.deactivate).toHaveBeenCalledOnce());
+    expect(client.activate).toHaveBeenCalledOnce();
+
+    setVisibility("visible");
+    await vi.waitFor(() => expect(client.activate).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not connect a tab that starts hidden until it becomes visible", async () => {
+    setTokens("a", "r");
+    visibility = "hidden";
+    const { client } = await start("/topic/telemetry", () => {});
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(client.activate).not.toHaveBeenCalled();
+
+    setVisibility("visible");
+    await vi.waitFor(() => expect(client.activate).toHaveBeenCalledOnce());
+  });
+
+  it("stops following visibility once unsubscribed", async () => {
+    setTokens("a", "r");
+    const { stop, client } = await start("/topic/telemetry", () => {});
+    await vi.waitFor(() => expect(client.activate).toHaveBeenCalledOnce());
+    stop();
+    await vi.waitFor(() => expect(client.deactivate).toHaveBeenCalledOnce());
+
+    setVisibility("hidden");
+    setVisibility("visible");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(client.activate).toHaveBeenCalledOnce();
+    expect(client.deactivate).toHaveBeenCalledOnce();
   });
 });
